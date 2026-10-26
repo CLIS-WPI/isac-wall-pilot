@@ -10,3 +10,97 @@ Each entry: what changed, why, and which BRIEF section it affects.
   `ImportError: libatomic.so.1: cannot open shared object file`). Verified on
   this server with Sionna 2.2.0 / Mitsuba 3.9.1 / Dr.Jit 1.5.0.
 - **BRIEF section:** §3.2 Baseline Dockerfile.
+
+## D2 — Wall material is the Sionna finite-thickness slab with default thickness
+
+- **Type:** interpretation.
+- **What:** The wall uses Sionna's `RadioMaterial` finite-thickness
+  single-layer slab model. The thickness is the API default
+  `0.10000000149011612 m` as realized by Dr.Jit, recorded in
+  `configs/pilot.yaml` as `wall.thickness_m`; it is a fixed controlled
+  parameter and is not swept. Slab coefficients are evaluated at 3.5 GHz for
+  incidence angles `0, 26.565, 45, 63.435` degrees measured from the inward
+  wall normal and written to `results/phase2/material_reference.json`.
+- **Why:** Phase 1 showed that `PathSolver` reflection coefficients match
+  `itu_coefficients_single_layer_slab`, not the simplified single-interface
+  Fresnel coefficients. The default thickness is part of the executed material
+  object, so making it explicit and fixed avoids an unreported wall-loss
+  degree of freedom.
+- **BRIEF section:** §5.1 nominal physical scene; §7.1 actual Sionna
+  components; §9.2 twin-guided wall prediction.
+- **Phase 1 evidence:** `RadioMaterial` signature has `thickness=0.1`;
+  creating the pilot material and printing `thickness` gave
+  `0.10000000149011612`. At 3.5 GHz,
+  `complex_relative_permittivity` gave `eta=[5-0.102715j]`. Executed slab
+  checks matched RT:
+  `r_TE=-0.2030512689+0.1115346686j` vs slab
+  `-0.2030507326+0.1115333885j` (abs error `1.387875e-6`) at the 45-degree
+  wall case, and `r_TE=-0.3660115766-0.2306077063j` vs slab
+  `-0.3660115600-0.2306076884j` (abs error `2.441216e-8`) at normal
+  incidence. The executed function returns `(r_te, r_tm, t_te, t_tm)`.
+
+## D3 — Solver flags and seed handling are explicit for every scientific run
+
+- **Type:** interpretation.
+- **What:** Every scientific `PathSolver` and `RCSSolver` construction uses
+  `refraction=False`, `diffraction=False`, `diffuse_reflection=False`,
+  `deterministic=True`, and an explicit seed from `configs/pilot.yaml`; no
+  scientific run passes `seed=None`. These keys are explicit in
+  `solver.path_solver` and, where supported, `solver.rcs_solver`.
+- **Why:** BRIEF §7.1 requires deterministic construction where supported and
+  explicit seeds; the primary model is specular-first-order unless a separate
+  labelled diagnostic says otherwise.
+- **BRIEF section:** §7.1 actual Sionna components; §13.1 staged runs;
+  §15 required validation tests.
+- **Phase 1 evidence:** `PathSolver` is constructed as
+  `PathSolver(deterministic=True)`; `deterministic` is not a `__call__`
+  argument. `PathSolver.__call__` accepts `refraction`, `diffraction`, and
+  `diffuse_reflection`; `RCSSolver.__call__` accepts `refraction` and
+  `seed` but has no `diffraction` or `diffuse_reflection` argument. Measured
+  deterministic solves with fixed seeds were exact in Phase 1. The unsupported
+  RCSSolver keys are therefore recorded as unavailable flags rather than passed
+  as invalid arguments; `RCSSolver` still uses `deterministic=True`,
+  `refraction=False`, and an explicit seed.
+
+## D4 — Primary additive model separates target paths from background and relay paths
+
+- **Type:** interpretation.
+- **What:** The primary additive model computes background clutter and the
+  gNB-relay/relay-gNB links with `PathSolver` on a blank scene containing no
+  target cube. Target-interacting paths come only from `RCSSolver` with the
+  target present. Occlusion is a separate labelled check, not part of the
+  primary additive `H_target + H_background + y_relay` construction.
+- **Why:** BRIEF §7.1 assigns `RCSSolver` to target-interacting sensing paths
+  and `PathSolver` to background and relay links; mixing a target scatterer
+  into the background solve would double count or alter the background.
+- **BRIEF section:** §7.1 actual Sionna components; §7.2 received-signal
+  model.
+- **Phase 1 evidence:** `RCSSolver` returned only target-interacting paths,
+  and the target scattering event counts toward `max_depth`. A
+  `ConstantRCSSensingTarget` at the LoS midpoint blocked ordinary
+  `PathSolver` (`valid` changed from `1` to `0`), demonstrating that the two
+  solves must not share the same target-present scene for the primary model.
+
+## D5 — Transmit steering is `v(phi)=conj(a_TX(phi))`
+
+- **Type:** interpretation.
+- **What:** The planner uses
+  `v(phi) = conj(a_TX(phi))`, with
+  `a_TX(phi)_m = exp(+j 2*pi/lambda * p_m . k(phi)) / sqrt(M)`, and reports
+  physical directional gain as `|v(phi)^H w|^2` exactly as in BRIEF §9.3.
+  Code uses this order for beam construction and the RT adapter; it does not
+  take an extra conjugate of the Sionna channel when evaluating `h @ w`.
+- **Why:** Phase 1 measured that Sionna's synthetic-array TX response follows
+  the `+j` exponential convention and that matched transmit weights are
+  `conj(a_TX)`. This keeps the BRIEF formulas literal and avoids a sign
+  inversion.
+- **BRIEF section:** §9.2 twin-guided wall prediction; §9.3 wall beam and
+  finite-aperture leakage; §15 required validation tests.
+- **Phase 1 evidence:** `steering_vectors` returned unit-norm
+  `a_m=exp(+j*2*pi/lambda*d_m.r_hat)/sqrt(M)` and synthetic-array RT phases
+  matched with TX error `5.761645e-6`. Phase 2 adapter validation with
+  `synthetic_array=True` and `h @ w` measured peaks: requested
+  `-45 -> -45`, `-20 -> -20`, `0 -> 0`, `26.565 -> 27`, `45 -> 45`
+  degrees on the forward visible arc. With `synthetic_array=False`, tested
+  `Paths.a` phases were zero for this configuration, so that mode is not used
+  for beam validation.

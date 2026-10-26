@@ -628,3 +628,80 @@ wall x=8: L=16.000000000 m, cos(theta)=1.0
   geometries; the corresponding slab `r_TM` values are the negative at normal
   incidence. Do not substitute the simplified single-interface Fresnel
   coefficients for the RT slab coefficients.
+
+## Phase 2 — wall material default and slab coefficients
+
+Executed:
+
+```python
+print(inspect.signature(RadioMaterial))
+material = RadioMaterial(name="phase2-default-thickness")
+print(material.thickness, float(material.thickness[0]))
+omega = 2.0 * math.pi * 3.5e9
+eta = complex_relative_permittivity(mi.Float(5.0), mi.Float(0.02), mi.Float(omega))
+print(eta)
+r_te, r_tm, t_te, t_tm = itu_coefficients_single_layer_slab(
+    mi.Float(math.cos(math.radians(45.0))),
+    eta,
+    mi.Float(float(material.thickness[0])),
+    mi.Float(0.0856549814),
+)
+print(r_te, r_tm)
+```
+
+```
+(name: str | None = None, thickness: float | drjit.cuda.ad.Float | None = 0.1,
+ relative_permittivity: float | drjit.cuda.ad.Float = 1.0,
+ conductivity: float | drjit.cuda.ad.Float = 0.0,
+ scattering_coefficient: float | drjit.cuda.ad.Float = 0.0,
+ xpd_coefficient: float | drjit.cuda.ad.Float = 0.0,
+ scattering_pattern: str = 'lambertian',
+ frequency_update_callback: Optional[Callable[[drjit.cuda.ad.Float], Tuple[drjit.cuda.ad.Float, drjit.cuda.ad.Float]]] = None,
+ color: Optional[Tuple[float, float, float]] = None,
+ props: mitsuba.Properties | None = None, **kwargs)
+thickness [0.1] 0.10000000149011612
+eta [5-0.102715j]
+slab45 [-0.203053+0.111538j] [0.0855331-0.053198j]
+```
+
+- The configured D2 thickness is the realized default
+  `0.10000000149011612 m`, not the decimal `0.1`; this is recorded exactly in
+  `configs/pilot.yaml` and `results/phase2/material_reference.json`.
+- `itu_coefficients_single_layer_slab` returns
+  `(r_te, r_tm, t_te, t_tm)` as a tuple of Dr.Jit complex scalars. The printed
+  values above are rounded by Dr.Jit's display; the full JSON reference values
+  are generated from `.real[0]` and `.imag[0]`.
+
+## Phase 2 — synthetic-array RT adapter for D5
+
+Executed with a 16-element y-axis ULA at 3.5 GHz, two receivers at 0 and 45
+degrees, `PathSolver(deterministic=True)`, `max_depth=0`, one LoS path:
+
+```python
+paths = PathSolver(deterministic=True)(
+    scene, max_depth=0, synthetic_array=synthetic, los=True,
+    specular_reflection=False, diffuse_reflection=False,
+    refraction=False, diffraction=False, seed=3101,
+)
+a = torch.as_tensor(paths.a[0]) + 1j * torch.as_tensor(paths.a[1])
+print(tuple(a.shape))
+print(torch.angle(a[1, 0, 0, :, 0]).mul(180 / math.pi).tolist())
+```
+
+```
+synthetic False a_shape (2, 1, 1, 16, 1)
+rx 1 phase0deg [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+synthetic True  a_shape (2, 1, 1, 16, 1)
+rx 1 phase0deg [125.40576934814453, -107.31503295898438, 19.96424102783203, 147.24351501464844, -85.477294921875, 41.80194854736328, 169.0811767578125, -63.639610290527344, 63.639610290527344, -169.0811767578125, -41.80194854736328, 85.477294921875, -147.24351501464844, -19.96424102783203, 107.31503295898438, -125.40576934814453]
+```
+
+- `Paths.a` is `(2, num_rx, num_tx, num_ant, num_paths)` for real/imag when
+  `synthetic_array=True`; reshape the 16-element axis before applying beam
+  weights.
+- `synthetic_array=False` applies the array response per element in this
+  configuration and the tested `Paths.a` phases were all zero. Use
+  `synthetic_array=True` for the D5 validation adapter, then evaluate
+  `h @ w` with `v(phi)=conj(a_TX(phi))`; do not add a second conjugate.
+- The y-axis ULA has front-back ambiguity. The Phase 2 validation ring uses
+  the forward visible arc `[-90, 90]` degrees; a full 360-degree ring produces
+  aliased peaks at both `phi` and `180-phi`.

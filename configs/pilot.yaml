@@ -1,4 +1,348 @@
-# Filled in Phase 2 with every physical, waveform, statistical, and device
-# setting from BRIEF §5.1, §6.1, §6.4, §8.2, §13.1, and the seeds.
-# Intentionally empty in Phase 0: no settings are invented before the
-# geometry and convention tests of Phase 2 establish them.
+schema_version: 1
+phase: 2
+brief_sections:
+  geometry: ["5", "5.1", "5.2", "5.3"]
+  waveform: ["6.1", "6.2", "6.3", "6.4"]
+  map: ["8.2"]
+  beams: ["9.3", "12.3"]
+  statistics: ["13.1"]
+  tests: ["15"]
+
+constants:
+  speed_of_light_m_per_s: 299792458.0
+  boltzmann_j_per_k: 1.380649e-23
+  reference_temperature_k: 290.0
+
+device:
+  backend: cuda
+  index: 0
+  require_name_substring: H100
+  mitsuba_variant_prefix: cuda
+  main_dtype: complex64
+  analytical_dtype: complex128
+  main_float_dtype: float32
+  analytical_float_dtype: float64
+  require_cuda: true
+  deterministic: true
+
+rf:
+  carrier_frequency_hz: 3.5e9
+  baseline_bandwidth_profile: baseline
+  profiles:
+    baseline:
+      fft_size: 2048
+      subcarrier_spacing_hz: 60000.0
+      cp_length: 256
+      occupied_bandwidth_hz: 122880000.0
+    bw61:
+      fft_size: 1024
+      subcarrier_spacing_hz: 60000.0
+      cp_length: 128
+      occupied_bandwidth_hz: 61440000.0
+    bw246:
+      fft_size: 4096
+      subcarrier_spacing_hz: 60000.0
+      cp_length: 512
+      occupied_bandwidth_hz: 245760000.0
+
+physical:
+  gnb_position_m: [0.0, 0.0, 2.0]
+  candidate_position_m: [60.0, 0.0, 2.0]
+  relay_position_m: [30.0, 0.0, 2.0]
+  candidate_velocity_m_per_s: [0.0, 0.0, 0.0]
+  relay_velocity_m_per_s: [0.0, 0.0, 0.0]
+  walls:
+    positive:
+      offset_m: 15.0
+      inward_normal: [0.0, -1.0, 0.0]
+      x_min_m: -10.0
+      x_max_m: 130.0
+      z_min_m: 0.0
+      z_max_m: 12.0
+    negative:
+      offset_m: -15.0
+      inward_normal: [0.0, 1.0, 0.0]
+      x_min_m: -10.0
+      x_max_m: 130.0
+      z_min_m: 0.0
+      z_max_m: 12.0
+
+arrays:
+  tx:
+    num_elements: 16
+    spacing_wavelengths: 0.5
+    axis: y
+    broadside_azimuth_deg: 0.0
+    pattern: iso
+    polarization: V
+    element_pattern: isotropic
+  rx:
+    num_rows: 1
+    num_cols: 1
+    vertical_spacing: 0.5
+    horizontal_spacing: 0.5
+    pattern: iso
+    polarization: V
+
+wall:
+  material_model: sionna_slab
+  thickness_m: 0.10000000149011612
+  api_default_thickness_m: 0.1
+  relative_permittivity: 5.0
+  conductivity_s_per_m: 0.02
+  scattering_coefficient: 0.0
+  xpd_coefficient: 0.0
+  reference_frequency_hz: 3.5e9
+  reference_incidence_angles_deg: [0.0, 26.565, 45.0, 63.435]
+  incidence_angle_convention: from_wall_normal
+  controlled_parameter: true
+  swept: false
+
+target:
+  model: constant_rcs_non_depolarizing_point
+  rcs_m2: 1.0
+  velocity_m_per_s: [0.0, 0.0, 0.0]
+
+relay:
+  model: idealized_point_radio
+  velocity_m_per_s: [0.0, 0.0, 0.0]
+  receiver_noise_figure_db: 7.0
+  max_average_transmit_power_dbm: 10.0
+  hardware_impairments: excluded
+  housing_scattering: excluded
+
+waveform:
+  profiles:
+    - name: baseline
+      fft_size: 2048
+      subcarrier_spacing_hz: 60000.0
+      cp_length: 256
+      num_symbols: 64
+      occupied_bandwidth_hz: 122880000.0
+      sample_rate_hz: 122880000.0
+      symbol_duration_s: 1.875e-05
+      action_duration_s: 0.0012
+    - name: bw61
+      fft_size: 1024
+      subcarrier_spacing_hz: 60000.0
+      cp_length: 128
+      num_symbols: 64
+      occupied_bandwidth_hz: 61440000.0
+      sample_rate_hz: 61440000.0
+      symbol_duration_s: 1.875e-05
+      action_duration_s: 0.0012
+    - name: bw246
+      fft_size: 4096
+      subcarrier_spacing_hz: 60000.0
+      cp_length: 512
+      num_symbols: 64
+      occupied_bandwidth_hz: 245760000.0
+      sample_rate_hz: 245760000.0
+      symbol_duration_s: 1.875e-05
+      action_duration_s: 0.0012
+  probe:
+    modulation: QPSK
+    unit_modulus: true
+    fresh_per_action: true
+    phase_continuity: true
+    fft_convention: unitary_orthonormal
+    subcarrier_occupancy: full_contiguous
+  nominal_total_power_dbm: 10.0
+  power_dbm_sweep: [-20.0, -10.0, 0.0, 10.0, 20.0, 30.0]
+  power_sweep_holds_channel_fixed: true
+  equal_power_and_duration: true
+  receiver_noise_figure_db: 7.0
+  receiver_temperature_k: 290.0
+  baseline_doppler_hz: 0.0
+  bandwidth_comparison_profiles: [baseline, bw61, bw246]
+  power_relative_tolerance: 0.005
+
+noise:
+  model: proper_complex_gaussian
+  variance_convention: complex_sample_variance_before_fft
+  receiver_noise_figure_db: 7.0
+  relay_noise_figure_db: 7.0
+  temperature_k: 290.0
+  noise_only_verification: true
+
+geometry_reference:
+  candidate_range_m: 60.0
+  relay_range_m: 30.0
+  wall_offset_m: 15.0
+  wall_departure_candidate_deg: 26.565051
+  wall_departure_relay_deg: 45.0
+  candidate_direct_round_trip_delay_ns: 400.276914
+  relay_added_delay_ns: 200.138457
+  target_wall_direct_return_delay_ns: 423.900055
+  relay_wall_plus_replay_delay_ns: 441.726946
+  wall_delay_difference_ns: 17.826891
+  fraunhofer_distance_m_approx: 9.64
+  delay_bin_spacing_ns: 8.138021
+  latency_floor_ns: 20.0
+
+map:
+  sigma_map_m: [0.0, 0.25, 0.5, 1.0, 2.0]
+  material_relative_change: [-0.2, 0.2]
+  wall_translation: coherent_whole_surface
+  preserve_wall_dimensions: true
+  reject_invalid_corridor: true
+  planner_knows_sigma_map: true
+  true_wall_offset_hidden: true
+
+solver:
+  id: 20260201
+  path_solver:
+    deterministic: true
+    refraction: false
+    diffraction: false
+    diffuse_reflection: false
+    seed: 20260201
+    seed_policy: explicit_from_config
+  rcs_solver:
+    deterministic: true
+    refraction: false
+    diffraction: false
+    diffuse_reflection: false
+    seed: 20260201
+    seed_policy: explicit_from_config
+  los_and_specular_per_experiment: true
+  max_depth_per_experiment: true
+  forbidden_seed_none: true
+
+primary_model:
+  model: additive_point_target
+  background_clutter_source: path_solver_blank_scene
+  relay_downlink_source: path_solver_blank_scene
+  relay_uplink_source: path_solver_blank_scene
+  target_source: rcs_solver
+  target_cube_in_path_solver: false
+  target_induced_occlusion: separate_labeled_check
+  blank_scene_common_to_both_worlds: true
+
+steering:
+  convention: v_phi_equals_conj_a_tx_phi
+  array_response_phase: exp_plus_j_2pi_over_lambda_p_dot_k
+  phase_sign: 1
+  physical_gain: abs_v_hermitian_w_squared
+  matched_tx_weights: conj_a_tx
+  array_origin: array_center
+  normalization: unit_l2_steering_vector
+  reference_element_index: 0
+
+beam:
+  num_robust_samples: 257
+  projected_norm_floor: 0.001
+  common_reference_phase_alignment: true
+  equal_nonnegative_weights: true
+  uncertainty:
+    sigma_map_m: 1.0
+    sigma_candidate_range_m: 0.0
+  map_free:
+    angles_deg: [-60.0, -50.0, -40.0, -30.0, -20.0, -10.0, 10.0, 20.0, 30.0, 40.0, 50.0, 60.0]
+    coarse_exploration_angles_deg: [-50.0, -30.0, 30.0, 50.0]
+    coarse_symbols: 8
+    refinement_symbols: 16
+    refinement_step_deg: 10.0
+    total_extra_symbols: 64
+
+validation:
+  rt_adapter:
+    ring_radius_m: 50.0
+    receiver_spacing_deg: 1.0
+    visible_arc_deg: [-90.0, 90.0]
+    requested_phi_deg: [-45.0, -20.0, 0.0, 26.565, 45.0]
+    peak_tolerance_deg: 1.0
+    synthetic_array: true
+  null_depth_min_db: -100.0
+  beam_power_relative_tolerance: 1.0e-6
+  geometry_abs_tolerance: 5.0e-7
+  lut_rt_relative_tolerance: 1.0e-3
+
+statistics:
+  validation:
+    deterministic_checks: true
+    environment_checks: true
+    selected_time_domain_checks: true
+  smoke:
+    sigma_map_m: [0.0, 0.5, 1.0]
+    worlds: [target, replay]
+    core_beam_settings: true
+    noise_records_per_case: 16
+    infer_significance: false
+  pilot:
+    calibration_geometries: 12
+    heldout_geometries: 24
+    candidate_distance_m_range: [50.0, 70.0]
+    relay_distance_m_range: [20.0, 40.0]
+    true_corridor_half_width_m_range: [12.0, 18.0]
+    target_relay_collinear: true
+    map_error_settings: [0.0, 0.25, 0.5, 1.0, 2.0]
+    map_error_realizations_per_setting: 4
+    noise_probe_realizations_per_world: 32
+    cache_compact_path_data: true
+    primary_power_dbm: 10.0
+    primary_bandwidth_profile: baseline
+    feasible_direct_matched_fixed_relay_gain: true
+    equal_budget: true
+    confidence_level: 0.95
+    heldout_requires_approval: true
+
+stress:
+  one_factor_at_a_time: true
+  power_dbm: [-20.0, -10.0, 0.0, 10.0, 20.0, 30.0]
+  bandwidth_profiles: [baseline, bw61, bw246]
+  material_relative_change: [-0.2, 0.2]
+  rcs_ratio_db: [-6.0, 6.0]
+  relay_max_average_power_dbm: 10.0
+  blockage_stress_set: labeled
+
+output:
+  material_reference: results/phase2/material_reference.json
+  geometry_reference: results/phase2/geometry_reference.json
+  beam_reference: results/phase2/beam_reference.json
+  waveform_reference: results/phase2/waveform_reference.json
+
+seeds:
+  policy: explicit_per_stream_never_none
+  master: 20260201
+  streams:
+    physical_geometry:
+      calibration: [1101, 1102, 1103, 1104, 1105, 1106, 1107, 1108, 1109, 1110, 1111, 1112]
+      heldout: [1201, 1202, 1203, 1204, 1205, 1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223, 1224]
+    twin_error:
+      calibration: [2101, 2102, 2103, 2104, 2105, 2106, 2107, 2108, 2109, 2110, 2111, 2112]
+      heldout: [2201, 2202, 2203, 2204, 2205, 2206, 2207, 2208, 2209, 2210, 2211, 2212, 2213, 2214, 2215, 2216, 2217, 2218, 2219, 2220, 2221, 2222, 2223, 2224]
+    probe_symbols:
+      calibration: [3101, 3102, 3103, 3104, 3105, 3106, 3107, 3108, 3109, 3110, 3111, 3112]
+      heldout: [3201, 3202, 3203, 3204, 3205, 3206, 3207, 3208, 3209, 3210, 3211, 3212, 3213, 3214, 3215, 3216, 3217, 3218, 3219, 3220, 3221, 3222, 3223, 3224]
+    receiver_noise:
+      calibration: [4101, 4102, 4103, 4104, 4105, 4106, 4107, 4108, 4109, 4110, 4111, 4112]
+      heldout: [4201, 4202, 4203, 4204, 4205, 4206, 4207, 4208, 4209, 4210, 4211, 4212, 4213, 4214, 4215, 4216, 4217, 4218, 4219, 4220, 4221, 4222, 4223, 4224]
+    relay_noise:
+      calibration: [5101, 5102, 5103, 5104, 5105, 5106, 5107, 5108, 5109, 5110, 5111, 5112]
+      heldout: [5201, 5202, 5203, 5204, 5205, 5206, 5207, 5208, 5209, 5210, 5211, 5212, 5213, 5214, 5215, 5216, 5217, 5218, 5219, 5220, 5221, 5222, 5223, 5224]
+    diagnostic_beam_selection:
+      calibration: [6101, 6102, 6103, 6104, 6105, 6106, 6107, 6108, 6109, 6110, 6111, 6112]
+      heldout: [6201, 6202, 6203, 6204, 6205, 6206, 6207, 6208, 6209, 6210, 6211, 6212, 6213, 6214, 6215, 6216, 6217, 6218, 6219, 6220, 6221, 6222, 6223, 6224]
+
+decisions:
+  D2:
+    type: interpretation
+    brief_section: "5.1,7.1,9.2"
+    choice: sionna_default_radio_material_slab
+    config_key: wall
+  D3:
+    type: interpretation
+    brief_section: "7.1,13.1,15"
+    choice: explicit_flags_and_seed
+    config_key: solver
+  D4:
+    type: interpretation
+    brief_section: "7.1,7.2"
+    choice: blank_scene_paths_plus_rcs_target
+    config_key: primary_model
+  D5:
+    type: interpretation
+    brief_section: "9.2,9.3,15"
+    choice: v_equals_conj_a_tx
+    config_key: steering
