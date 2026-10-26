@@ -42,12 +42,14 @@ It writes `environment.json` and `preflight.log` under the output directory.
 ## Dependency freeze
 
 ```bash
-scripts/drun.sh pip freeze > requirements.lock.txt
+scripts/drun.sh sh -c 'pip freeze > /workspace/results/requirements.lock.txt'
+cp results/requirements.lock.txt requirements.lock.txt
 ```
 
-The NVIDIA CUDA base image prints a 15-line licence banner on container start,
-so that banner precedes the freeze output. The committed `requirements.lock.txt`
-is the exact freeze with only those banner lines removed.
+The freeze is written inside the container because the NVIDIA CUDA base image
+prints a licence banner on container startup that would otherwise contaminate
+the redirected stdout. The committed `requirements.lock.txt` is the unedited
+in-container freeze.
 
 ## Development loop
 
