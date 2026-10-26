@@ -42,7 +42,12 @@ class PathChannel:
     num_rx_antennas: int
     num_tx_antennas: int
 
-    def cfr(self, profile: OfdmProfile) -> torch.Tensor:
+    def cfr(
+        self,
+        profile: OfdmProfile,
+        *,
+        tau_float64: bool = False,
+    ) -> torch.Tensor:
         if self.a.ndim != 6 or self.tau.ndim != 3:
             raise ChannelError(
                 f"{self.name}: unexpected CIR shapes {self.a.shape}, "
@@ -53,10 +58,14 @@ class PathChannel:
             profile.subcarrier_spacing_hz,
             device="cuda",
         )
+        tau = self.tau
+        if tau_float64:
+            freqs = freqs.to(torch.float64)
+            tau = tau.to(torch.float64)
         return cir_to_ofdm_channel(
             freqs,
             self.a.unsqueeze(0),
-            self.tau.unsqueeze(0),
+            tau.unsqueeze(0),
             normalize=False,
         )
 
@@ -102,19 +111,29 @@ class SionnaExperimentA:
     calibration: RelayCalibration
     profile: OfdmProfile
 
-    def target_cfr(self) -> torch.Tensor:
-        return self.target.cfr(self.profile)
+    def target_cfr(self, *, tau_float64: bool = False) -> torch.Tensor:
+        return self.target.cfr(self.profile, tau_float64=tau_float64)
 
-    def target_effective(self, weights: torch.Tensor) -> torch.Tensor:
-        return effective_response(self.target_cfr(), weights)
+    def target_effective(
+        self, weights: torch.Tensor, *, tau_float64: bool = False
+    ) -> torch.Tensor:
+        return effective_response(
+            self.target_cfr(tau_float64=tau_float64), weights
+        )
 
-    def relay_effective(self, weights: torch.Tensor) -> torch.Tensor:
+    def relay_effective(
+        self, weights: torch.Tensor, *, tau_float64: bool = False
+    ) -> torch.Tensor:
         if not self.calibration.feasible:
             raise ChannelError(
                 "relay calibration is infeasible at the configured power cap"
             )
-        downlink_cfr = self.downlink.cfr(self.profile)
-        uplink_cfr = self.uplink.cfr(self.profile)
+        downlink_cfr = self.downlink.cfr(
+            self.profile, tau_float64=tau_float64
+        )
+        uplink_cfr = self.uplink.cfr(
+            self.profile, tau_float64=tau_float64
+        )
         downlink = downlink_cfr[0, 0, 0, 0, :, 0, :]
         uplink = uplink_cfr[0, 0, :, 0, 0, 0, :]
         weights = weights.to(downlink.dtype)
@@ -369,6 +388,9 @@ def analytical_matched_channels(
     dtype: torch.dtype = torch.complex128,
     profile_name: str = "baseline",
 ) -> AnalyticalMatchedChannels:
+    if dtype not in (torch.complex64, torch.complex128):
+        raise ChannelError(f"unsupported analytical dtype {dtype}")
+    real_dtype = torch.float32 if dtype is torch.complex64 else torch.float64
     profile = profile_from_config(config, profile_name)
     tx_array = ArrayGeometry.from_config(config)
     rx_values = config.section("arrays", "gnb_rx")
@@ -381,29 +403,43 @@ def analytical_matched_channels(
     relay_range = float(config.get("physical", "relay_position_m")[0])
     sigma = float(config.get("target", "rcs_m2"))
     wavelength = config.wavelength_m
-    target_coefficient = (
+    target_coefficient = torch.tensor(
         wavelength
         * sqrt(sigma)
-        / ((4.0 * pi) ** 1.5 * candidate_range**2)
+        / ((4.0 * pi) ** 1.5 * candidate_range**2),
+        device="cuda",
+        dtype=real_dtype,
     )
-    downlink_coefficient = wavelength / (4.0 * pi * relay_range)
+    downlink_coefficient = torch.tensor(
+        wavelength / (4.0 * pi * relay_range),
+        device="cuda",
+        dtype=real_dtype,
+    )
     uplink_coefficient = downlink_coefficient
-    target_delay = 2.0 * candidate_range / config.speed_of_light
-    downlink_delay = relay_range / config.speed_of_light
-    uplink_delay = relay_range / config.speed_of_light
+    target_delay = torch.tensor(
+        2.0 * candidate_range / config.speed_of_light,
+        device="cuda",
+        dtype=real_dtype,
+    )
+    downlink_delay = torch.tensor(
+        relay_range / config.speed_of_light,
+        device="cuda",
+        dtype=real_dtype,
+    )
+    uplink_delay = downlink_delay
     added_delay = target_delay - downlink_delay - uplink_delay
     gain = target_coefficient / (downlink_coefficient * uplink_coefficient)
     freqs = subcarrier_frequencies(
         profile.fft_size,
         profile.subcarrier_spacing_hz,
         device="cuda",
-    ).to(torch.float64)
-    absolute_freqs = config.frequency_hz + freqs
+    ).to(real_dtype)
+    absolute_freqs = freqs + float(config.frequency_hz)
     tx_response = array_response(
-        0.0, tx_array, device="cuda", dtype=torch.complex128
+        0.0, tx_array, device="cuda", dtype=dtype
     )
     rx_response = array_response(
-        0.0, rx_array, device="cuda", dtype=torch.complex128
+        0.0, rx_array, device="cuda", dtype=dtype
     )
     target_phase = torch.exp(-2j * pi * absolute_freqs * target_delay)
     down_phase = torch.exp(-2j * pi * absolute_freqs * downlink_delay)
@@ -436,19 +472,20 @@ def analytical_matched_channels(
             f"target {tuple(target_cfr.shape)} and relay "
             f"{tuple(relay_cfr.shape)} CFR shapes differ"
         )
+    if not target_cfr.is_cuda or not relay_cfr.is_cuda:
+        raise ChannelError("analytical CFR tensors left CUDA")
     return AnalyticalMatchedChannels(
         target_cfr=target_cfr.to(dtype),
         relay_cfr=relay_cfr.to(dtype),
-        target_delay_s=target_delay,
-        downlink_delay_s=downlink_delay,
-        uplink_delay_s=uplink_delay,
-        added_delay_s=added_delay,
-        gain=complex(gain),
-        downlink_coefficient=downlink_coefficient,
-        target_coefficient=target_coefficient,
+        target_delay_s=float(target_delay.item()),
+        downlink_delay_s=float(downlink_delay.item()),
+        uplink_delay_s=float(uplink_delay.item()),
+        added_delay_s=float(added_delay.item()),
+        gain=complex(gain.item()),
+        downlink_coefficient=float(downlink_coefficient.item()),
+        target_coefficient=float(target_coefficient.item()),
         profile=profile,
     )
-
 
 def effective_response(cfr: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
     if cfr.ndim == 3:

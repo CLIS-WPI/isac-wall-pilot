@@ -76,9 +76,12 @@ def array_response(
     device: str = "cuda",
     dtype: torch.dtype = torch.complex128,
 ) -> torch.Tensor:
-    positions = array.positions_m(device=device, dtype=torch.float64)
+    if dtype not in (torch.complex64, torch.complex128):
+        raise BeamError(f"unsupported steering dtype {dtype}")
+    real_dtype = torch.float32 if dtype is torch.complex64 else torch.float64
+    positions = array.positions_m(device=device, dtype=real_dtype)
     phi = torch.tensor(
-        np.deg2rad(float(phi_deg)), device=device, dtype=torch.float64
+        np.deg2rad(float(phi_deg)), device=device, dtype=real_dtype
     )
     direction = torch.stack(
         [torch.cos(phi), torch.sin(phi), torch.zeros_like(phi)]

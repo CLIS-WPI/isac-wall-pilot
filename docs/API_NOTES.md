@@ -798,3 +798,33 @@ True  (2, 1, 1, 16, 1) (2, 1, 1)       [125.4058837890625, -107.31492614746094, 
   `[num_rx, num_tx, num_paths]` and the per-element array phase is applied to
   `Paths.a`. This is the mode used for the D5 RT adapter and all Phase 3
   Experiment A solves. `synthetic_array=False` is explained but not used.
+
+## Phase 3 fix-up — Sionna residual with float64 delays
+
+Executed with the nominal 16/1/16 Experiment A links and the baseline 2048
+subcarriers. The CFR was rebuilt after casting `Paths.tau` to `float64`; the
+complex64 path coefficients and calibration gain were left unchanged.
+
+```python
+target32 = experiment.target_effective(weights)
+relay32 = experiment.relay_effective(weights)
+target64 = experiment.target_effective(weights, tau_float64=True)
+relay64 = experiment.relay_effective(weights, tau_float64=True)
+print(target32.dtype, target64.dtype,
+      ((target32 - relay32).abs() / target32.abs()).max().item(),
+      ((target64 - relay64).abs() / target64.abs()).max().item())
+```
+
+```
+torch.complex64 torch.complex128 8.310603334393818e-06 8.66097007216447e-06
+```
+
+- `cir_to_ofdm_channel` derives its real dtype from `tau.dtype`. Promoting
+  `tau` to `float64` therefore promotes the exponential and CFR to
+  `complex128`, but cannot recover precision already lost in the complex64
+  `Paths.a` coefficients and the complex64 relay calibration gain.
+- The measured maximum error increased from `8.310603e-6` to `8.661e-6`, so
+  float32 storage of `tau` is not the limiting source. The residual is
+  dominated by roundoff in the per-element complex64 path coefficients, their
+  array phases, and the calibrated gain product. It remains well inside the
+  declared `1e-3` Sionna tolerance; no tolerance was changed.

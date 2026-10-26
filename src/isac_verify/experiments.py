@@ -70,6 +70,8 @@ class AnalyticalComparison:
     c64_errors: torch.Tensor
     c128_max_relative_error: float
     c64_max_relative_error: float
+    c128_family_max_relative_error: dict[str, float]
+    c64_family_max_relative_error: dict[str, float]
     c128_response_ratio_deviation: float
     c64_response_ratio_deviation: float
     num_beams: int
@@ -79,6 +81,8 @@ class AnalyticalComparison:
 class SionnaComparison:
     errors: torch.Tensor
     max_relative_error: float
+    family_max_relative_error: dict[str, float]
+    tau64_max_relative_error: float
     response_ratio_deviation: float
     target_power_w: torch.Tensor
     relay_power_w: torch.Tensor
@@ -97,6 +101,22 @@ class NoiseComparison:
     independent_ks_statistic: float
     independent_ks_pvalue: float
     forwarded_relay_noise_mean_power_w: float
+
+
+@dataclass(frozen=True)
+class RatioNoiseComparison:
+    num_records: int
+    num_symbols: int
+    feature_names: list[str]
+    target_means: torch.Tensor
+    target_stds: torch.Tensor
+    relay_means: torch.Tensor
+    relay_stds: torch.Tensor
+    ks_statistics: torch.Tensor
+    ks_pvalues: torch.Tensor
+    max_ks_statistic: float
+    min_ks_pvalue: float
+    max_abs_mean_difference: float
 
 
 def _random_beams(
@@ -193,6 +213,18 @@ def _response_ratio_deviation(
     return float((ratio - 1.0).abs().max().item())
 
 
+def _family_max_relative_error(
+    errors: torch.Tensor, actions: Sequence[BeamAction]
+) -> dict[str, float]:
+    per_beam = errors.max(dim=1).values
+    families: dict[str, list[float]] = {}
+    for index, action in enumerate(actions):
+        families.setdefault(action.kind, []).append(
+            float(per_beam[index].item())
+        )
+    return {name: max(values) for name, values in families.items()}
+
+
 def analytical_comparison(config: PilotConfig) -> AnalyticalComparison:
     actions = beam_actions(config)
     weights = _ideal_weights(actions)
@@ -219,6 +251,12 @@ def analytical_comparison(config: PilotConfig) -> AnalyticalComparison:
         c64_errors=errors_64,
         c128_max_relative_error=float(errors_128.max().item()),
         c64_max_relative_error=float(errors_64.max().item()),
+        c128_family_max_relative_error=_family_max_relative_error(
+            errors_128, actions
+        ),
+        c64_family_max_relative_error=_family_max_relative_error(
+            errors_64, actions
+        ),
         c128_response_ratio_deviation=_response_ratio_deviation(
             target_128, relay_128
         ),
@@ -242,10 +280,19 @@ def sionna_comparison(
         config.get("experiment_a", "relative_error_floor_fraction")
     )
     errors = _relative_error_per_beam(target, relay, floor_fraction)
+    target_tau64 = setup.target_effective(weights, tau_float64=True)
+    relay_tau64 = setup.relay_effective(weights, tau_float64=True)
+    errors_tau64 = _relative_error_per_beam(
+        target_tau64, relay_tau64, floor_fraction
+    )
     return (
         SionnaComparison(
             errors=errors,
             max_relative_error=float(errors.max().item()),
+            family_max_relative_error=_family_max_relative_error(
+                errors, actions
+            ),
+            tau64_max_relative_error=float(errors_tau64.max().item()),
             response_ratio_deviation=_response_ratio_deviation(target, relay),
             target_power_w=target.abs().square().mean(dim=(1, 2)),
             relay_power_w=relay.abs().square().mean(dim=(1, 2)),
@@ -412,6 +459,93 @@ def noise_comparison(
         independent_ks_pvalue=float(ks.pvalue),
         forwarded_relay_noise_mean_power_w=float(
             relay_noise_record.abs().square().mean().item()
+        ),
+    )
+
+
+def ratio_noise_comparison(
+    config: PilotConfig, experiment: SionnaExperimentA
+) -> RatioNoiseComparison:
+    actions = beam_actions(config)
+    weights = torch.stack([action.weights for action in actions])
+    target = experiment.target_effective(weights)
+    relay = experiment.relay_effective(weights)
+    profile = experiment.profile
+    num_records = int(
+        config.get("experiment_a", "ratio_noise_records")
+    )
+    num_symbols = int(
+        config.get("experiment_a", "ratio_noise_symbols")
+    )
+    if num_records < 2 or num_symbols < 1:
+        raise ValidationError("ratio-noise record and symbol counts must be positive")
+    symbols = qpsk_symbols(
+        profile,
+        int(config.get("experiment_a", "ratio_symbol_seed")),
+    )[:num_symbols]
+    variance = noise_variance_w(config, profile.sample_rate_hz)
+    shape = (num_symbols, len(actions), target.shape[1], profile.fft_size)
+    ratio_records: dict[str, torch.Tensor] = {}
+    for world, response, base_seed in (
+        (
+            "target",
+            target,
+            int(config.get("experiment_a", "ratio_target_noise_seed")),
+        ),
+        (
+            "relay",
+            relay,
+            int(config.get("experiment_a", "ratio_relay_noise_seed")),
+        ),
+    ):
+        records = []
+        for record in range(num_records):
+            noise = proper_complex_noise(
+                shape,
+                variance,
+                base_seed + record,
+            )
+            measured = (
+                symbols[:, None, None, :]
+                * response[None, :, :, :]
+                + noise
+            )
+            beam_power = measured.abs().square().mean(dim=(0, 2, 3))
+            records.append((beam_power[1:] / beam_power[0]).detach())
+        ratio_records[world] = torch.stack(records)
+        del noise, measured, beam_power
+    target_records = ratio_records["target"]
+    relay_records = ratio_records["relay"]
+    target_means = target_records.mean(dim=0)
+    target_stds = target_records.std(dim=0, unbiased=True)
+    relay_means = relay_records.mean(dim=0)
+    relay_stds = relay_records.std(dim=0, unbiased=True)
+    ks_statistics = []
+    ks_pvalues = []
+    for index in range(target_records.shape[1]):
+        result = ks_2samp(
+            target_records[:, index].detach().cpu().numpy(),
+            relay_records[:, index].detach().cpu().numpy(),
+        )
+        ks_statistics.append(float(result.statistic))
+        ks_pvalues.append(float(result.pvalue))
+    statistics = torch.tensor(ks_statistics, dtype=torch.float64)
+    pvalues = torch.tensor(ks_pvalues, dtype=torch.float64)
+    feature_names = [action.name for action in actions[1:]]
+    return RatioNoiseComparison(
+        num_records=num_records,
+        num_symbols=num_symbols,
+        feature_names=feature_names,
+        target_means=target_means.detach().cpu(),
+        target_stds=target_stds.detach().cpu(),
+        relay_means=relay_means.detach().cpu(),
+        relay_stds=relay_stds.detach().cpu(),
+        ks_statistics=statistics,
+        ks_pvalues=pvalues,
+        max_ks_statistic=float(statistics.max().item()),
+        min_ks_pvalue=float(pvalues.min().item()),
+        max_abs_mean_difference=float(
+            (target_means - relay_means).abs().max().item()
         ),
     )
 
@@ -584,6 +718,7 @@ def run_validation(
     sionna, experiment = sionna_comparison(config)
     delays = delay_checks(config, experiment)
     noise = noise_comparison(config, experiment)
+    ratio_noise = ratio_noise_comparison(config, experiment)
     c128_tolerance = float(
         config.get("experiment_a", "analytical_c128_tolerance")
     )
@@ -636,11 +771,21 @@ def run_validation(
             ),
             "analytical_c128_max_relative_error": analytical.c128_max_relative_error,
             "analytical_c64_max_relative_error": analytical.c64_max_relative_error,
+            "analytical_c128_family_max_relative_error": (
+                analytical.c128_family_max_relative_error
+            ),
+            "analytical_c64_family_max_relative_error": (
+                analytical.c64_family_max_relative_error
+            ),
             "analytical_c128_tolerance": c128_tolerance,
             "analytical_c64_tolerance": c64_tolerance,
             "analytical_c128_response_ratio_deviation": analytical.c128_response_ratio_deviation,
             "analytical_c64_response_ratio_deviation": analytical.c64_response_ratio_deviation,
             "sionna_max_relative_error": sionna.max_relative_error,
+            "sionna_family_max_relative_error": (
+                sionna.family_max_relative_error
+            ),
+            "sionna_tau64_max_relative_error": sionna.tau64_max_relative_error,
             "sionna_tolerance": sionna_tolerance,
             "sionna_response_ratio_deviation": sionna.response_ratio_deviation,
             "rx_steering_max_relative_difference": (
@@ -664,6 +809,26 @@ def run_validation(
         },
         "calibration": experiment.calibration.as_dict(),
         "delays": delays,
+        "ratio_noise": {
+            "num_records": ratio_noise.num_records,
+            "num_symbols": ratio_noise.num_symbols,
+            "feature_names": ratio_noise.feature_names,
+            "target_means": ratio_noise.target_means,
+            "target_stds": ratio_noise.target_stds,
+            "relay_means": ratio_noise.relay_means,
+            "relay_stds": ratio_noise.relay_stds,
+            "ks_statistics": ratio_noise.ks_statistics,
+            "ks_pvalues": ratio_noise.ks_pvalues,
+            "max_ks_statistic": ratio_noise.max_ks_statistic,
+            "min_ks_pvalue": ratio_noise.min_ks_pvalue,
+            "max_abs_mean_difference": ratio_noise.max_abs_mean_difference,
+            "definition": (
+                "per non-direct beam action, ratio of mean measured power "
+                "over symbols, receive elements, and subcarriers to the "
+                "direct-beam measured power; target and relay use independent "
+                "proper-complex noise records"
+            ),
+        },
         "noise": {
             "variance_w": noise.variance_w,
             "relay_variance_w": noise.relay_variance_w,
@@ -691,6 +856,40 @@ def run_validation(
         f"{analytical.c64_max_relative_error:.3e}"
     )
     print(f"Sionna max relative error: {sionna.max_relative_error:.3e}")
+    print(
+        "Sionna max relative error with float64 tau: "
+        f"{sionna.tau64_max_relative_error:.3e}"
+    )
+    print(
+        "family max relative error (c128/c64/Sionna): "
+        f"direct={analytical.c128_family_max_relative_error['direct']:.3e}/"
+        f"{analytical.c64_family_max_relative_error['direct']:.3e}/"
+        f"{sionna.family_max_relative_error['direct']:.3e}; "
+        f"dither={analytical.c128_family_max_relative_error['dither']:.3e}/"
+        f"{analytical.c64_family_max_relative_error['dither']:.3e}/"
+        f"{sionna.family_max_relative_error['dither']:.3e}; "
+        f"random={analytical.c128_family_max_relative_error['random']:.3e}/"
+        f"{analytical.c64_family_max_relative_error['random']:.3e}/"
+        f"{sionna.family_max_relative_error['random']:.3e}"
+    )
+    print(
+        "ratio features: "
+        f"{ratio_noise.num_records} records x {ratio_noise.num_symbols} symbols, "
+        f"max KS={ratio_noise.max_ks_statistic:.6f}, "
+        f"min p={ratio_noise.min_ks_pvalue:.6f}, "
+        f"max |mean target-relay|={ratio_noise.max_abs_mean_difference:.6e}"
+    )
+    print(
+        "ratio mean/std ranges: target mean "
+        f"[{float(ratio_noise.target_means.min()):.6e}, "
+        f"{float(ratio_noise.target_means.max()):.6e}], "
+        f"target std [{float(ratio_noise.target_stds.min()):.6e}, "
+        f"{float(ratio_noise.target_stds.max()):.6e}], "
+        f"relay mean [{float(ratio_noise.relay_means.min()):.6e}, "
+        f"{float(ratio_noise.relay_means.max()):.6e}], "
+        f"relay std [{float(ratio_noise.relay_stds.min()):.6e}, "
+        f"{float(ratio_noise.relay_stds.max()):.6e}]"
+    )
     print(f"target CIR shape: {delays['target_cir_shape']}")
     print(f"downlink CIR shape: {delays['downlink_cir_shape']}")
     print(f"uplink CIR shape: {delays['uplink_cir_shape']}")
