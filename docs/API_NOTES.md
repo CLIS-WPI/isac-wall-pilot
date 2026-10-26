@@ -265,7 +265,7 @@ print(tuple(ra.shape), ra.device, ra.dtype, float(ra.abs().max()),
 - `RCSSolver` computes only paths that interact with a sensing target; the
   scattering event counts as one interaction, so `max_depth=1` restricts both
   legs to unobstructed LoS.
-- Target used: `ConstantRCSSensingTarget` (default cube geometry, RCS
+- Target used: `ConstantRCSSensingTarget` (`length=width=height=0.2 m`, RCS
   `sigma=1.0 m^2`, no cross-polarization, scattering point at the target
   centre). Targets are added with `scene.add(...)` and appear in
   `scene.sensing_targets`.
@@ -286,3 +286,345 @@ RCSSolver: valid=1 cir=(1, 1, 1, 1, 1, 1) device=cuda:0 |a|max=7.691267e-05 targ
 
 These are the actual values written to `results/preflight/environment.json` in
 Phase 0.
+
+## Phase 1 probe run
+
+Command (inside the repository, live source mount):
+
+```bash
+ISAC_DEV=1 scripts/drun.sh python scripts/api_probe.py
+```
+
+Final output:
+
+```
+status: PASS
+wrote results/phase1/api_probe.json
+PASS paths_and_angles
+PASS cir
+PASS los_amplitude_carrier_phase
+PASS cfr_and_normalization
+PASS reflection_and_material
+PASS rcs
+PASS synthetic_array
+PASS conversions
+PASS isac
+PASS array
+PASS frequency_callback
+PASS interop
+PASS determinism
+```
+
+The probe hard-fails on any mismatch; `results/phase1/api_probe.json` is the
+executed evidence file.
+
+## `Paths` angle, vertex, and interaction conventions
+
+Executed with the two-wall scene, `PathSolver()(scene, max_depth=1, seed=42)`:
+
+```python
+paths = PathSolver()(scene, max_depth=1, seed=42)
+print(paths.tau.shape, paths.theta_t.shape, paths.theta_r.shape,
+      paths.vertices.shape, paths.interactions.shape)
+print(paths.theta_t, paths.phi_t, paths.theta_r, paths.phi_r)
+```
+
+```
+(1, 1, 3) (1, 1, 3) (1, 1, 3) (1, 1, 1, 3, 3) (1, 1, 1, 3)
+[[[1.5708, 1.5708, 1.5708]]] [[[0.0000, 0.0000, 0.0000]]]
+[[[1.5708, 1.5708, 1.5708]]] [[[3.1416, 3.1416, 3.1416]]]
+```
+
+- `theta_t`, `phi_t`, `theta_r`, `phi_r`: `(num_rx, num_tx, num_paths)`,
+  float32 on `cuda:0`. Zenith `theta` is measured from `+z`; azimuth `phi` is
+  measured from `+x` toward `+y`.
+- Unit direction: `r_hat(theta, phi) = [sin(theta)cos(phi),
+  sin(theta)sin(phi), cos(theta)]`.
+- LoS TX `(-4,2,2)` to RX `(4,2,2)` along `+x`: TX departure
+  `theta_t=pi/2, phi_t=0`; RX arrival `theta_r=pi/2, phi_r=pi`. The RX angle
+  vector points from RX back toward TX.
+- `Paths.vertices`: `(max_depth, num_rx, num_tx, num_paths, 3)`. The LoS entry
+  is `[0,0,0]`; a reflection entry is the specular point. Measured wall points:
+  `[-2.18e-5, -2.0, 2.0000002]` and `[8.0, 1.9999998, 2.0]`.
+- `Paths.interactions`: `(max_depth, num_rx, num_tx, num_paths)`, uint32.
+  `InteractionType.NONE=0`, `SPECULAR=1`, `DIFFUSE=2`, `REFRACTION=4`,
+  `DIFFRACTION=8`, `SENSING=16`. LoS is all-zero in the first row; unused depth
+  slots are also zero.
+
+## `Paths.cir` and `Paths.cfr`
+
+`Paths.cir` signature (no amplitude-normalize argument):
+
+```
+(*, sampling_frequency: float = 1.0, num_time_steps: int = 1,
+ normalize_delays: bool = True, reverse_direction: bool = False,
+ out_type: Literal['drjit', 'jax', 'numpy', 'tf', 'torch'] = 'drjit')
+```
+
+`Paths.cir(normalize_delays=False)` measured for the two-wall scene:
+
+```
+a shape=(1, 1, 1, 1, 3, 1) dtype=torch.complex64 device=cuda:0
+tau shape=(1, 1, 3) dtype=torch.float32 device=cuda:0
+tau min=2.6685126996994768e-08 s max=5.3370253993989536e-08 s
+|a|max=0.0008520259289070964
+```
+
+`Paths.cfr` signature:
+
+```
+(frequencies: drjit.cuda.ad.Float, sampling_frequency: float = 1.0,
+ num_time_steps: int = 1, normalize_delays: bool = True,
+ normalize: bool = False, reverse_direction: bool = False,
+ out_type: Literal['drjit', 'jax', 'numpy', 'tf', 'torch'] = 'drjit')
+```
+
+- `Paths.a` is the passband coefficient without the propagation phase. For
+  LoS, `a` is real positive and equals `lambda/(4*pi*d)`.
+- `Paths.cir` multiplies `a` by `exp(-j*2*pi*f_c*tau)`, so it includes the
+  carrier phase. Measured LoS `a=8.5202593e-4`, `tau=2.6685127e-8 s`,
+  `cir` phase matches the carrier factor.
+- `Paths.cfr` expects baseband subcarrier frequencies; passing absolute
+  frequencies adds the carrier a second time. The probe measured an absolute-
+  versus-baseband CFR difference of `1.6172385e-3`, which is the expected
+  double-counting effect.
+- `Paths.cfr` output omits the singleton `num_paths` axis; shape is
+  `(1,1,1,1,1,2048)`. `cir_to_ofdm_channel` shape is
+  `(1,1,1,1,1,1,2048)`.
+
+## `subcarrier_frequencies` and `cir_to_ofdm_channel`
+
+```
+subcarrier_frequencies(num_subcarriers: int, subcarrier_spacing: float,
+                       precision: Optional[str] = None,
+                       device: Optional[str] = None) -> torch.Tensor
+
+cir_to_ofdm_channel(frequencies: torch.Tensor, a: torch.Tensor,
+                    tau: torch.Tensor, normalize: bool = False) -> torch.Tensor
+```
+
+Executed at 3.5 GHz, FFT 2048, SCS 60 kHz:
+
+```
+freqs shape=(2048,) dtype=torch.float32 device=cuda:0
+first_three=[-61440000.0, -61380000.0, -61320000.0] Hz
+last_three=[61260000.0, 61320000.0, 61380000.0] Hz
+center_pair=[-60000.0, 0.0] Hz
+```
+
+- Frequencies are baseband, centered around 0, with the expected FFT ordering.
+- `cir_to_ofdm_channel(freqs, a, tau, normalize=False)` equals
+  `Paths.cfr(freqs, normalize_delays=False, normalize=False)` to
+  `3.958549e-10` max absolute difference.
+- The subcarrier phase residual against `exp(-j*2*pi*f*tau)` is
+  `9.266216e-8` rad max.
+- `normalize=True` sets mean power to `1.0`; raw mean power was
+  `7.259482e-7`.
+
+## OFDM conversions
+
+Signatures:
+
+```
+ofdm_to_time_channel(h_f: torch.Tensor, l_min: int = 0,
+                     l_max: Optional[int] = None) -> torch.Tensor
+time_to_doppler_channel(h_t: torch.Tensor) -> torch.Tensor
+ofdm_to_delay_doppler_channel(h_f: torch.Tensor, l_min: int = 0,
+                              l_max: Optional[int] = None) -> torch.Tensor
+```
+
+Executed with FFT 2048, 64 symbols, SCS 60 kHz, integer delay `l0=10`:
+
+```
+ofdm_to_time_channel: input (1,1,1,1,1,64,2048)
+                      output (1,1,1,1,1,64,64)
+                      peak lag=10, peak value=1.0
+ofdm_to_time_channel(l_min=-10): output (1,1,1,1,1,64,74)
+                                  peak index=20
+time_to_doppler_channel: input (1,1,1,1,1,64,8)
+                         output (1,1,1,1,1,64,8)
+                         q0=2 peak index=34, center=32
+ofdm_to_delay_doppler_channel: input (1,1,1,1,1,64,2048)
+                               output (1,1,1,1,1,64,64)
+                               peak (q=34, l=10)
+```
+
+- `ofdm_to_time_channel` uses a centered subcarrier ordering and inverse-FFT
+  taps; `l_min` shifts the lag index.
+- `time_to_doppler_channel` centers Doppler bins; for 64 symbols, q=+2 maps to
+  index 34.
+- `ofdm_to_delay_doppler_channel` requires the complete time-frequency grid
+  `[..., num_time_steps, fft_size]`; it applies
+  `exp(+j*2*pi*n*l/N) * exp(-j*2*pi*b*q/S)` as measured.
+
+## `steering_vectors` and `angular_delay_doppler_spectrum`
+
+Signatures:
+
+```
+steering_vectors(positions: torch.Tensor, theta: float | torch.Tensor,
+                 phi: float | torch.Tensor, wavelength: float | torch.Tensor,
+                 *, mode: str = 'cartesian',
+                 precision: Optional[Literal['single', 'double']] = None)
+                 -> torch.Tensor
+
+angular_delay_doppler_spectrum(h_dd: torch.Tensor,
+                               rx_steering_vectors: torch.Tensor,
+                               tx_steering_vectors: torch.Tensor,
+                               *, mode: str = 'paired') -> torch.Tensor
+```
+
+Executed with `M=4`, `lambda=0.0856549814 m`, ULA along `y`:
+
+```
+paired scalar shape=(4,)
+cartesian scalar shape=(1, 1, 4)
+cartesian phi-array shape=(1, 2, 4)
+unit norm=1.0
+```
+
+- Formula: `a_m = exp(+j*2*pi/lambda * d_m . r_hat(theta, phi)) / sqrt(M)`.
+- Paired scalar returns `[M]`, not `[1,M]`; Cartesian scalar returns
+  `[1,1,M]`; Cartesian phi arrays add the corresponding axis.
+- RT synthetic-array phases match this convention for both TX departure and
+  RX arrival, with measured errors `5.761645e-6` (TX) and `4.270060e-6` (RX).
+- `angular_delay_doppler_spectrum` with `h_dd` shape `(1,1,4,1,4,1,1)` and
+  5x5 Cartesian scans returned `(1,1,5,1,5,1,1)`. Matched peak `1.0` at
+  `[0,0,3,0,1,0,0]` for RX `phi=0.6`, TX `phi=-0.4`; global max was `1.0`.
+- For a transmit beam, `a_TX` is the physical TX response; matched transmit
+  weights are `conj(a_TX)`. RX steering is `a_RX`.
+
+## `PlanarArray` 16-element ULA
+
+```
+PlanarArray(*, num_rows: int, num_cols: int, vertical_spacing: float = 0.5,
+            horizontal_spacing: float = 0.5, pattern: str, **kwargs)
+```
+
+Executed with `num_rows=1, num_cols=16, vertical_spacing=0.5,
+horizontal_spacing=0.5, pattern="iso", polarization="V"`:
+
+```
+num_ant=16 array_size=16
+normalized_positions shape=(3,16)
+normalized y (wavelengths)=[-3.75,-3.25,...,3.25,3.75]
+positions shape=(3,16), physical y=[-0.321206,...,0.321206] m
+x=z=0
+```
+
+- The ULA is along `y`, lies in the `y-z` plane at `x=0`, and has broadside
+  `+x`.
+- Element order increases with `y`: row 0, then columns 0..15.
+- `positions(wavelength)` returns physical positions in meters; normalized
+  positions are in wavelengths.
+
+## `Scene.frequency` and material callback
+
+```
+Scene.frequency setter: (self, f)
+callback: Callable[[mi.Float], Tuple[mi.Float, mi.Float]]
+```
+
+Executed callback `lambda f: (f/1e9, 0.01)`:
+
+```
+epsilon at 3.5 GHz=3.5, conductivity=0.01
+epsilon at 7 GHz=7.0, conductivity=0.01
+material.thickness=0.10000000149 m
+```
+
+- The frequency setter requires a positive frequency and calls
+  `frequency_update()` on every radio material.
+- `wavelength = speed_of_light/f`; LoS amplitude scales with wavelength, delay
+  does not. Measured `a_3.5GHz=8.520259e-4`, `a_7GHz=4.2601296e-4`, ratio
+  `2.0`; delay unchanged at `2.6685127e-8 s`.
+
+## RT to torch interop
+
+```
+mi.TensorXf.torch()                 # works
+torch.as_tensor(mi.TensorXf)        # also works
+```
+
+Measured `PathSolver` tensors:
+
+```
+a_real/a_imag: torch.float32 cuda:0 requires_grad=False
+tau: torch.float32 cuda:0 requires_grad=False
+valid: torch.bool cuda:0 requires_grad=False
+interactions: torch.uint32 cuda:0 requires_grad=False
+Paths.cir(out_type="torch"): complex64 cuda:0
+```
+
+No CPU round trip is needed. `interactions` is uint32; convert to int64 before
+using it as an index in torch (`index_cuda` is not implemented for uint32).
+
+## Determinism
+
+Executed two consecutive solves with the same seed, specular-only scene:
+
+```
+PathSolver deterministic=False: tau exact=True, a exact=True
+PathSolver deterministic=True:  tau exact=True, a exact=True
+RCSSolver deterministic=False:  tau exact=True, a exact=True
+RCSSolver deterministic=True:   tau exact=True, a exact=True
+```
+
+Sionna documents that a fixed seed alone is not a guarantee; use
+`deterministic=True` when bitwise reproducibility is required.
+
+## RCS depth, target occlusion, and sigma
+
+`RCSSolver` and `ConstantRCSSensingTarget` are imported from
+`sionna.rt.rcs`, not from `sionna.rt`.
+
+Executed with target `(0,5,2)`, `max_depth` varied:
+
+```
+depth 1: valid=1  interactions=[[16]]
+depth 2: valid=5  interactions include [[16,0], [1,16], ...]
+depth 3: valid=11 interactions include [[16,0,0], [1,16,0], [1,1,16], ...]
+target two-leg distance=10.0 m, tau=3.335640741e-8 s
+```
+
+- `max_depth` includes the sensing-target scattering event. Depth 1 is
+  target-only LoS; depth 2 adds one wall reflection on either leg; depth 3
+  adds two-wall combinations.
+- `ConstantRCSSensingTarget` uses `AbsorberRadioMaterial`; adding one at the
+  LoS midpoint blocked ordinary `PathSolver`: valid went from `1` to `0`.
+- `RCSSolver` with no sensing target raises
+  `ValueError: Scene has no sensing targets`; it does not return an empty path
+  set.
+- `ConstantRCSSensingTarget(name="target", sigma=1.0, ...)`: measured
+  `sigma=1.0 m^2`, position `[0,5,2]`. With `sigma=4.0`, `|a|` doubled:
+  `a_sigma_1=7.691268e-5`, `a_sigma_4=1.5382536e-4`, ratio `2.0`.
+
+## Reflection and material check
+
+Executed `PathSolver(max_depth=1)` with `scene.frequency=3.5 GHz`, material
+`eps_r=5.0`, `sigma=0.02 S/m`, thickness `0.1 m`, `lambda=0.0856549814 m`:
+
+```
+wall y=-2: L=11.313708499 m, cos(theta)=0.7071087094
+  a_RT / (lambda/(4*pi*L)) = -0.2030512689 + 0.1115346686j
+  slab r_TE                 = -0.2030507326 + 0.1115333885j
+  abs error=1.387875e-6
+
+wall x=8: L=16.000000000 m, cos(theta)=1.0
+  a_RT / (lambda/(4*pi*L)) = -0.3660115766 - 0.2306077063j
+  slab r_TE                 = -0.3660115600 - 0.2306076884j
+  abs error=2.441216e-8
+```
+
+- RT uses the finite-thickness slab:
+  `itu_coefficients_single_layer_slab(cos_theta, eta, d, wavelength)`, which
+  returns `(r_te, r_tm, t_te, t_tm)`.
+- `fresnel_reflection_coefficients_simplified` is a single-interface function
+  and is not what RT uses for these walls. Executed example at cos=0.70710678:
+  `r_te=-0.500061+0.0042787j`, `r_tm=0.250043-0.0042794j`.
+- `complex_relative_permittivity(eta_r, sigma, omega)` returns a Dr.Jit
+  `Complex2f`; `eta=[5-0.102715j]` at 3.5 GHz.
+- The measured V-polarized reflection coefficients match slab `r_TE` for both
+  geometries; the corresponding slab `r_TM` values are the negative at normal
+  incidence. Do not substitute the simplified single-interface Fresnel
+  coefficients for the RT slab coefficients.
