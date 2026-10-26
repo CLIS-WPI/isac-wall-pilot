@@ -17,6 +17,16 @@ def _preflight(args: argparse.Namespace) -> int:
     return run_preflight(require_h100=args.require_h100, output_path=args.output)
 
 
+def _validate(args: argparse.Namespace) -> int:
+    from .experiments import run_validation
+
+    return run_validation(
+        config_path=args.config,
+        require_h100=args.require_h100,
+        output_path=args.output,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="isac_verify",
@@ -39,6 +49,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="directory for environment.json and preflight.log",
     )
     preflight.set_defaults(handler=_preflight)
+
+    validate = subparsers.add_parser(
+        "validate",
+        help="run Phase 2 and Phase 3 deterministic validation checks",
+    )
+    validate.add_argument(
+        "--config",
+        default="configs/pilot.yaml",
+        help="pilot YAML configuration",
+    )
+    validate.add_argument(
+        "--require-h100",
+        action="store_true",
+        help="fail unless the visible GPU name contains H100",
+    )
+    validate.add_argument(
+        "--output",
+        default="results/validate",
+        help="directory for validation_summary.json and Experiment A figure",
+    )
+    validate.set_defaults(handler=_validate)
 
     return parser
 

@@ -19,7 +19,7 @@ from isac_verify.waveform import (
 
 def _uniform_weights(config: PilotConfig) -> torch.Tensor:
     power = dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
-    count = int(config.get("arrays", "tx", "num_elements"))
+    count = int(config.get("arrays", "gnb_tx", "num_elements"))
     return torch.full(
         (count,), (power / count) ** 0.5, dtype=torch.complex64, device="cuda"
     )

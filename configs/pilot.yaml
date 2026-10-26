@@ -1,10 +1,12 @@
 schema_version: 1
-phase: 2
+phase: 3
 brief_sections:
   geometry: ["5", "5.1", "5.2", "5.3"]
   waveform: ["6.1", "6.2", "6.3", "6.4"]
+  propagation: ["7.1", "7.2", "7.4"]
   map: ["8.2"]
   beams: ["9.3", "12.3"]
+  experiment_a: ["11", "11.1", "11.2"]
   statistics: ["13.1"]
   tests: ["15"]
 
@@ -68,7 +70,7 @@ physical:
       z_max_m: 12.0
 
 arrays:
-  tx:
+  gnb_tx:
     num_elements: 16
     spacing_wavelengths: 0.5
     axis: y
@@ -76,13 +78,38 @@ arrays:
     pattern: iso
     polarization: V
     element_pattern: isotropic
-  rx:
+  gnb_rx:
+    num_elements: 16
+    spacing_wavelengths: 0.5
+    axis: y
+    broadside_azimuth_deg: 0.0
+    pattern: iso
+    polarization: V
+    element_pattern: isotropic
+  relay:
     num_rows: 1
     num_cols: 1
     vertical_spacing: 0.5
     horizontal_spacing: 0.5
     pattern: iso
     polarization: V
+  phase2_validation_rx:
+    num_rows: 1
+    num_cols: 1
+    vertical_spacing: 0.5
+    horizontal_spacing: 0.5
+    pattern: iso
+    polarization: V
+  links:
+    target:
+      tx: gnb_tx
+      rx: gnb_rx
+    downlink:
+      tx: gnb_tx
+      rx: relay
+    uplink:
+      tx: relay
+      rx: gnb_rx
 
 wall:
   material_model: sionna_slab
@@ -219,6 +246,29 @@ primary_model:
   target_induced_occlusion: separate_labeled_check
   blank_scene_common_to_both_worlds: true
 
+background:
+  self_link_policy: excluded
+  self_link_method: omit_gnb_tx_to_gnb_rx_direct_path
+  isolation_assumption: ideal_tx_rx_isolation_direct_leakage_cancelled
+  other_paths: retained
+  relay_links: separate_path_solver_solves
+
+experiment_a:
+  reference_beam_phi_deg: 0.0
+  dither_deg: [-5.0, -2.0, 0.0, 2.0, 5.0]
+  num_random_beams: 64
+  random_beam_seed: 7101
+  relative_error_floor_fraction: 1.0e-12
+  analytical_c128_tolerance: 1.0e-10
+  analytical_c64_tolerance: 1.0e-5
+  sionna_relative_tolerance: 1.0e-3
+  noise_floor_relative_tolerance: 0.02
+  noise_symbol_seed: 3101
+  paired_noise_seed: 4101
+  independent_target_noise_seed: 4201
+  independent_relay_noise_seed: 4202
+  forwarded_relay_noise_seed: 5101
+
 steering:
   convention: v_phi_equals_conj_a_tx_phi
   array_response_phase: exp_plus_j_2pi_over_lambda_p_dot_k
@@ -301,6 +351,7 @@ output:
   geometry_reference: results/phase2/geometry_reference.json
   beam_reference: results/phase2/beam_reference.json
   waveform_reference: results/phase2/waveform_reference.json
+  validate: results/validate
 
 seeds:
   policy: explicit_per_stream_never_none
@@ -346,3 +397,13 @@ decisions:
     brief_section: "9.2,9.3,15"
     choice: v_equals_conj_a_tx
     config_key: steering
+  D6:
+    type: interpretation
+    brief_section: "7.1,7.2,11"
+    choice: exclude_gnb_self_direct_path_ideal_isolation
+    config_key: background
+  D7:
+    type: interpretation
+    brief_section: "7.4,11.1"
+    choice: evaluator_side_actual_path_matched_relay_calibration
+    config_key: experiment_a

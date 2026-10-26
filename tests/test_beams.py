@@ -121,8 +121,8 @@ def test_rt_adapter_peak_table(config: PilotConfig, output_dir) -> None:
     from sionna.rt import PathSolver, PlanarArray, Receiver, Transmitter, load_scene
 
     assert mi.variant().startswith("cuda")
-    tx_values = config.section("arrays", "tx")
-    rx_values = config.section("arrays", "rx")
+    tx_values = config.section("arrays", "gnb_tx")
+    rx_values = config.section("arrays", "phase2_validation_rx")
     validation = config.section("validation", "rt_adapter")
     radius = float(validation["ring_radius_m"])
     spacing = float(validation["receiver_spacing_deg"])

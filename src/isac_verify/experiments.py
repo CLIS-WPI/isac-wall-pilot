@@ -1,1 +1,735 @@
-"""Experiment A/B orchestration and deterministic seeding. Filled in Phase 7 (BRIEF §11, §12)."""
+"""Experiment A orchestration and Phase 3 validation.
+
+Experiment A is a matched LoS negative control.  The analytical and Sionna
+channels are compared after the same beam weights, with no per-link
+normalization and with absolute delays.  The validation command also rechecks
+the Phase 2 material, geometry, beam, and waveform references.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from math import log10, pi, sqrt
+from pathlib import Path
+from typing import Any, Sequence
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from scipy.stats import ks_2samp
+
+from .beams import (
+    ArrayGeometry,
+    beam_gain,
+    beampattern,
+    dbm_to_watt,
+    direct_beam,
+    projected_wall_beam,
+)
+from .channels import (
+    SionnaExperimentA,
+    analytical_matched_channels,
+    build_sionna_experiment_a,
+    effective_response,
+)
+from .config import PilotConfig
+from .geometry import image_method_reference
+from .material import build_material_reference
+from .replay import (
+    forwarded_relay_noise,
+    noise_variance_w,
+    proper_complex_noise,
+    relay_noise_variance_w,
+)
+from .waveform import (
+    profile_from_config,
+    qpsk_symbols,
+    waveform_reference,
+)
+
+
+class ValidationError(RuntimeError):
+    """Raised when a measured validation invariant is outside its tolerance."""
+
+
+@dataclass(frozen=True)
+class BeamAction:
+    name: str
+    kind: str
+    angle_deg: float | None
+    weights: torch.Tensor
+
+
+@dataclass(frozen=True)
+class AnalyticalComparison:
+    c128_errors: torch.Tensor
+    c64_errors: torch.Tensor
+    c128_max_relative_error: float
+    c64_max_relative_error: float
+    c128_response_ratio_deviation: float
+    c64_response_ratio_deviation: float
+    num_beams: int
+
+
+@dataclass(frozen=True)
+class SionnaComparison:
+    errors: torch.Tensor
+    max_relative_error: float
+    response_ratio_deviation: float
+    target_power_w: torch.Tensor
+    relay_power_w: torch.Tensor
+    num_beams: int
+
+
+@dataclass(frozen=True)
+class NoiseComparison:
+    variance_w: float
+    relay_variance_w: float
+    measured_floor_w: float
+    floor_ratio: float
+    paired_max_relative_error: float
+    independent_target_mean_power_w: float
+    independent_relay_mean_power_w: float
+    independent_ks_statistic: float
+    independent_ks_pvalue: float
+    forwarded_relay_noise_mean_power_w: float
+
+
+def _random_beams(
+    count: int,
+    power_w: float,
+    num_elements: int,
+    seed: int,
+) -> torch.Tensor:
+    if count < 1:
+        raise ValidationError("random beam count must be positive")
+    generator = torch.Generator(device="cuda")
+    generator.manual_seed(int(seed))
+    real = torch.randn(
+        (count, num_elements),
+        generator=generator,
+        device="cuda",
+        dtype=torch.float32,
+    )
+    imag = torch.randn(
+        (count, num_elements),
+        generator=generator,
+        device="cuda",
+        dtype=torch.float32,
+    )
+    weights = real + 1j * imag
+    norms = torch.linalg.vector_norm(weights, dim=1, keepdim=True)
+    return (sqrt(power_w) * weights / norms).to(torch.complex64)
+
+
+def beam_actions(config: PilotConfig) -> list[BeamAction]:
+    array = ArrayGeometry.from_config(config)
+    power = dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
+    reference_phi = float(config.get("experiment_a", "reference_beam_phi_deg"))
+    actions = [
+        BeamAction(
+            name="direct",
+            kind="direct",
+            angle_deg=reference_phi,
+            weights=direct_beam(reference_phi, power, array).weights,
+        )
+    ]
+    for phi in config.get("experiment_a", "dither_deg"):
+        actions.append(
+            BeamAction(
+                name=f"dither_{float(phi):+g}",
+                kind="dither",
+                angle_deg=float(phi),
+                weights=direct_beam(float(phi), power, array).weights,
+            )
+        )
+    random_weights = _random_beams(
+        int(config.get("experiment_a", "num_random_beams")),
+        power,
+        array.num_elements,
+        int(config.get("experiment_a", "random_beam_seed")),
+    )
+    for index, weights in enumerate(random_weights):
+        actions.append(
+            BeamAction(
+                name=f"random_{index:03d}",
+                kind="random",
+                angle_deg=None,
+                weights=weights,
+            )
+        )
+    return actions
+
+
+def _ideal_weights(actions: Sequence[BeamAction]) -> torch.Tensor:
+    return torch.stack([action.weights for action in actions]).to(torch.complex128)
+
+
+def _relative_error_per_beam(
+    reference: torch.Tensor,
+    measured: torch.Tensor,
+    floor_fraction: float,
+) -> torch.Tensor:
+    if reference.shape != measured.shape:
+        raise ValidationError(
+            f"reference shape {tuple(reference.shape)} != measured "
+            f"{tuple(measured.shape)}"
+        )
+    magnitude = reference.abs()
+    scale = float(magnitude.max().item())
+    floor = max(scale * float(floor_fraction), torch.finfo(magnitude.dtype).tiny)
+    error = (reference - measured).abs() / magnitude.clamp_min(floor)
+    return error.max(dim=2).values
+
+
+def _response_ratio_deviation(
+    reference: torch.Tensor, measured: torch.Tensor
+) -> float:
+    ratio = measured / reference
+    return float((ratio - 1.0).abs().max().item())
+
+
+def analytical_comparison(config: PilotConfig) -> AnalyticalComparison:
+    actions = beam_actions(config)
+    weights = _ideal_weights(actions)
+    floor_fraction = float(
+        config.get("experiment_a", "relative_error_floor_fraction")
+    )
+    channels_128 = analytical_matched_channels(
+        config, dtype=torch.complex128
+    )
+    channels_64 = analytical_matched_channels(config, dtype=torch.complex64)
+    target_128 = effective_response(
+        channels_128.target_cfr.to(torch.complex128), weights
+    )
+    relay_128 = effective_response(
+        channels_128.relay_cfr.to(torch.complex128), weights
+    )
+    weights_64 = weights.to(torch.complex64)
+    target_64 = effective_response(channels_64.target_cfr, weights_64)
+    relay_64 = effective_response(channels_64.relay_cfr, weights_64)
+    errors_128 = _relative_error_per_beam(target_128, relay_128, floor_fraction)
+    errors_64 = _relative_error_per_beam(target_64, relay_64, floor_fraction)
+    return AnalyticalComparison(
+        c128_errors=errors_128,
+        c64_errors=errors_64,
+        c128_max_relative_error=float(errors_128.max().item()),
+        c64_max_relative_error=float(errors_64.max().item()),
+        c128_response_ratio_deviation=_response_ratio_deviation(
+            target_128, relay_128
+        ),
+        c64_response_ratio_deviation=_response_ratio_deviation(
+            target_64, relay_64
+        ),
+        num_beams=len(actions),
+    )
+
+
+def sionna_comparison(
+    config: PilotConfig,
+    experiment: SionnaExperimentA | None = None,
+) -> tuple[SionnaComparison, SionnaExperimentA]:
+    setup = experiment or build_sionna_experiment_a(config)
+    actions = beam_actions(config)
+    weights = torch.stack([action.weights for action in actions])
+    target = setup.target_effective(weights)
+    relay = setup.relay_effective(weights)
+    floor_fraction = float(
+        config.get("experiment_a", "relative_error_floor_fraction")
+    )
+    errors = _relative_error_per_beam(target, relay, floor_fraction)
+    return (
+        SionnaComparison(
+            errors=errors,
+            max_relative_error=float(errors.max().item()),
+            response_ratio_deviation=_response_ratio_deviation(target, relay),
+            target_power_w=target.abs().square().mean(dim=(1, 2)),
+            relay_power_w=relay.abs().square().mean(dim=(1, 2)),
+            num_beams=len(actions),
+        ),
+        setup,
+    )
+
+
+def _phase_delay_s(cfr: torch.Tensor, spacing_hz: float) -> float:
+    if cfr.numel() < 2:
+        raise ValidationError("need at least two subcarriers for delay")
+    phase_step = torch.angle((cfr[1:] * cfr[:-1].conj()).mean())
+    return float((-phase_step / (2.0 * pi * spacing_hz)).item())
+
+
+def delay_checks(
+    config: PilotConfig, experiment: SionnaExperimentA
+) -> dict[str, Any]:
+    profile = experiment.profile
+    target_coefficient, target_delay = experiment.target.single_path()
+    down_coefficient, down_delay = experiment.downlink.single_path()
+    up_coefficient, up_delay = experiment.uplink.single_path()
+    reference = direct_beam(
+        float(config.get("experiment_a", "reference_beam_phi_deg")),
+        dbm_to_watt(config.get("waveform", "nominal_total_power_dbm")),
+        ArrayGeometry.from_config(config),
+    ).weights
+    target_cfr = effective_response(experiment.target_cfr(), reference)
+    down_cfr = effective_response(
+        experiment.downlink.cfr(profile), reference
+    )
+    relay_cfr = experiment.relay_effective(reference)
+    measured_target = _phase_delay_s(
+        target_cfr[0], profile.subcarrier_spacing_hz
+    )
+    measured_down = _phase_delay_s(
+        down_cfr[0], profile.subcarrier_spacing_hz
+    )
+    measured_relay = _phase_delay_s(
+        relay_cfr[0], profile.subcarrier_spacing_hz
+    )
+    return {
+        "target_path_delay_ns": target_delay * 1e9,
+        "downlink_path_delay_ns": down_delay * 1e9,
+        "uplink_path_delay_ns": up_delay * 1e9,
+        "target_cfr_delay_ns": measured_target * 1e9,
+        "downlink_cfr_delay_ns": measured_down * 1e9,
+        "relay_cfr_delay_ns": measured_relay * 1e9,
+        "target_cfr_delay_error_ns": (measured_target - target_delay) * 1e9,
+        "downlink_cfr_delay_error_ns": (measured_down - down_delay) * 1e9,
+        "relay_cfr_delay_error_ns": (
+            measured_relay - experiment.calibration.target_delay_s
+        )
+        * 1e9,
+        "target_cir_shape": list(experiment.target.a.shape),
+        "downlink_cir_shape": list(experiment.downlink.a.shape),
+        "uplink_cir_shape": list(experiment.uplink.a.shape),
+        "target_coefficient_shape": list(target_coefficient.shape),
+        "downlink_coefficient_shape": list(down_coefficient.shape),
+        "uplink_coefficient_shape": list(up_coefficient.shape),
+        "target_coefficient": [
+            complex(target_coefficient[0, 0].item()).real,
+            complex(target_coefficient[0, 0].item()).imag,
+        ],
+        "downlink_coefficient": [
+            complex(down_coefficient[0, 0].item()).real,
+            complex(down_coefficient[0, 0].item()).imag,
+        ],
+        "uplink_coefficient": [
+            complex(up_coefficient[0, 0].item()).real,
+            complex(up_coefficient[0, 0].item()).imag,
+        ],
+    }
+
+
+def noise_comparison(
+    config: PilotConfig, experiment: SionnaExperimentA
+) -> NoiseComparison:
+    profile = experiment.profile
+    reference = direct_beam(
+        float(config.get("experiment_a", "reference_beam_phi_deg")),
+        dbm_to_watt(config.get("waveform", "nominal_total_power_dbm")),
+        ArrayGeometry.from_config(config),
+    ).weights
+    target = effective_response(experiment.target_cfr(), reference)
+    relay = experiment.relay_effective(reference)
+    symbols = qpsk_symbols(
+        profile,
+        int(config.get("experiment_a", "noise_symbol_seed")),
+    )
+    variance = noise_variance_w(config, profile.sample_rate_hz)
+    noise_shape = (
+        profile.num_symbols,
+        target.shape[0],
+        profile.fft_size,
+    )
+    paired_noise = proper_complex_noise(
+        noise_shape,
+        variance,
+        int(config.get("experiment_a", "paired_noise_seed")),
+    )
+    signal = symbols[:, None, :]
+    target_observation = signal * target[None, :, :] + paired_noise
+    relay_observation = signal * relay[None, :, :] + paired_noise
+    paired_error = float(
+        (target_observation - relay_observation).abs().max().item()
+        / target_observation.abs().max().item()
+    )
+    independent_target_noise = proper_complex_noise(
+        noise_shape,
+        variance,
+        int(config.get("experiment_a", "independent_target_noise_seed")),
+    )
+    independent_relay_noise = proper_complex_noise(
+        noise_shape,
+        variance,
+        int(config.get("experiment_a", "independent_relay_noise_seed")),
+    )
+    target_independent = signal * target[None, :, :] + independent_target_noise
+    relay_independent = signal * relay[None, :, :] + independent_relay_noise
+    target_powers = (
+        target_independent.abs().square().reshape(-1).detach().cpu().numpy()
+    )
+    relay_powers = (
+        relay_independent.abs().square().reshape(-1).detach().cpu().numpy()
+    )
+    ks = ks_2samp(target_powers, relay_powers)
+    relay_variance = relay_noise_variance_w(config, profile.sample_rate_hz)
+    frequencies = torch.fft.fftfreq(
+        profile.fft_size,
+        d=1.0 / profile.sample_rate_hz,
+        device="cuda",
+    )
+    uplink_cfr = experiment.uplink.cfr(profile)[0, 0, :, 0, 0, 0, :]
+    relay_noise_record = forwarded_relay_noise(
+        uplink_cfr,
+        experiment.calibration,
+        variance_w=relay_variance,
+        seed=int(config.get("experiment_a", "forwarded_relay_noise_seed")),
+        shape=(profile.num_symbols, experiment.uplink.num_rx_antennas, profile.fft_size),
+        frequencies_hz=frequencies,
+    )
+    measured_floor = float(
+        torch.fft.fft(paired_noise, dim=-1, norm="ortho")
+        .abs()
+        .square()
+        .mean()
+        .item()
+    )
+    return NoiseComparison(
+        variance_w=variance,
+        relay_variance_w=relay_variance,
+        measured_floor_w=measured_floor,
+        floor_ratio=measured_floor / variance,
+        paired_max_relative_error=paired_error,
+        independent_target_mean_power_w=float(
+            target_independent.abs().square().mean().item()
+        ),
+        independent_relay_mean_power_w=float(
+            relay_independent.abs().square().mean().item()
+        ),
+        independent_ks_statistic=float(ks.statistic),
+        independent_ks_pvalue=float(ks.pvalue),
+        forwarded_relay_noise_mean_power_w=float(
+            relay_noise_record.abs().square().mean().item()
+        ),
+    )
+
+
+def phase2_checks(config: PilotConfig) -> dict[str, Any]:
+    material = build_material_reference(config)
+    geometry = image_method_reference(
+        candidate_range_m=float(config.get("geometry_reference", "candidate_range_m")),
+        relay_range_m=float(config.get("geometry_reference", "relay_range_m")),
+        wall_offset_m=float(config.get("geometry_reference", "wall_offset_m")),
+        speed_of_light_m_per_s=config.speed_of_light,
+        latency_floor_s=float(
+            config.get("geometry_reference", "latency_floor_ns")
+        )
+        * 1e-9,
+    )
+    array = ArrayGeometry.from_config(config)
+    power = dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
+    wall_beam = projected_wall_beam(
+        float(config.get("geometry_reference", "wall_departure_candidate_deg")),
+        0.0,
+        power,
+        array,
+        min_projected_norm=float(config.get("beam", "projected_norm_floor")),
+        dtype=torch.complex128,
+    )
+    if not wall_beam.usable:
+        raise ValidationError("Phase 2 projected wall beam is unusable")
+    scan = np.arange(-90.0, 90.0001, 0.01)
+    pattern = beampattern(scan, wall_beam, array, dtype=torch.complex128)
+    peak_gain = float(pattern.max().item())
+    direct_gain = beam_gain(0.0, wall_beam, array, dtype=torch.complex128)
+    null_depth_db = 10.0 * log10(max(direct_gain, 1e-300) / peak_gain)
+    waveform = waveform_reference(
+        config,
+        int(config.get("seeds", "streams", "probe_symbols", "calibration")[0]),
+    )
+    power_errors = [
+        abs(entry["measured_mean_power_w"] - power) / power
+        for entry in waveform["entries"]
+    ]
+    return {
+        "status": "PASS"
+        if null_depth_db <= float(config.get("validation", "null_depth_min_db"))
+        and max(power_errors)
+        <= float(config.get("waveform", "power_relative_tolerance"))
+        else "FAIL",
+        "material_model": material["material_model"],
+        "material_thickness_m": material["material"]["thickness_m"],
+        "geometry": {
+            "candidate_direct_round_trip_delay_ns": geometry[
+                "candidate_direct_round_trip_delay_s"
+            ]
+            * 1e9,
+            "relay_added_delay_ns": geometry["relay_added_delay_s"] * 1e9,
+            "wall_departure_candidate_deg": geometry[
+                "wall_departure_candidate_deg"
+            ],
+        },
+        "null_depth_db": null_depth_db,
+        "waveform_max_relative_power_error": max(power_errors),
+    }
+
+
+def _check_runtime(require_h100: bool) -> dict[str, Any]:
+    import mitsuba as mi
+
+    if not torch.cuda.is_available():
+        raise ValidationError("torch.cuda.is_available() is False")
+    name = torch.cuda.get_device_name(0)
+    if require_h100 and "H100" not in name:
+        raise ValidationError(f"GPU name {name!r} does not contain H100")
+    variant = mi.variant()
+    if variant is None or not variant.startswith("cuda"):
+        raise ValidationError(
+            f"Mitsuba variant {variant!r} is not CUDA-backed"
+        )
+    return {
+        "gpu_name": name,
+        "cuda_available": True,
+        "mitsuba_variant": variant,
+    }
+
+
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu().tolist()
+    if isinstance(value, complex):
+        return [value.real, value.imag]
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, dict):
+        return {key: _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    return value
+
+
+def _figure(
+    output: Path,
+    analytical: AnalyticalComparison,
+    sionna: SionnaComparison,
+    config: PilotConfig,
+) -> None:
+    index = np.arange(analytical.num_beams)
+    figure, axis = plt.subplots(figsize=(9.0, 5.0))
+    axis.semilogy(
+        index,
+        analytical.c128_errors.amax(dim=1).detach().cpu().numpy(),
+        label="analytical complex128",
+        linewidth=1.2,
+    )
+    axis.semilogy(
+        index,
+        analytical.c64_errors.amax(dim=1).detach().cpu().numpy(),
+        label="analytical complex64",
+        linewidth=1.2,
+    )
+    axis.semilogy(
+        index,
+        sionna.errors.amax(dim=1).detach().cpu().numpy(),
+        label="Sionna LoS",
+        linewidth=1.2,
+    )
+    axis.axhline(
+        float(config.get("experiment_a", "analytical_c128_tolerance")),
+        color="black",
+        linestyle="--",
+        linewidth=0.9,
+        label="complex128 tolerance",
+    )
+    axis.axhline(
+        float(config.get("experiment_a", "analytical_c64_tolerance")),
+        color="tab:gray",
+        linestyle=":",
+        linewidth=0.9,
+        label="complex64 tolerance",
+    )
+    axis.axhline(
+        float(config.get("experiment_a", "sionna_relative_tolerance")),
+        color="tab:red",
+        linestyle="-.",
+        linewidth=0.9,
+        label="Sionna tolerance",
+    )
+    axis.set_xlabel("beam action index")
+    axis.set_ylabel("maximum relative target/relay difference")
+    axis.set_title("Experiment A matched LoS negative control")
+    axis.grid(True, which="both", alpha=0.25)
+    axis.legend(fontsize=7, ncol=2)
+    figure.tight_layout()
+    figure.savefig(output / "experiment_a.png", dpi=180)
+    figure.savefig(output / "experiment_a.pdf")
+    plt.close(figure)
+
+
+def run_validation(
+    config_path: str | Path,
+    require_h100: bool,
+    output_path: str | Path = "results/validate",
+) -> int:
+    config = PilotConfig.load(config_path)
+    output = Path(output_path)
+    output.mkdir(parents=True, exist_ok=True)
+    runtime = _check_runtime(require_h100)
+    phase2 = phase2_checks(config)
+    analytical = analytical_comparison(config)
+    sionna, experiment = sionna_comparison(config)
+    delays = delay_checks(config, experiment)
+    noise = noise_comparison(config, experiment)
+    c128_tolerance = float(
+        config.get("experiment_a", "analytical_c128_tolerance")
+    )
+    c64_tolerance = float(
+        config.get("experiment_a", "analytical_c64_tolerance")
+    )
+    sionna_tolerance = float(
+        config.get("experiment_a", "sionna_relative_tolerance")
+    )
+    noise_tolerance = float(
+        config.get("experiment_a", "noise_floor_relative_tolerance")
+    )
+    checks = {
+        "phase2": phase2["status"] == "PASS",
+        "analytical_c128": analytical.c128_max_relative_error
+        <= c128_tolerance,
+        "analytical_c64": analytical.c64_max_relative_error <= c64_tolerance,
+        "sionna": sionna.max_relative_error <= sionna_tolerance,
+        "noise_floor": abs(noise.floor_ratio - 1.0) <= noise_tolerance,
+        "paired_noise": noise.paired_max_relative_error <= 1e-5,
+        "relay_power_cap": experiment.calibration.power_feasible,
+        "relay_latency": experiment.calibration.latency_feasible,
+        "rx_steering": (
+            experiment.calibration.rx_steering_max_relative_difference
+            <= c64_tolerance
+        ),
+    }
+    status = "PASS" if all(checks.values()) else "FAIL"
+    summary = {
+        "status": status,
+        "checks": checks,
+        "runtime": runtime,
+        "d6": {
+            "self_link": "excluded from background computations",
+            "assumption": "ideal gNB TX/RX isolation; direct leakage cancelled",
+            "relay_links": "gNB-to-relay and relay-to-gNB solved separately",
+        },
+        "phase2": phase2,
+        "experiment_a": {
+            "num_beams": analytical.num_beams,
+            "reference_beam_phi_deg": float(
+                config.get("experiment_a", "reference_beam_phi_deg")
+            ),
+            "dither_deg": config.get("experiment_a", "dither_deg"),
+            "num_random_beams": int(
+                config.get("experiment_a", "num_random_beams")
+            ),
+            "random_beam_seed": int(
+                config.get("experiment_a", "random_beam_seed")
+            ),
+            "analytical_c128_max_relative_error": analytical.c128_max_relative_error,
+            "analytical_c64_max_relative_error": analytical.c64_max_relative_error,
+            "analytical_c128_tolerance": c128_tolerance,
+            "analytical_c64_tolerance": c64_tolerance,
+            "analytical_c128_response_ratio_deviation": analytical.c128_response_ratio_deviation,
+            "analytical_c64_response_ratio_deviation": analytical.c64_response_ratio_deviation,
+            "sionna_max_relative_error": sionna.max_relative_error,
+            "sionna_tolerance": sionna_tolerance,
+            "sionna_response_ratio_deviation": sionna.response_ratio_deviation,
+            "rx_steering_max_relative_difference": (
+                experiment.calibration.rx_steering_max_relative_difference
+            ),
+            "target_cir_shape": delays["target_cir_shape"],
+            "downlink_cir_shape": delays["downlink_cir_shape"],
+            "uplink_cir_shape": delays["uplink_cir_shape"],
+            "sionna_target_power_min_w": float(
+                sionna.target_power_w.min().item()
+            ),
+            "sionna_target_power_max_w": float(
+                sionna.target_power_w.max().item()
+            ),
+            "sionna_relay_power_min_w": float(
+                sionna.relay_power_w.min().item()
+            ),
+            "sionna_relay_power_max_w": float(
+                sionna.relay_power_w.max().item()
+            ),
+        },
+        "calibration": experiment.calibration.as_dict(),
+        "delays": delays,
+        "noise": {
+            "variance_w": noise.variance_w,
+            "relay_variance_w": noise.relay_variance_w,
+            "measured_floor_w": noise.measured_floor_w,
+            "floor_ratio": noise.floor_ratio,
+            "paired_max_relative_error": noise.paired_max_relative_error,
+            "independent_target_mean_power_w": noise.independent_target_mean_power_w,
+            "independent_relay_mean_power_w": noise.independent_relay_mean_power_w,
+            "independent_ks_statistic": noise.independent_ks_statistic,
+            "independent_ks_pvalue": noise.independent_ks_pvalue,
+            "forwarded_relay_noise_mean_power_w": noise.forwarded_relay_noise_mean_power_w,
+        },
+    }
+    (output / "validation_summary.json").write_text(
+        json.dumps(_jsonable(summary), indent=2) + "\n", encoding="utf-8"
+    )
+    _figure(output, analytical, sionna, config)
+    print(f"validation status: {status}")
+    print(
+        "analytical c128 max relative error: "
+        f"{analytical.c128_max_relative_error:.3e}"
+    )
+    print(
+        "analytical c64 max relative error: "
+        f"{analytical.c64_max_relative_error:.3e}"
+    )
+    print(f"Sionna max relative error: {sionna.max_relative_error:.3e}")
+    print(f"target CIR shape: {delays['target_cir_shape']}")
+    print(f"downlink CIR shape: {delays['downlink_cir_shape']}")
+    print(f"uplink CIR shape: {delays['uplink_cir_shape']}")
+    print(
+        "RX steering max relative difference: "
+        f"{experiment.calibration.rx_steering_max_relative_difference:.3e}"
+    )
+    print(
+        "measured delta: "
+        f"{experiment.calibration.measured_added_delay_s * 1e9:.9f} ns"
+    )
+    print(
+        "analytical delta: "
+        f"{experiment.calibration.analytical_added_delay_s * 1e9:.9f} ns"
+    )
+    print(
+        "delay difference: "
+        f"{experiment.calibration.delay_difference_s * 1e9:.9f} ns"
+    )
+    print(
+        "relay gain: "
+        f"{experiment.calibration.gain.real:.6f}"
+        f"{experiment.calibration.gain.imag:+.6f}j"
+    )
+    print(
+        "relay transmit power: "
+        f"{experiment.calibration.relay_transmit_power_w:.6e} W "
+        f"(cap {experiment.calibration.max_transmit_power_w:.6e} W, "
+        f"feasible={experiment.calibration.power_feasible})"
+    )
+    print(
+        "receiver noise variance: "
+        f"{noise.variance_w:.6e} W, measured floor ratio "
+        f"{noise.floor_ratio:.6f}"
+    )
+    print(f"wrote {output / 'validation_summary.json'}")
+    print(f"wrote {output / 'experiment_a.png'}")
+    print(f"wrote {output / 'experiment_a.pdf'}")
+    if status != "PASS":
+        failed = [name for name, passed in checks.items() if not passed]
+        raise ValidationError(f"validation failed: {', '.join(failed)}")
+    return 0

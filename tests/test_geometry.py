@@ -64,8 +64,8 @@ def test_image_method_matches_brief_table(config: PilotConfig) -> None:
 
     wavelength = config.wavelength_m
     fraunhofer = fraunhofer_distance_m(
-        int(config.get("arrays", "tx", "num_elements")),
-        float(config.get("arrays", "tx", "spacing_wavelengths")),
+        int(config.get("arrays", "gnb_tx", "num_elements")),
+        float(config.get("arrays", "gnb_tx", "spacing_wavelengths")),
         wavelength,
     )
     assert f"{fraunhofer:.2f}" == "9.64"

@@ -221,7 +221,7 @@ def waveform_reference(
     *,
     device: str = "cuda",
 ) -> dict[str, Any]:
-    array = config.section("arrays", "tx")
+    array = config.section("arrays", "gnb_tx")
     beam_power = dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
     weights = torch.full(
         (int(array["num_elements"]),),

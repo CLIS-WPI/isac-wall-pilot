@@ -104,3 +104,47 @@ Each entry: what changed, why, and which BRIEF section it affects.
   degrees on the forward visible arc. With `synthetic_array=False`, tested
   `Paths.a` phases were zero for this configuration, so that mode is not used
   for beam validation.
+
+## D6 — The gNB TX-to-gNB RX direct self path is excluded by ideal isolation
+
+- **Type:** interpretation.
+- **What:** No background or relay computation solves the direct monostatic
+  gNB TX-to-gNB RX path. Relay links are solved separately as gNB-to-relay and
+  relay-to-gNB. The target is solved with `RCSSolver`. The assumed direct
+  leakage is cancelled by ideal TX/RX isolation; all other enabled paths are
+  retained.
+- **Why:** The nominal Experiment A scene has co-located gNB phase centres.
+  A direct self path at zero range is not a physical background path for the
+  sensing model and would contaminate the matched negative control. BRIEF
+  §11.1 removes walls and background scatterers for Experiment A.
+- **BRIEF section:** §7.1 actual Sionna components; §7.2 received-signal model;
+  §11 Experiment A.
+- **Phase 3 evidence:** `background.self_link_policy=excluded` in
+  `configs/pilot.yaml`; `channels.py` performs no gNB self solve. The executed
+  Validation run solved only `gNB->relay`, `relay->gNB`, and the target path;
+  the resulting target and matched relay responses agreed to
+  `8.310603e-6` maximum relative error over 70 beams and every RX element.
+
+## D7 — Matched relay gain and delay are calibrated from actual Sionna paths
+
+- **Type:** interpretation.
+- **What:** The evaluator calibrates the fixed relay gain at the reference
+  direct beam from the actual `RCSSolver` target coefficient and the actual
+  `PathSolver` downlink and uplink coefficients. It records the analytical
+  nominal delay, the measured path delay, their difference, the complex gain,
+  and the relay average transmit power. A gain whose transmit power exceeds
+  the 10 dBm cap is marked infeasible and is never rescaled.
+- **Why:** BRIEF §7.4 requires evaluator-side calibration against the actual
+  direct-path candidate return and forbids hiding a cap violation by scaling
+  the target or relay. The actual Sionna coefficients differ slightly from the
+  closed-form free-space values because of the finite target model and
+  array/solver conventions.
+- **BRIEF section:** §7.4 attacker capabilities and constraints; §11.1
+  physical assumptions; §11.2 required checks.
+- **Phase 3 evidence:** Executed nominal values:
+  measured `delta=200.1384586947097 ns`, analytical
+  `delta=200.1384571188912 ns`, difference `1.575818e-6 ns`,
+  `g=-10.298308372497559-0.9971696734428406j`, `|g|=10.3464729591`,
+  relay average transmit power `8.841942352730346e-7 W` against the
+  `0.01 W` cap (feasible). The corresponding target and matched-relay CFRs
+  agreed to `8.310603e-6` maximum relative error over the 70 beam actions and every RX element. The target and relay RX steering vectors differed by `1.201e-07` relative L2 difference.

@@ -30,7 +30,7 @@ class ArrayGeometry:
 
     @classmethod
     def from_config(cls, config: PilotConfig) -> "ArrayGeometry":
-        tx = config.section("arrays", "tx")
+        tx = config.section("arrays", "gnb_tx")
         return cls(
             num_elements=int(tx["num_elements"]),
             spacing_wavelengths=float(tx["spacing_wavelengths"]),

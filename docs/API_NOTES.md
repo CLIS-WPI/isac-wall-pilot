@@ -705,3 +705,96 @@ rx 1 phase0deg [125.40576934814453, -107.31503295898438, 19.96424102783203, 147.
 - The y-axis ULA has front-back ambiguity. The Phase 2 validation ring uses
   the forward visible arc `[-90, 90]` degrees; a full 360-degree ring produces
   aliased peaks at both `phi` and `180-phi`.
+
+## Phase 3 — absolute CIR/CFR shapes and Experiment A paths
+
+Executed in the live container with the nominal Experiment A geometry
+(`gnb=(0,0,2)`, relay `(30,0,2)`, candidate `(60,0,2)`, 16-element y-axis gNB
+TX and RX ULAs, a single-antenna relay, no walls, `RCSSolver` for the target and
+`PathSolver` for the two relay links):
+
+```python
+a_t, tau_t = paths_t.cir(out_type="torch", normalize_delays=False)
+a_d, tau_d = paths_d.cir(out_type="torch", normalize_delays=False)
+a_u, tau_u = paths_u.cir(out_type="torch", normalize_delays=False)
+print(tuple(a_t.shape), tuple(tau_t.shape), tuple(a_d.shape), tuple(a_u.shape))
+h_t = cir_to_ofdm_channel(freqs, a_t.unsqueeze(0), tau_t.unsqueeze(0), normalize=False)
+h_d = cir_to_ofdm_channel(freqs, a_d.unsqueeze(0), tau_d.unsqueeze(0), normalize=False)
+h_u = cir_to_ofdm_channel(freqs, a_u.unsqueeze(0), tau_u.unsqueeze(0), normalize=False)
+print(tuple(h_t.shape), tuple(h_d.shape), tuple(h_u.shape))
+```
+
+```
+target a (1, 16, 1, 16, 1, 1) tau (1, 1, 1) cfr (1, 1, 16, 1, 16, 1, 2048)
+downlink a (1, 1, 1, 16, 1, 1) tau (1, 1, 1) cfr (1, 1, 1, 1, 16, 1, 2048)
+uplink a (1, 16, 1, 1, 1, 1) tau (1, 1, 1) cfr (1, 1, 16, 1, 1, 1, 2048)
+target coefficient (16, 16) delay 4.002769173894194e-07
+downlink coefficient (1, 16) delay 1.0006922934735485e-07
+uplink coefficient (16, 1) delay 1.0006922934735485e-07
+```
+
+- `Paths.cir()` returns 6-D `a` with layout
+  `[num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths, num_time_steps]`.
+  `cir_to_ofdm_channel` requires the extra leading batch axis, so add
+  `a.unsqueeze(0)` and `tau.unsqueeze(0)`. The output layout is
+  `[batch, num_rx, num_rx_ant, num_tx, num_tx_ant, num_time_steps, fft_size]`.
+- The gNB TX and RX arrays are both 16-element horizontal ULAs at the same
+  phase center. The target is receive-by-transmit: its CIR coefficient matrix
+  is `(16, 16)`. The downlink gNB-to-relay coefficient is `(1, 16)`; the
+  uplink relay-to-gNB coefficient is `(16, 1)`. The relay is single-antenna in
+  both directions. Sionna arrays are scene-global, so each link is solved in
+  its own scene with its own TX/RX array setting; these settings are recorded
+  under `arrays.links` in `configs/pilot.yaml`.
+- The TX-antenna axis is axis 4 of the 7-D CFR. The RX-antenna axis is axis 2.
+  The package helper `effective_response` extracts
+  `cfr[0, 0, :, 0, :, 0, :]` and applies the beam weights, returning a
+  `(num_rx_antennas, fft_size)` RX vector per subcarrier. It never collapses the
+  RX array before the equality comparison.
+- `Paths.cir()` already applies the carrier phase
+  `exp(-j 2*pi*f_c*tau)` to `a`; `cir_to_ofdm_channel(..., baseband_freqs,
+  normalize=False)` applies only the additional baseband phase. Do not add a
+  separate carrier factor for the relay added delay. A relay calibration built
+  directly from the `Paths.cir` coefficients matched every RX element and
+  subcarrier of the target to `8.310603e-6` maximum relative error over 70
+  beams.
+- The target and relay receive steering vectors had relative L2 difference
+  `1.201e-07` after phase alignment in the collinear Experiment A geometry.
+- The nominal Experiment A values measured in Phase 3 were
+  `tau_target=400.2769173894194 ns`, `tau_down=tau_up=100.06922934735485 ns`,
+  and `delta=200.1384586947097 ns`. The analytical delay was
+  `200.1384571188912 ns`; the difference was `1.575818e-6 ns`.
+
+## Phase 3 — why `synthetic_array=False` has zero `Paths.a` phases
+
+Executed with a 16-element y-axis ULA, two receivers at 0 and 45 degrees, one
+LoS path, and `PathSolver(deterministic=True, max_depth=0)`:
+
+```python
+for synthetic in [False, True]:
+    paths = PathSolver(deterministic=True)(scene, max_depth=0,
+        synthetic_array=synthetic, los=True, specular_reflection=False,
+        diffuse_reflection=False, refraction=False, diffraction=False, seed=7101)
+    a = torch.as_tensor(paths.a[0]) + 1j * torch.as_tensor(paths.a[1])
+    tau = torch.as_tensor(paths.tau)
+    print(synthetic, tuple(a.shape), tuple(tau.shape),
+          torch.angle(a[1, 0, 0, :, 0]).mul(180/math.pi).tolist(),
+          float(tau[1, 0, :].min()), float(tau[1, 0, :].max()))
+```
+
+```
+False (2, 1, 1, 16, 1) (2, 1, 1, 16, 1) [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] 9.931449795885783e-08 1.008296877103021e-07
+True  (2, 1, 1, 16, 1) (2, 1, 1)       [125.4058837890625, -107.31492614746094, 19.9643497467041, 147.24351501464844, -85.47723388671875, 41.80195236206055, 169.08119201660156, -63.639610290527344, 63.639610290527344, -169.08119201660156, -41.80195236206055, 85.47723388671875, -147.24351501464844, -19.9643497467041, 107.31492614746094, -125.4058837890625] 1.0006922934735485e-07 1.0006922934735485e-07
+```
+
+- Installed `Paths.cir` source applies
+  `phase = -2*pi*self._frequency*tau_` and then `a = cpx_mul(a, exp)`.
+- With `synthetic_array=False`, `Paths.tau` has the full per-element shape
+  `(2, 1, 1, 16, 1)` in the executed test, matching the
+  `[num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths]` layout of `Paths.a`,
+  and already carries the per-element propagation delay. `Paths.a` remains the
+  common passband coefficient, so the tested element phases are zero and the
+  array phase is in `tau`.
+- With `synthetic_array=True`, `Paths.tau` collapses to `(2, 1, 1)`
+  `[num_rx, num_tx, num_paths]` and the per-element array phase is applied to
+  `Paths.a`. This is the mode used for the D5 RT adapter and all Phase 3
+  Experiment A solves. `synthetic_array=False` is explained but not used.
