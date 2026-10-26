@@ -1,0 +1,237 @@
+{
+  "container_image": {
+    "base_image": "nvidia/cuda:12.6.3-devel-ubuntu24.04",
+    "base_image_id": "sha256:b9fb16b2c7ab0fb001b6ef9cd4889805b1af2d908a24aee925e8246ac1507de5",
+    "base_image_repo_digests": [
+      "nvidia/cuda@sha256:392c0df7b577ecae17a17f6ba7f2009c217bb4422f8431c053ae9af61a8c148a"
+    ],
+    "image": "isac-wall-pilot:2.2.0",
+    "image_id": "sha256:f86c89ecc085a5e2947a1c468fc50d9e6926749eb1b9d9c05cf3ce7499548d89",
+    "image_repo_digests": [],
+    "note": "Collected on the host by scripts/record_image.sh; a running container cannot inspect its own image ID/digest.",
+    "source": "results/preflight/image_info.json",
+    "visible_in_container": false
+  },
+  "finished_utc": "2026-10-26T22:30:41Z",
+  "framework": "PyTorch",
+  "gpu": {
+    "cuda_available": true,
+    "cuda_fft": {
+      "device": "cuda:0",
+      "dtype": "complex64",
+      "finite": true,
+      "seconds": 0.10211286199046299,
+      "shape": [
+        16,
+        2048,
+        14
+      ]
+    },
+    "cuda_matmul": {
+      "device": "cuda:0",
+      "dtype": "float32",
+      "finite": true,
+      "seconds": 0.0785487309913151,
+      "shape": [
+        4096,
+        4096
+      ]
+    },
+    "cuda_version": "12.6",
+    "device": {
+      "compute_capability": {
+        "major": 9,
+        "minor": 0
+      },
+      "multi_processor_count": 132,
+      "name": "NVIDIA H100 NVL",
+      "total_memory_bytes": 99949674496,
+      "uuid": "96b18ccc-7894-5e31-0ad6-a74b5b79ac28"
+    },
+    "device_count": 1,
+    "memory": {
+      "nvml_device": {
+        "compute_capability": {
+          "major": 9,
+          "minor": 0
+        },
+        "driver_version": "580.126.09",
+        "free_memory_bytes": 99139780608,
+        "label": "NVML device observation (whole device/context, not PyTorch allocator statistics)",
+        "name": "NVIDIA H100 NVL",
+        "nvml_version": "13.580.126.09",
+        "total_memory_bytes": 100485038080,
+        "used_memory_bytes": 1345257472,
+        "uuid": "GPU-96b18ccc-7894-5e31-0ad6-a74b5b79ac28"
+      },
+      "nvml_processes": {
+        "compute_processes": [
+          {
+            "pid": 1333249,
+            "used_gpu_memory_bytes": 786432000
+          }
+        ],
+        "graphics_processes": [
+          {
+            "pid": 2104,
+            "used_gpu_memory_bytes": 4669440
+          }
+        ],
+        "label": "NVML process observations (host PIDs; not PyTorch allocator statistics)"
+      },
+      "pytorch_allocator": {
+        "batch": "complex64[16, 2048, 14] OFDM-like batch, FFT along the 2048 axis, then elementwise power",
+        "label": "PyTorch caching allocator statistics",
+        "peak_allocated_bytes": 50987008,
+        "peak_reserved_bytes": 58720256
+      }
+    },
+    "selected_device": "cuda:0",
+    "torch_version": "2.9.1+cu126"
+  },
+  "gpu_memory_after": {
+    "compute_capability": {
+      "major": 9,
+      "minor": 0
+    },
+    "driver_version": "580.126.09",
+    "free_memory_bytes": 98493857792,
+    "label": "NVML device observation (whole device/context, not PyTorch allocator statistics)",
+    "name": "NVIDIA H100 NVL",
+    "nvml_version": "13.580.126.09",
+    "total_memory_bytes": 100485038080,
+    "used_memory_bytes": 1991180288,
+    "uuid": "GPU-96b18ccc-7894-5e31-0ad6-a74b5b79ac28"
+  },
+  "mitsuba": {
+    "cuda_backend": true,
+    "drjit_version": "1.5.0",
+    "mitsuba_version": "3.9.1",
+    "variant": "cuda_ad_mono_polarized"
+  },
+  "python": {
+    "executable": "/opt/venv/bin/python",
+    "machine": "x86_64",
+    "packages": {
+      "PyYAML": "6.0.3",
+      "drjit": "1.5.0",
+      "isac-verify": "0.1.0",
+      "matplotlib": "3.11.2",
+      "mitsuba": "3.9.1",
+      "numpy": "2.5.4",
+      "nvidia-ml-py": "13.615.71",
+      "pandas": "3.1.0",
+      "pyarrow": "26.0.0",
+      "pytest": "9.1.1",
+      "scipy": "1.18.1",
+      "sionna": "2.2.0",
+      "sionna-rt": "2.2.0",
+      "torch": "2.9.1+cu126"
+    },
+    "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "version": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]"
+  },
+  "ray_tracing": {
+    "pathsolver": {
+      "cir_abs_max": 0.0008520259289070964,
+      "cir_device": "cuda:0",
+      "cir_dtype": "torch.complex64",
+      "cir_shape": [
+        1,
+        1,
+        1,
+        1,
+        4,
+        1
+      ],
+      "interactions": [
+        [
+          [
+            [
+              0,
+              1,
+              1,
+              1
+            ]
+          ]
+        ],
+        [
+          [
+            [
+              0,
+              0,
+              0,
+              1
+            ]
+          ]
+        ],
+        [
+          [
+            [
+              0,
+              0,
+              0,
+              0
+            ]
+          ]
+        ]
+      ],
+      "los_distance_m": 8.0,
+      "los_expected_delay_s": 2.6685127615852163e-08,
+      "los_measured_min_delay_s": 2.6685126996994768e-08,
+      "los_relative_delay_error": 2.3191097466091288e-08,
+      "max_depth": 3,
+      "num_paths": 4,
+      "num_valid": 4,
+      "num_valid_specular_paths": 3,
+      "scene": "custom two-wall scene from XML (wall-a y=-2, wall-b x=8)",
+      "seed": 42,
+      "tau_s": [
+        2.6685126996994768e-08,
+        3.77384701266692e-08,
+        5.3370253993989536e-08,
+        5.966975891169568e-08
+      ]
+    },
+    "rcssolver": {
+      "cir_abs_max": 7.691267092013732e-05,
+      "cir_device": "cuda:0",
+      "cir_dtype": "torch.complex64",
+      "cir_shape": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "expected_delay_s": 3.3356409519815205e-08,
+      "max_depth": 1,
+      "measured_min_delay_s": 3.335640741397583e-08,
+      "num_valid": 1,
+      "relative_delay_error": 6.313147622855796e-08,
+      "seed": 42,
+      "target": {
+        "class": "ConstantRCSSensingTarget",
+        "height_m": 0.2,
+        "length_m": 0.2,
+        "name": "target",
+        "position": [
+          0.0,
+          5.0,
+          2.0
+        ],
+        "sigma_m2": 1.0,
+        "width_m": 0.2
+      },
+      "tau_s": [
+        3.335640741397583e-08
+      ],
+      "two_leg_distance_m": 10.0
+    }
+  },
+  "require_h100": true,
+  "status": "PASS",
+  "timestamp_utc": "2026-10-26T22:30:36Z"
+}

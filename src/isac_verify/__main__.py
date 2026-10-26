@@ -1,0 +1,61 @@
+"""CLI entry point.
+
+Phase 0 implements ``preflight``. Later phases add ``validate`` (Phase 3),
+``run`` (Phase 7), and ``report`` (Phase 7) as specified in BRIEF §3.3/§4.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+
+def _preflight(args: argparse.Namespace) -> int:
+    from .environment import run_preflight
+
+    return run_preflight(require_h100=args.require_h100, output_path=args.output)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="isac_verify",
+        description="GPU-only Sionna pilot for active wall-assisted sensing verification",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    preflight = subparsers.add_parser(
+        "preflight",
+        help="check CUDA/OptiX, run PathSolver and RCSSolver, write environment.json",
+    )
+    preflight.add_argument(
+        "--require-h100",
+        action="store_true",
+        help="fail unless the visible GPU name contains H100",
+    )
+    preflight.add_argument(
+        "--output",
+        default="results/preflight",
+        help="directory for environment.json and preflight.log",
+    )
+    preflight.set_defaults(handler=_preflight)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    handler = getattr(args, "handler", None)
+    if handler is None:
+        parser.print_help()
+        return 2
+    try:
+        return int(handler(args))
+    except Exception as exc:  # noqa: BLE001
+        print(f"isac_verify: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
