@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import shutil
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from isac_verify.config import PilotConfig
 from isac_verify.metrics import integrity_checks, summarize_trials
 from isac_verify.phase7 import METHODS, Phase7Error, _mapfree_look_plan, run_smoke
 from isac_verify.report import build_report
+from isac_verify.verification import classify_evidence
 
 
 def _reduced_config(config: PilotConfig, path: Path) -> Path:
@@ -58,6 +60,7 @@ def test_report_rebuilds_from_saved_results(smoke_run: dict[str, Path]) -> None:
         "aggregate_metrics.csv",
         "01_geometry.png",
         "02_experiment_a.png",
+        "02b_experiment_b_paired_wall_energy.png",
         "03_beampatterns.png",
         "04_predicted_delays.png",
         "05_spectra.png",
@@ -140,6 +143,110 @@ def test_score_columns_are_availability_masked(smoke_run: dict[str, Path]) -> No
     summary = summarize_trials(trials)
     assert summary["S_available_count"].max() == 1
     assert summary["wall_excess_snr_available_count"].max() == 1
+
+
+def test_status_and_path_labels_follow_validity_rules(
+    smoke_run: dict[str, Path],
+) -> None:
+    trials = pd.read_parquet(smoke_run["output"] / "trials.parquet")
+    assert set(trials["status"]) <= {
+        "SUPPORTED",
+        "UNRESOLVED",
+        "ACQUISITION_FAILED",
+    }
+    direct = trials[trials["method"] == "direct_only"]
+    assert direct["status"].eq("UNRESOLVED").all()
+    assert direct["status_reason"].eq("no_wall_probe").all()
+    assert direct["path_availability"].eq("NOT_ATTEMPTED").all()
+    mapfree = trials[trials["method"].str.startswith("mapfree")]
+    assert mapfree["path_availability"].eq("NOT_APPLICABLE_NO_TWIN").all()
+    non_twin = trials[
+        ~trials["method"].isin(
+            ["exact_oracle", "imperfect_narrow", "imperfect_robust"]
+        )
+    ]
+    assert ~non_twin["path_availability"].eq("NOT_OBSERVABLE").any()
+
+
+def test_below_support_is_unresolved_not_rejected() -> None:
+    status, reason = classify_evidence(
+        score=0.01,
+        net_wall_w=10.0,
+        wall_noise_w=1.0,
+        direct_reliable=True,
+        reference_detectable=True,
+        thresholds={
+            "noise_sigmas": 3.0,
+            "supported_min": 0.8,
+            "rejected_max": 0.05,
+        },
+    )
+    assert status == "UNRESOLVED"
+    assert reason == "below_support_threshold"
+
+
+def test_declared_action_seed_streams_are_independent(
+    smoke_run: dict[str, Path],
+) -> None:
+    manifest = json.loads(
+        (smoke_run["output"] / "seed_manifest.json").read_text(encoding="utf-8")
+    )
+    streams = manifest["streams"]
+    direct = {
+        streams["direct"][name][0]
+        for name in ("probe_symbols", "receiver_noise", "relay_noise")
+    }
+    wall = {
+        streams["wall_action"][method][name][0]
+        for method in streams["wall_action"]
+        for name in ("probe_symbols", "receiver_noise", "relay_noise")
+    }
+    mapfree = {
+        streams["mapfree"]["mapfree_two_beam"][name][0]
+        for name in ("probe_symbols", "receiver_noise", "relay_noise")
+    }
+    coarse = {
+        streams["mapfree"]["mapfree_coarse_to_fine"]["coarse"][name][0][index]
+        for name in ("probe_symbols", "receiver_noise", "relay_noise")
+        for index in range(4)
+    }
+    refine = {
+        streams["mapfree"]["mapfree_coarse_to_fine"]["refine"][name][0][index]
+        for name in ("probe_symbols", "receiver_noise", "relay_noise")
+        for index in range(2)
+    }
+    assert len(direct) == 3
+    assert direct.isdisjoint(wall | mapfree | coarse | refine)
+    assert len(wall) == 9
+    assert len(coarse) == 12
+    assert len(refine) == 6
+
+
+def test_twin_error_is_shared_across_sigma(
+    smoke_run: dict[str, Path],
+) -> None:
+    twin = pd.read_csv(smoke_run["output"] / "twin_realizations.csv")
+    for _, group in twin.groupby("twin_index"):
+        assert group["z_positive"].nunique() == 1
+        assert group["z_negative"].nunique() == 1
+    assert np.allclose(
+        twin["epsilon_positive_m"],
+        twin["sigma_map_m"] * twin["z_positive"],
+    )
+    assert np.allclose(
+        twin["epsilon_negative_m"],
+        twin["sigma_map_m"] * twin["z_negative"],
+    )
+
+
+def test_experiment_a_all_beams_are_saved(
+    smoke_run: dict[str, Path],
+) -> None:
+    beams = pd.read_csv(smoke_run["output"] / "experiment_a_beams.csv")
+    assert len(beams) == int(PilotConfig.load(smoke_run["config"]).get("experiment_a", "num_random_beams")) + 6
+    assert beams["analytical_c128_relative_error"].gt(0.0).all()
+    assert beams["analytical_c64_relative_error"].gt(0.0).all()
+    assert beams["sionna_relative_error"].gt(0.0).all()
 
 
 def test_mapfree_two_beam_spends_one_extra_action(config: PilotConfig) -> None:

@@ -126,6 +126,55 @@ def _geometry_figure(
 def _experiment_a_figure(
     output: Path,
     *,
+    source: Path,
+    dpi: int,
+) -> None:
+    path = source / "experiment_a_beams.csv"
+    if not path.exists():
+        return
+    frame = pd.read_csv(path)
+    fig, ax = plt.subplots(figsize=(7.2, 4.6))
+    styles = {
+        "direct": ("#1f77b4", "o"),
+        "dither": ("#ff7f0e", "s"),
+        "random": ("#2ca02c", "."),
+    }
+    for kind, group in frame.groupby("beam_kind", sort=False):
+        color, marker = styles.get(str(kind), ("#7f7f7f", "."))
+        ax.plot(
+            group["beam_index"],
+            group["analytical_c128_relative_error"],
+            marker=marker,
+            linestyle="-",
+            markersize=3.0,
+            linewidth=0.8,
+            color=color,
+            alpha=0.85,
+            label=f"{kind} c128",
+        )
+        ax.plot(
+            group["beam_index"],
+            group["sionna_relative_error"],
+            marker=marker,
+            linestyle="--",
+            markersize=2.5,
+            linewidth=0.8,
+            color=color,
+            alpha=0.55,
+            label=f"{kind} Sionna",
+        )
+    ax.set_yscale("log")
+    ax.set_xlabel("beam index (direct, dither, random)")
+    ax.set_ylabel("max relative effective-response difference")
+    ax.set_title("Experiment A effective-response differences across all beams")
+    ax.grid(True, which="both", alpha=0.25)
+    ax.legend(fontsize=5, ncol=3)
+    _save(fig, output, "02_experiment_a", dpi)
+
+
+def _experiment_b_figure(
+    output: Path,
+    *,
     trials: pd.DataFrame,
     dpi: int,
 ) -> None:
@@ -149,10 +198,10 @@ def _experiment_a_figure(
     ax.set_yscale("log")
     ax.set_xlabel("target-world wall energy [W]")
     ax.set_ylabel("replay-world wall energy [W]")
-    ax.set_title("Experiment A paired worlds: target versus replay")
+    ax.set_title("Experiment B paired worlds: target versus replay wall energy")
     ax.grid(True, which="both", alpha=0.25)
     ax.legend(fontsize=7)
-    _save(fig, output, "02_experiment_a", dpi)
+    _save(fig, output, "02b_experiment_b_paired_wall_energy", dpi)
 
 
 def _beampattern_figure(
@@ -305,22 +354,50 @@ def _score_figure(output: Path, *, trials: pd.DataFrame, dpi: int) -> None:
 
 
 def _status_figure(output: Path, *, summary: pd.DataFrame, dpi: int) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(11.0, 4.2), sharex=True)
+    fig, axes = plt.subplots(1, 2, figsize=(12.0, 4.4), sharex=True)
+    availability = (
+        ("NOT_OBSERVABLE", "-"),
+        ("NOT_ATTEMPTED", "--"),
+        ("NOT_APPLICABLE_NO_TWIN", ":"),
+    )
     for method in METHOD_ORDER:
         group = summary[summary["method"] == method]
-        for world, style in (("target", "-"), ("replay", "--")):
+        for world, marker in (("target", "o"), ("replay", "s")):
             subset = group[group["world"] == world]
             if subset.empty:
                 continue
-            axes[0].plot(subset["sigma_map_m"], subset["acquisition_rate"], style, marker="o", markersize=3, label=f"{METHOD_LABELS[method]} {world}")
-            axes[1].plot(subset["sigma_map_m"], subset["not_observable_rate"], style, marker="o", markersize=3)
-    axes[0].set_ylabel("acquisition rate")
-    axes[1].set_ylabel("NOT_OBSERVABLE rate")
+            axes[0].plot(
+                subset["sigma_map_m"],
+                subset["acquisition_failure_rate"],
+                linestyle="-" if world == "target" else "--",
+                marker=marker,
+                markersize=3,
+                label=f"{METHOD_LABELS[method]} {world}",
+            )
+            for status, style in availability:
+                axes[1].plot(
+                    subset["sigma_map_m"],
+                    subset[f"{status.lower()}_rate"],
+                    linestyle=style,
+                    marker=marker,
+                    markersize=2.5,
+                    alpha=0.75,
+                )
+    axes[0].set_ylabel("acquisition failure rate")
+    axes[1].set_ylabel("path-availability rate")
     for ax in axes:
         ax.set_xlabel("sigma_map [m]")
         ax.grid(True, alpha=0.25)
     axes[0].legend(fontsize=5, ncol=2)
-    fig.suptitle("Smoke status rates versus declared map error")
+    axes[1].text(
+        0.01,
+        0.98,
+        "solid NOT_OBSERVABLE\ndashed NOT_ATTEMPTED\ndotted NOT_APPLICABLE_NO_TWIN",
+        transform=axes[1].transAxes,
+        va="top",
+        fontsize=6,
+    )
+    fig.suptitle("Smoke status and path-availability rates versus declared map error")
     _save(fig, output, "07_status_rates", dpi)
 
 
@@ -501,13 +578,16 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
     direction_summary.to_csv(output / "mapfree_direction_summary.csv", index=False)
     noise_path = source / "noise_normalization.csv"
     noise = pd.read_csv(noise_path) if noise_path.exists() else pd.DataFrame()
+    twin_path = source / "twin_realizations.csv"
+    twin = pd.read_csv(twin_path) if twin_path.exists() else pd.DataFrame()
     arrays: dict[str, Any] = {}
     npz_path = source / "representative_waveforms.npz"
     if npz_path.exists():
         with np.load(npz_path) as loaded:
             arrays = {key: loaded[key] for key in loaded.files}
     _geometry_figure(output, config=config, geometry=geometry, paths=paths, dpi=dpi)
-    _experiment_a_figure(output, trials=trials, dpi=dpi)
+    _experiment_a_figure(output, source=source, dpi=dpi)
+    _experiment_b_figure(output, trials=trials, dpi=dpi)
     _beampattern_figure(output, config=config, arrays=arrays, dpi=dpi)
     _delay_figure(output, config=config, trials=trials, dpi=dpi)
     _spectra_figure(output, config=config, arrays=arrays, dpi=dpi)
@@ -524,7 +604,21 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "## Scope",
         "",
         "- Geometry: nominal smoke corridor.",
-        "- Map-error settings: " + ", ".join(str(value) for value in geometry.get("twin_wall_offsets_m", {}).keys()) + " m.",
+        "- Map-error settings: "
+        + (
+            ", ".join(
+                f"{value:g}"
+                for value in sorted(
+                    {
+                        float(row["sigma_map_m"])
+                        for row in geometry.get("twin_realizations", [])
+                    }
+                )
+            )
+            if geometry.get("twin_realizations")
+            else "n/a"
+        )
+        + " m.",
         "- Worlds: target and replay on the same true map.",
         "- Records per method/sigma/world: " + str(records_per_cell),
         "- Twin realizations per sigma: "
@@ -549,8 +643,8 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "",
         "## Aggregate table",
         "",
-        "| method | world | sigma [m] | n | acquisition | not observable | unusable beam | S n | S median | S 5-95% | wall-excess n | wall-excess median | wall-excess 5-95% | null depth [dB] |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---|---:|",
+        "| method | world | sigma [m] | n | acquisition | acquisition failure | not observable | not attempted | no-twin N/A | unusable beam | S n | S median | S 5-95% | AOA error median | AOA error 5-95% | wall-excess n | wall-excess median | wall-excess 5-95% | null depth median [dB] | null depth 5-95% |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---|---:|---:|---|---:|---|",
     ]
     for _, row in summary.iterrows():
         s_range = (
@@ -564,24 +658,48 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
             if pd.notna(row.get("wall_excess_snr_q05"))
             else "n/a"
         )
+        aoa_range = (
+            f"{_format_number(row['candidate_aoa_error_deg_q05'])} to "
+            f"{_format_number(row['candidate_aoa_error_deg_q95'])}"
+            if pd.notna(row.get("candidate_aoa_error_deg_q05"))
+            else "n/a"
+        )
+        null_range = (
+            f"{_format_number(row['null_depth_db_q05'])} to "
+            f"{_format_number(row['null_depth_db_q95'])}"
+            if pd.notna(row.get("null_depth_db_q05"))
+            else "n/a"
+        )
+        unusable_text = (
+            f"{float(row['unusable_beam_rate']):.1%}"
+            if pd.notna(row.get("unusable_beam_rate"))
+            else "n/a"
+        )
         lines.append(
-            "| {method} | {world} | {sigma:.3g} | {records} | {acq:.1%} | {no:.1%} | "
-            "{unusable:.1%} | {sn} | {smed} | {srange} | {exn} | {exmed} | "
-            "{exrange} | {null} |".format(
+            "| {method} | {world} | {sigma:.3g} | {records} | {acq:.1%} | "
+            "{fail:.1%} | {no:.1%} | {na:.1%} | {nt:.1%} | {unusable} | "
+            "{sn} | {smed} | {srange} | {aoamed} | {aoarange} | {exn} | {exmed} | "
+            "{exrange} | {null} | {nullrange} |".format(
                 method=METHOD_LABELS.get(row["method"], row["method"]),
                 world=row["world"],
                 sigma=float(row["sigma_map_m"]),
                 records=int(row["records"]),
                 acq=float(row["acquisition_rate"]),
+                fail=float(row["acquisition_failure_rate"]),
                 no=float(row["not_observable_rate"]),
-                unusable=float(row["unusable_beam_rate"]),
+                na=float(row["not_attempted_rate"]),
+                nt=float(row["not_applicable_no_twin_rate"]),
+                unusable=unusable_text,
                 sn=int(row["S_available_count"]),
                 smed=_format_number(row.get("S_median")),
                 srange=s_range,
+                aoamed=_format_number(row.get("candidate_aoa_error_deg_median")),
+                aoarange=aoa_range,
                 exn=int(row["wall_excess_snr_available_count"]),
                 exmed=_format_number(row.get("wall_excess_snr_median")),
                 exrange=ex_range,
                 null=_format_number(row.get("null_depth_db_median")),
+                nullrange=null_range,
             )
         )
     noise_lines: list[str] = []
@@ -695,6 +813,94 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "NVML delta.",
     ]
 
+    twin_lines: list[str] = []
+    if not twin.empty:
+        twin_lines = [
+            "",
+            "## Twin map-error realizations",
+            "",
+            "A common standard-normal draw `z` is used for each twin "
+            "realization across sigma, with independent draws for the two "
+            "walls and `epsilon = sigma z`.",
+            "",
+            "| sigma [m] | realization | z+ | z- | epsilon+ [m] | epsilon- [m] | positive wall [m] | negative wall [m] |",
+            "|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+        for _, row in twin.iterrows():
+            twin_lines.append(
+                "| {sigma:.3g} | {index} | {zp:.4f} | {zn:.4f} | "
+                "{ep:+.4f} | {en:+.4f} | {pos:.4f} | {neg:.4f} |".format(
+                    sigma=float(row["sigma_map_m"]),
+                    index=int(row["twin_index"]),
+                    zp=float(row["z_positive"]),
+                    zn=float(row["z_negative"]),
+                    ep=float(row["epsilon_positive_m"]),
+                    en=float(row["epsilon_negative_m"]),
+                    pos=float(row["twin_positive_wall_m"]),
+                    neg=float(row["twin_negative_wall_m"]),
+                )
+            )
+
+    guard_bounds = config.section("phase6", "processing")["guard_ratio_bounds"]
+    guard_lines = [
+        "",
+        "## Guard-statistic sanity",
+        "",
+        "The guard check compares the mean per-cell power in the declared "
+        "guard interval with the mean per-cell noise calibration. Under the "
+        "noise-only model the expected ratio is 1. The declared acceptance "
+        f"bounds are `[{float(guard_bounds[0]):g}, {float(guard_bounds[1]):g}]`; "
+        "no scientific threshold is attached to this engineering check.",
+    ]
+
+    planned_trials = 12 * 5 * 32 * 2 * 6
+    heldout_trials = 24 * 5 * 32 * 2 * 6
+    smoke_trials = int(len(trials))
+    end_to_end = float(timing.get("end_to_end_s") or 0.0)
+    warm = float(timing.get("warm_steady_state_s") or 0.0)
+    if end_to_end > 0.0 and smoke_trials > 0 and warm > 0.0:
+        throughput = smoke_trials / end_to_end
+        startup = max(end_to_end - warm * smoke_trials, 0.0)
+        planned_seconds = startup + warm * planned_trials
+        heldout_seconds = startup + warm * heldout_trials
+        conservative_seconds = planned_trials / throughput
+        total_bytes = int(nvml_start.get("total_bytes", 0) or 0)
+        peak_reserved = int(
+            timing.get("pytorch_peak_reserved_bytes", 0) or 0
+        )
+        headroom = total_bytes - peak_reserved if total_bytes else 0
+        projection_lines = [
+            "",
+            "## Phase 8 runtime and memory projection (not executed)",
+            "",
+            f"Smoke throughput was {smoke_trials} rows in "
+            f"{_format_number(end_to_end, 6)} s. The planned Phase 8A grid "
+            f"is `12 x 5 x 32 x 2 x 6 = {planned_trials}` trials, and the "
+            f"held-out grid is `24 x 5 x 32 x 2 x 6 = {heldout_trials}` trials.",
+            "",
+            "| estimate | trials | projected wall clock |",
+            "|---|---:|---:|",
+            f"| Phase 8A, warm-median projection plus startup | {planned_trials} | "
+            f"{_format_number(planned_seconds / 3600.0, 4)} h |",
+            f"| Held-out, warm-median projection plus startup | {heldout_trials} | "
+            f"{_format_number(heldout_seconds / 3600.0, 4)} h |",
+            f"| Phase 8A, end-to-end throughput projection | {planned_trials} | "
+            f"{_format_number(conservative_seconds / 3600.0, 4)} h |",
+            "",
+            f"GPU total memory was {total_bytes} bytes; the process-local "
+            f"PyTorch peak reserved {peak_reserved} bytes, leaving "
+            f"{headroom} bytes relative to device total. NVML free memory at "
+            f"start was {int(nvml_start.get('free_bytes', 0) or 0)} bytes. "
+            "These are engineering projections, not measured Phase 8 results.",
+        ]
+    else:
+        projection_lines = [
+            "",
+            "## Phase 8 runtime and memory projection (not executed)",
+            "",
+            "Timing was incomplete, so no runtime projection was formed.",
+        ]
+
     lines += [
         "",
         "`S` is populated only where `S_available=True` (mapped methods). "
@@ -704,25 +910,26 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "table reports the available count for each column. `unusable beam` is the "
         "fraction of records where no transmit beam could be formed from the "
         "available estimate or map-free selection.",
-    ] + noise_lines + direction_lines + [
+    ] + noise_lines + direction_lines + twin_lines + guard_lines + projection_lines + [
         "",
         "## Figures",
         "",
         "1. `01_geometry` — true/twin walls and solved target/relay paths.",
-        "2. `02_experiment_a` — paired target versus replay wall energy.",
+        "2. `02_experiment_a` — Experiment A effective-response differences across all beams.",
+        "2b. `02b_experiment_b_paired_wall_energy` — paired target versus replay wall energy.",
         "3. `03_beampatterns` — saved direct, exact, and robust beams.",
         "4. `04_predicted_delays` — predicted wall gates against true-path delays.",
         "5. `05_spectra` — representative target/replay delay and angle spectra.",
         "6. `06_score_distributions` — score distributions without a threshold.",
-        "7. `07_status_rates` — acquisition and NOT_OBSERVABLE rates versus sigma.",
+        "7. `07_status_rates` — acquisition-failure and path-availability rates versus sigma.",
         "9. `09_runtime_memory` — timing categories and separate memory measurements.",
     ] + timing_lines + [
         "",
         "## Claim limits",
         "",
         "- No confidence interval, p-value, or threshold-based scientific claim is made.",
-        "- The smoke run shares one base acquisition per world across records; it does "
-        "not estimate acquisition probability.",
+        "- Each record is acquired from its own direct observation; the smoke "
+        "run still does not estimate a population acquisition probability.",
         "- Results are implementation evidence for the next pilot stage, not an "
         "estimate of wall-assisted sensing performance.",
         "",
@@ -737,6 +944,8 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "- `paths_diagnostic.parquet`",
         "- `representative_waveforms.npz`",
         "- `noise_normalization.csv`",
+        "- `experiment_a_beams.csv`",
+        "- `twin_realizations.csv`",
         "- `mapfree_directions.csv`",
         "- `mapfree_direction_summary.csv`",
         "- `mapfree_looks.csv`",

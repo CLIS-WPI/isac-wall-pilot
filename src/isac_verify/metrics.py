@@ -46,7 +46,14 @@ def summarize_trials(trials: pd.DataFrame) -> pd.DataFrame:
             group.loc[excess_available, "wall_excess_snr"], errors="coerce"
         )
         null = pd.to_numeric(group["null_depth_db"], errors="coerce")
+        aoa_error = pd.to_numeric(
+            group["candidate_aoa_error_deg"], errors="coerce"
+        )
         runtime = pd.to_numeric(group["trial_runtime_s"], errors="coerce")
+        beam_attempted = (
+            ~group["method"].eq("direct_only")
+            & ~group["path_availability"].eq("NOT_ATTEMPTED")
+        )
         rows.append(
             {
                 "method": method,
@@ -56,11 +63,31 @@ def summarize_trials(trials: pd.DataFrame) -> pd.DataFrame:
                 "acquisition_rate": float(
                     np.mean(group["acquisition_status"].eq("ACQUIRED"))
                 ),
+                "acquisition_failure_rate": float(
+                    np.mean(group["status"].eq("ACQUISITION_FAILED"))
+                ),
                 "not_observable_rate": float(
                     np.mean(group["path_availability"].eq("NOT_OBSERVABLE"))
                 ),
-                "unusable_beam_rate": float(
-                    np.mean(~group["beam_usable"].astype(bool))
+                "not_attempted_rate": float(
+                    np.mean(group["path_availability"].eq("NOT_ATTEMPTED"))
+                ),
+                "not_applicable_no_twin_rate": float(
+                    np.mean(
+                        group["path_availability"].eq("NOT_APPLICABLE_NO_TWIN")
+                    )
+                ),
+                "available_path_rate": float(
+                    np.mean(group["path_availability"].eq("AVAILABLE"))
+                ),
+                "unusable_beam_rate": (
+                    float(
+                        np.mean(
+                            ~group.loc[beam_attempted, "beam_usable"].astype(bool)
+                        )
+                    )
+                    if beam_attempted.any()
+                    else None
                 ),
                 "S_available_count": int(s_available.sum()),
                 "S_available_rate": float(np.mean(s_available)),
@@ -82,8 +109,33 @@ def summarize_trials(trials: pd.DataFrame) -> pd.DataFrame:
                     if not excess_values.empty
                     else None
                 ),
+                "candidate_aoa_error_deg_median": (
+                    float(aoa_error.median())
+                    if aoa_error.notna().any()
+                    else None
+                ),
+                "candidate_aoa_error_deg_q05": (
+                    float(aoa_error.quantile(0.05))
+                    if aoa_error.notna().any()
+                    else None
+                ),
+                "candidate_aoa_error_deg_q95": (
+                    float(aoa_error.quantile(0.95))
+                    if aoa_error.notna().any()
+                    else None
+                ),
                 "null_depth_db_median": (
                     float(null.median()) if null.notna().any() else None
+                ),
+                "null_depth_db_q05": (
+                    float(null.quantile(0.05))
+                    if null.notna().any()
+                    else None
+                ),
+                "null_depth_db_q95": (
+                    float(null.quantile(0.95))
+                    if null.notna().any()
+                    else None
                 ),
                 "runtime_s_median": (
                     float(runtime.median()) if runtime.notna().any() else None
@@ -137,6 +189,16 @@ def integrity_checks(
         ["probe_seed", "receiver_noise_seed", "relay_noise_seed"]
     ].nunique()
     paired_ok = bool((paired <= 1).all().all())
+    statuses = set(trials["status"].astype(str))
+    direct_rows = trials[trials["method"] == "direct_only"]
+    mapfree_rows = trials[
+        trials["method"].isin(["mapfree_two_beam", "mapfree_coarse_to_fine"])
+    ]
+    mapped_rows = trials[
+        ~trials["method"].isin(
+            ["direct_only", "mapfree_two_beam", "mapfree_coarse_to_fine"]
+        )
+    ]
     return {
         "expected_rows": int(expected_rows),
         "actual_rows": int(len(trials)),
@@ -163,6 +225,23 @@ def integrity_checks(
         ),
         "paired_seed_agreement": paired_ok,
         "paired_seed_groups_checked": int(len(paired)),
+        "status_labels_allowed": bool(
+            statuses <= {"SUPPORTED", "UNRESOLVED", "ACQUISITION_FAILED"}
+        ),
+        "direct_only_path_not_attempted": bool(
+            direct_rows["path_availability"].eq("NOT_ATTEMPTED").all()
+        ),
+        "mapfree_path_not_applicable": bool(
+            mapfree_rows["path_availability"].eq("NOT_APPLICABLE_NO_TWIN").all()
+        ),
+        "not_observable_only_from_twin": bool(
+            not trials.loc[
+                ~trials.index.isin(mapped_rows.index), "path_availability"
+            ].eq("NOT_OBSERVABLE").any()
+        ),
+        "acquisition_failure_rows": int(
+            trials["status"].eq("ACQUISITION_FAILED").sum()
+        ),
         "S_available_by_method": {
             str(method): bool(group["S_available"].any())
             for method, group in trials.groupby("method", sort=False)

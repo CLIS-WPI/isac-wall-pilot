@@ -809,7 +809,7 @@ def guard_noise_power(
         windowed.permute(1, 0, 2), l_min=l_min, l_max=l_max
     )
     zero = h_dd[:, choices.profile.num_symbols // 2, :]
-    return float(zero.abs().square().flatten().median().item())
+    return float(zero.abs().square().flatten().mean().item())
 
 
 def _log_parabolic_offset(left: float, center: float, right: float) -> float:

@@ -197,14 +197,9 @@ def classify_evidence(
     if wall_noise_w > 0.0 and net_wall_w <= noise_sigmas * wall_noise_w:
         return "UNRESOLVED", "wall_energy_consistent_with_noise"
     supported_min = float(thresholds["supported_min"])
-    rejected_max = float(thresholds["rejected_max"])
-    if supported_min <= rejected_max:
-        raise VerificationError("test thresholds must be ordered")
     if score >= supported_min:
         return "SUPPORTED", "above_supported_threshold"
-    if score <= rejected_max:
-        return "REJECTED", "below_rejected_threshold"
-    return "UNRESOLVED", "between_thresholds"
+    return "UNRESOLVED", "below_support_threshold"
 
 
 def _wall_side(family: str) -> str:

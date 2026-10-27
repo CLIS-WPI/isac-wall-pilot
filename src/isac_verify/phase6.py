@@ -781,7 +781,7 @@ def phase6_diagnostics(
         "delay_axis": delay_axis,
         "noise": {
             "calibration_per_cell_w": noise_per_cell,
-            "guard_median_power_w": guard_power_w,
+            "guard_mean_power_w": guard_power_w,
             "guard_ratio": guard_ratio,
             "guard_ratio_bounds": list(guard_bounds),
             "guard_ok": guard_ok,
@@ -903,7 +903,7 @@ def print_phase6_tables(phase6: dict[str, Any]) -> None:
     )
     print(
         "phase 6 guard noise: "
-        f"median={phase6['noise']['guard_median_power_w']:.6e} W/cell "
+        f"mean={phase6['noise']['guard_mean_power_w']:.6e} W/cell "
         f"ratio={phase6['noise']['guard_ratio']:.6f} "
         f"bounds={phase6['noise']['guard_ratio_bounds']} "
         f"ok={phase6['noise']['guard_ok']}"

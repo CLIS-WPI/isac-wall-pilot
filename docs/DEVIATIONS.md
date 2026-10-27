@@ -405,3 +405,165 @@ declared processing choices, not post-hoc tuning.
   acquisition `peak/noise=41.865 dB`.
   Evidence: `results/phase7/noise_normalization.csv`;
   `results/phase7/report/report.md`; `results/phase6/phase6_summary.json`.
+
+## Phase 7 validity fixes after review
+
+### P7-4 — Independent action randomness with common random numbers
+
+- **Type:** validity fix.
+- **What:** Direct-action probe, receiver-noise, and relay-noise seeds are now
+  one declared stream per record and are shared across methods, sigma settings,
+  and worlds. The mapped wall probe and each map-free look use separate
+  declared seed streams; coarse-to-fine predeclares four coarse and two
+  refinement look streams per record.
+- **Before:** Every method and every map-free look reused the same
+  `probe_seed`, `receiver_noise_seed`, and `relay_noise_seed`, so different
+  actions received identical symbol and noise realizations.
+- **After:** `seed_manifest.json` declares `direct`, per-method
+  `wall_action`, and per-look `mapfree` streams. `integrity_checks` verifies
+  direct-seed agreement across methods within each record.
+- **BRIEF section:** §6.1 waveform and seed declaration; §13.1 staged runs;
+  §14.3 output files.
+- **Evidence:** `src/isac_verify/phase7.py:129` (`_seed_manifest`),
+  `src/isac_verify/phase7.py:651` (`_scan_looks`),
+  `src/isac_verify/phase7.py:1153` (`run_smoke`), and
+  `src/isac_verify/metrics.py:156` (`integrity_checks`).
+
+### P7-5 — Per-record acquisition and per-trial planning
+
+- **Type:** validity fix.
+- **What:** Each record now estimates its candidate, point spread, direct gate,
+  and direct energy from that record's own direct observation. Every mapped
+  trial builds its plan, twin prediction, beam, measured-direction null, gates,
+  and `r_DT` from that candidate and its own twin realization. Acquisition
+  failures produce `ACQUISITION_FAILED` rows for every method and are counted.
+- **Before:** One shared base acquisition per world was reused for all sixteen
+  records, so candidate, point spread, and gates were constant within a world;
+  the null depth was effectively constant at about `-69.9 dB`.
+- **After:** Candidate delay has 16 distinct values per method/world/sigma cell,
+  and per-trial null depth spans roughly `-102.9` to `-62.9 dB` across the
+  saved smoke rows.
+- **BRIEF section:** §8.2 imperfect-map construction; §9.1 direct observation;
+  §9.2 twin-guided wall prediction; §13.1 staged runs.
+- **Evidence:** `src/isac_verify/phase7.py:431` (`_acquire_record`),
+  `src/isac_verify/phase7.py:534` (`_plan_for`), and the per-record loop in
+  `src/isac_verify/phase7.py:1153`.
+
+### P7-6 — Independent twin wall errors with shared standardized draws
+
+- **Type:** validity fix.
+- **What:** The two walls now receive independent standard-normal draws
+  `z+` and `z-`. For each twin realization the same draws are reused across
+  sigma, with `epsilon+ = sigma*z+` and `epsilon- = sigma*z-`. The declared
+  corridor validity rule is checked for each trial's twin map.
+- **Before:** One rigid delta was applied to both walls, so their errors were
+  perfectly correlated and the two-sided corridor never changed width.
+- **After:** `twin_realizations.csv` reports `z`, realized `epsilon`, and both
+  wall offsets for all twelve sigma/realization combinations; all combinations
+  pass corridor validity.
+- **BRIEF section:** §8.2 imperfect-map construction; §9.2 twin-guided wall
+  prediction.
+- **Evidence:** `src/isac_verify/phase7.py:196` (`_twin_offsets`),
+  `src/isac_verify/phase7.py:534` (`_plan_for`), and
+  `results/phase7/twin_realizations.csv`.
+
+### P7-7 — Remove `REJECTED` and use the three allowed evidence labels
+
+- **Type:** validity fix.
+- **What:** `classify_evidence` now returns only `SUPPORTED`, `UNRESOLVED`, or
+  `ACQUISITION_FAILED`. Scores below the support threshold return
+  `UNRESOLVED` with reason `below_support_threshold`; direct-only successful
+  rows return `UNRESOLVED` with reason `no_wall_probe`.
+- **Before:** Scores below `rejected_max` returned `REJECTED`, a label outside
+  the declared decision set.
+- **After:** The full smoke run has 576 `UNRESOLVED` rows and no `REJECTED`
+  rows; `integrity_checks` enforces the allowed status set.
+- **BRIEF section:** §10.3 evidence score; §10.4 allowed decisions; §13.2
+  equal-budget comparisons.
+- **Evidence:** `src/isac_verify/verification.py:180`
+  (`classify_evidence`), `src/isac_verify/metrics.py:156`
+  (`integrity_checks`), and `tests/test_phase7.py`.
+
+### P7-8 — Restrict `NOT_OBSERVABLE` to twin planning outcomes
+
+- **Type:** validity fix.
+- **What:** `NOT_OBSERVABLE` is now produced only when a twin-based planner
+  finds no usable wall path. Direct-only rows use
+  `path_availability="NOT_ATTEMPTED"` and reason `no_wall_probe`. Both map-free
+  methods use `path_availability="NOT_APPLICABLE_NO_TWIN"` on every row.
+  Metrics and the status-rate figure now report acquisition failure,
+  `NOT_OBSERVABLE`, `NOT_ATTEMPTED`, and `NOT_APPLICABLE_NO_TWIN` separately.
+- **Before:** Direct-only rows were `NOT_OBSERVABLE`, and map-free availability
+  was set from the measured excess SNR, mixing missing-map semantics with a
+  data-dependent outcome.
+- **After:** The smoke run has 96/96 direct-only `NOT_ATTEMPTED` rows,
+  192/192 map-free `NOT_APPLICABLE_NO_TWIN` rows, and no measured-data
+  `NOT_OBSERVABLE` rows.
+- **BRIEF section:** §10.3 evidence score; §12.2 imperfect-map evaluation;
+  §14.1 core metrics.
+- **Evidence:** `src/isac_verify/phase7.py:1153` (`run_smoke`),
+  `src/isac_verify/metrics.py:34` (`summarize_trials`),
+  `src/isac_verify/report.py:356` (`_status_figure`).
+
+### P7-9 — Restore Experiment A Figure 2 and keep Experiment B separate
+
+- **Type:** validity fix.
+- **What:** Figure 2 is now the Experiment A effective-response difference for
+  all 70 direct, dither, and random beams, saved as
+  `experiment_a_beams.csv`. The paired target-versus-replay wall-energy scatter
+  is retained as `02b_experiment_b_paired_wall_energy`.
+- **Before:** Figure 2 was titled Experiment A but plotted Experiment B paired
+  wall energies.
+- **After:** `02_experiment_a` plots the c128 and Sionna relative effective-
+  response differences across every beam index, grouped by beam family.
+- **BRIEF section:** §11 Experiment A; §14.4 figures.
+- **Evidence:** `src/isac_verify/phase7.py:1120`
+  (`_write_experiment_a_beams`), `src/isac_verify/report.py:126`
+  (`_experiment_a_figure`), and `src/isac_verify/report.py:175`
+  (`_experiment_b_figure`).
+
+### P7-10 — Compare mean guard power with mean calibration
+
+- **Type:** validity fix.
+- **What:** `guard_noise_power` now returns the mean per-cell guard power, and
+  the Phase 6 guard ratio compares that mean with the mean calibration. The
+  expected noise-only ratio is one. Bounds are declared in
+  `configs/pilot.yaml` and repeated in the Phase 7 report.
+- **Before:** The Phase 6 diagnostic compared a single-realization median
+  guard power with the mean calibration; for exponential cell power the
+  expected median/mean ratio is `ln 2 ≈ 0.693`, not one.
+- **After:** Phase 6 reports guard mean `1.692430e-17 W/cell`, ratio `0.898027`,
+  within the declared `[0.5, 2.0]` bounds. The report states the statistic and
+  bounds.
+- **BRIEF section:** §10.1 effective-channel processing; §13.1 staged runs.
+- **Evidence:** `src/isac_verify/receiver.py:792` (`guard_noise_power`),
+  `src/isac_verify/phase6.py:784`, and
+  `src/isac_verify/report.py` (guard-statistic section).
+
+### P7-11 — Add Phase 8 runtime and memory projection without running it
+
+- **Type:** validity fix.
+- **What:** The report projects the declared Phase 8A grid
+  `12 x 5 x 32 x 2 x 6 = 23040` trials and the `24`-geometry held-out grid
+  `46080` trials from measured smoke throughput. It also reports process-local
+  peak reserved memory, device total, and headroom.
+- **Before:** The report contained smoke timing but no Phase 8 wall-clock or
+  held-out projection and no memory-headroom statement.
+- **After:** From 576 smoke rows in `247.997 s`, the warm-median projection is
+  `2.411 h` for Phase 8A and `4.813 h` for the held-out grid; the conservative
+  end-to-end projection is `2.756 h` for Phase 8A. Neither grid was executed.
+- **BRIEF section:** §13.2 equal-budget comparisons; §14.2 runtime and H100
+  metrics.
+- **Evidence:** `src/isac_verify/report.py:874` (projection section);
+  `results/phase7/timing.json`; `results/phase7/report/report.md`.
+
+## Phase 7 validity-fix verification
+
+- `ISAC_DEV=1 scripts/drun.sh python -m isac_verify run --config
+  configs/pilot.yaml --stage smoke --output results/phase7`:
+  `576/576` rows, 36/36 cells, integrity true, `SMOKE_COMPLETE`.
+- `ISAC_DEV=1 scripts/drun.sh python -m isac_verify validate --config
+  configs/pilot.yaml --require-h100 --output results/validate`:
+  `validation status: PASS`, `phase 6 status: PASS`.
+- `ISAC_DEV=1 scripts/drun.sh python -m pytest -q tests`:
+  `44 passed`.
