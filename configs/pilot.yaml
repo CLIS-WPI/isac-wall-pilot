@@ -480,6 +480,9 @@ seeds:
     diagnostic_beam_selection:
       calibration: [6101, 6102, 6103, 6104, 6105, 6106, 6107, 6108, 6109, 6110, 6111, 6112]
       heldout: [6201, 6202, 6203, 6204, 6205, 6206, 6207, 6208, 6209, 6210, 6211, 6212, 6213, 6214, 6215, 6216, 6217, 6218, 6219, 6220, 6221, 6222, 6223, 6224]
+    noise_only_floor:
+      calibration: [7101, 7102, 7103, 7104, 7105, 7106, 7107, 7108, 7109, 7110, 7111, 7112]
+      heldout: [7201, 7202, 7203, 7204, 7205, 7206, 7207, 7208, 7209, 7210, 7211, 7212, 7213, 7214, 7215, 7216, 7217, 7218, 7219, 7220, 7221, 7222, 7223, 7224]
 
 decisions:
   D2:
@@ -517,3 +520,81 @@ decisions:
     brief_section: "7.1,7.2,15"
     choice: per_link_depth_at_one_percent_power_change_with_relay_double_bounce
     config_key: scene.d9_depths
+
+phase8:
+  analysis_plan: docs/ANALYSIS_PLAN.md
+  heldout_requires_approval: true
+  geometry:
+    calibration_geometries: 12
+    heldout_geometries: 24
+    candidate_distance_m_range: [50.0, 70.0]
+    relay_distance_m_range: [20.0, 40.0]
+    true_corridor_half_width_m_range: [12.0, 18.0]
+    wall_thickness_m: 0.10
+    target_relay_collinear: true
+    seed_stream: physical_geometry
+    reject_only_if: matched_fixed_relay_infeasible
+    wall_observability_is_rejection_criterion: false
+  grid:
+    sigma_map_m: [0.0, 0.25, 0.5, 1.0, 2.0]
+    twin_realizations_per_sigma: 4
+    twin_error_epsilon: sigma_times_z_independent_per_wall
+    records_per_world: 32
+    worlds: [target, replay]
+    methods:
+      - direct_only
+      - exact_oracle
+      - imperfect_narrow
+      - imperfect_robust
+      - mapfree_two_beam
+      - mapfree_coarse_to_fine
+    power_dbm: 10.0
+    bandwidth_profile: baseline
+    relay: matched_fixed_physical_noise
+  methods:
+    primary: imperfect_robust
+    secondary: imperfect_narrow
+    diagnostic_only: exact_oracle
+  rules:
+    floor:
+      false_exceedance_rate: 0.01
+      min_noise_only_records: 1000
+      statistic: order_statistic_ceil_0p99_n
+    band:
+      replay_supported_rate_max: 0.05
+      s_hi_quantile: 0.995
+    common:
+      replay_quantile: 0.95
+    coverage:
+      required: 0.99
+      inflation_candidates: [1.0, 1.25, 1.5, 2.0]
+      selection_method: imperfect_robust
+      truth: outgoing_wall_path_of_plan_side
+    quantile_method: numpy_linear
+  heldout:
+    bootstrap_draws: 10000
+    confidence_level: 0.95
+    replay_supported_rate_max: 0.05
+    replay_supported_rate_upper_ci_max: 0.10
+    genuine_target_sigma_max_m: 0.5
+    useful_target_supported_rate_min: 0.50
+    advantage_sigma_m: [0.5, 1.0]
+    advantage_comparator: mapfree_coarse_to_fine
+    advantage_rule: common_supported
+    advantage_ci_lower_bound_min: 0.0
+    brief16_targets:
+      target_support_min: 0.80
+      attack_support_max: 0.10
+      not_observable_max: 0.20
+  stress:
+    wall_thickness_m: [0.05, 0.20]
+    array_calibration:
+      amplitude_error_db_rms: 0.5
+      phase_error_deg_rms: 5.0
+      realizations: 4
+      applies_to: physical_tx_rx_arrays_only
+    used_for_tuning: false
+  frozen:
+    gate_inflation_c: null
+    thresholds: null
+    t_common: null
