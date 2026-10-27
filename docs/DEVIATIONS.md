@@ -758,9 +758,36 @@ declared processing choices, not post-hoc tuning.
   passes (`results/validate_p8fix2`), and every numeric field of
   `validation_summary.json` (13578) and `phase6_summary.json` (472) equals the
   P8-4 run to within 1e-9 relative. Only the output paths differ. The nominal
-  direct return (about 438 ns) and wall return (about 424 ns) both lie inside
+  direct return (400.28 ns) and wall return (423.90 ns) both lie inside
   [300, 500] ns, so the smoke was not re-run.
 - **Run record:** `calibrate` now samples NVML's process list on device 0
   every 30 s during the run and writes the per-PID summary to
   `timing.json` as `gpu_processes_observed` (host PIDs, including the run's own
   process). It does not affect any computed value.
+
+### P8-6 — Calibration geometries run in parallel processes on one GPU
+
+- **Type:** execution change only. No computation, seed, rule or declared
+  value changed.
+- **What:** `calibrate --workers N` runs the 12 calibration slots in N worker
+  processes on the same GPU, each owning a fixed subset of slots
+  (`slot k` goes to worker `k mod N`). The main process runs preflight, writes the
+  resolved config and seed manifest, samples NVML for the whole run, waits for all
+  workers, and only then runs the unchanged analysis on the 12 shards. Each
+  worker calls the same per-slot function (`_run_slots`) as the sequential
+  path. Every worker recomputes the noise calibration from the declared seeds,
+  and the main process refuses to analyze unless all workers' values agree
+  exactly. A failed worker stops the run before analysis.
+- **Why:** a single process kept GPU 1 busy only about 35% of the time,
+  because each record launches many small kernels from Python. The calibration
+  slots are independent, so running them side by side shortens the run without
+  touching the computation.
+- **Equivalence evidence** (`results/phase8a_diag/eq_seq`, `eq_par`;
+  2 geometries x 2 records, run sequentially and with 2 workers): 240 rows in
+  both. All 104 non-timing columns are identical (`discovery` compared as text,
+  because its dicts contain NaN), and `thresholds.json` decision thresholds
+  are identical. Only `trial_runtime_s` differs.
+- **Run record:** the Phase 8A calibration uses `--workers 12` on GPU 1.
+  `timing.json` records `workers`, `worker_slots`, per-worker wall time and
+  PyTorch peaks, the agreed noise calibration, and the NVML process record for
+  the whole device.

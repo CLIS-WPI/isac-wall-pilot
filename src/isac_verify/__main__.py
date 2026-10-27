@@ -43,6 +43,12 @@ def _calibrate(args: argparse.Namespace) -> int:
         require_h100=args.require_h100,
         geometry_limit=args.geometry_limit,
         record_limit=args.record_limit,
+        workers=args.workers,
+        worker_slots=(
+            None
+            if args.worker_slots is None
+            else [int(slot) for slot in args.worker_slots.split(",")]
+        ),
     )
 
 
@@ -171,6 +177,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="recompute thresholds from saved shards",
     )
+    calibrate.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="parallel geometry processes on the same GPU (same code and seeds)",
+    )
+    calibrate.add_argument("--worker-slots", default=None, help=argparse.SUPPRESS)
     calibrate.set_defaults(handler=_calibrate)
 
     report = subparsers.add_parser(

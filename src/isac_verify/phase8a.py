@@ -11,6 +11,8 @@ from __future__ import annotations
 import copy
 import json
 import math
+import subprocess
+import sys
 import threading
 import time
 from dataclasses import replace
@@ -388,16 +390,19 @@ def run_calibration(
     require_h100: bool = True,
     geometry_limit: int | None = None,
     record_limit: int | None = None,
+    workers: int = 1,
+    worker_slots: list[int] | None = None,
 ) -> int:
-    """Run the calibration geometries and compute the frozen thresholds."""
+    """Run the calibration geometries and compute the frozen thresholds.
+
+    ``workers > 1`` runs the same per-geometry code in parallel processes on the
+    same GPU, each owning a fixed subset of slots; ``worker_slots`` is that
+    worker mode (no preflight, no analysis).
+    """
     config = PilotConfig.load(config_path)
     _require_gpu(config)
     output = Path(output_path)
     (output / "shards").mkdir(parents=True, exist_ok=True)
-    from .environment import run_preflight
-
-    if run_preflight(require_h100=require_h100, output_path=output) != 0:
-        raise Phase8Error("preflight failed")
     total_slots = int(config.get("phase8", "geometry", "calibration_geometries"))
     slots = total_slots if geometry_limit is None else min(total_slots, int(geometry_limit))
     records = (
@@ -405,6 +410,12 @@ def run_calibration(
         if record_limit is not None
         else int(config.get("phase8", "grid", "records_per_world"))
     )
+    if worker_slots is not None:
+        return _run_worker(config, output, worker_slots, records)
+    from .environment import run_preflight
+
+    if run_preflight(require_h100=require_h100, output_path=output) != 0:
+        raise Phase8Error("preflight failed")
     resolved = dict(config.data)
     resolved["phase8_runtime"] = {
         "split": SPLIT,
@@ -441,6 +452,92 @@ def run_calibration(
     timing["nvml_start"] = _nvml_snapshot()
     gpu_processes, stop_gpu_monitor = _start_gpu_process_monitor(run_start)
     torch.cuda.reset_peak_memory_stats()
+    if workers > 1:
+        timing.update(
+            _run_parallel(config_path, output, slots, records, workers, record_limit)
+        )
+    else:
+        timing["per_geometry_s"] = _run_slots(config, output, list(range(slots)), records)[
+            "per_geometry_s"
+        ]
+    timing["workers"] = workers
+    timing["end_to_end_s"] = _now() - run_start
+    timing["nvml_end"] = _nvml_snapshot()
+    stop_gpu_monitor()
+    timing["gpu_processes_observed"] = _summarize_gpu_processes(gpu_processes)
+    timing["pytorch_peak_allocated_bytes"] = int(torch.cuda.max_memory_allocated())
+    timing["pytorch_peak_reserved_bytes"] = int(torch.cuda.max_memory_reserved())
+    return analyze_calibration(
+        output, config, timing=timing, expected_geometries=slots, records=records
+    )
+
+
+def _run_parallel(
+    config_path: str | Path,
+    output: Path,
+    slots: int,
+    records: int,
+    workers: int,
+    record_limit: int | None,
+) -> dict[str, Any]:
+    """Run slot subsets in ``workers`` processes and merge their worker records."""
+    assignments = [list(range(slots))[k::workers] for k in range(min(workers, slots))]
+    (output / "workers").mkdir(exist_ok=True)
+    processes = []
+    for assigned in assignments:
+        command = [
+            sys.executable, "-m", "isac_verify", "calibrate",
+            "--config", str(config_path), "--output", str(output),
+            "--worker-slots", ",".join(str(slot) for slot in assigned),
+        ]
+        if record_limit is not None:
+            command += ["--record-limit", str(record_limit)]
+        log = open(output / "workers" / f"worker_{assigned[0]:02d}.log", "w", encoding="utf-8")
+        processes.append((assigned, subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT), log))
+    failed = []
+    for assigned, process, log in processes:
+        if process.wait() != 0:
+            failed.append(assigned)
+        log.close()
+    if failed:
+        raise Phase8Error(f"calibration workers failed for slots {failed}")
+    parts = [
+        json.loads((output / "workers" / f"worker_{assigned[0]:02d}.json").read_text(encoding="utf-8"))
+        for assigned in assignments
+    ]
+    # Every worker recomputes the noise calibration from the same seeds; it must agree exactly.
+    for part in parts[1:]:
+        if part["noise"] != parts[0]["noise"]:
+            raise Phase8Error("noise calibration differs between workers")
+    merged: dict[str, Any] = {"per_geometry_s": {}}
+    for part in parts:
+        merged["per_geometry_s"].update(part["per_geometry_s"])
+    merged["worker_slots"] = assignments
+    merged["noise_calibration_w"] = parts[0]["noise"]
+    merged["worker_pytorch_peak_allocated_bytes"] = [p["pytorch_peak_allocated_bytes"] for p in parts]
+    merged["worker_pytorch_peak_reserved_bytes"] = [p["pytorch_peak_reserved_bytes"] for p in parts]
+    merged["worker_wall_s"] = [p["wall_s"] for p in parts]
+    return merged
+
+
+def _run_worker(config: PilotConfig, output: Path, assigned: list[int], records: int) -> int:
+    start = _now()
+    torch.cuda.reset_peak_memory_stats()
+    part = _run_slots(config, output, assigned, records)
+    part["wall_s"] = _now() - start
+    part["pytorch_peak_allocated_bytes"] = int(torch.cuda.max_memory_allocated())
+    part["pytorch_peak_reserved_bytes"] = int(torch.cuda.max_memory_reserved())
+    (output / "workers" / f"worker_{assigned[0]:02d}.json").write_text(
+        _json_dump(part), encoding="utf-8"
+    )
+    return 0
+
+
+def _run_slots(
+    config: PilotConfig, output: Path, assigned: list[int], records: int
+) -> dict[str, Any]:
+    """Run the given calibration slots; shared by the sequential and worker paths."""
+    per_geometry_s: dict[str, float] = {}
     choices = ProcessingChoices.from_config(config)
     noise_records = int(config.get("phase6", "processing", "noise_calibration_records"))
     noise_full = noise_calibration(
@@ -463,7 +560,7 @@ def run_calibration(
         dbm_to_watt(config.get("waveform", "nominal_total_power_dbm")),
         ArrayGeometry.from_config(config),
     ).weights
-    for slot in range(slots):
+    for slot in assigned:
         geometry_id = f"cal_{slot:02d}"
         shard, meta_path = _shard_paths(output, slot)
         if shard.exists() and meta_path.exists():
@@ -503,22 +600,17 @@ def run_calibration(
             ),
             encoding="utf-8",
         )
-        timing["per_geometry_s"][geometry_id] = elapsed
+        per_geometry_s[geometry_id] = elapsed
         print(
             f"{geometry_id}: rows={len(frame)} rejected={len(rejected)} "
             f"elapsed={elapsed:.1f}s",
             flush=True,
         )
         torch.cuda.empty_cache()
-    timing["end_to_end_s"] = _now() - run_start
-    timing["nvml_end"] = _nvml_snapshot()
-    stop_gpu_monitor()
-    timing["gpu_processes_observed"] = _summarize_gpu_processes(gpu_processes)
-    timing["pytorch_peak_allocated_bytes"] = int(torch.cuda.max_memory_allocated())
-    timing["pytorch_peak_reserved_bytes"] = int(torch.cuda.max_memory_reserved())
-    return analyze_calibration(
-        output, config, timing=timing, expected_geometries=slots, records=records
-    )
+    return {
+        "per_geometry_s": per_geometry_s,
+        "noise": {"full": noise_full, **{str(k): v for k, v in noise_by_symbols.items()}},
+    }
 
 
 GPU_MONITOR_INTERVAL_S = 30.0

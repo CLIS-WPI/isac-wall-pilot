@@ -170,5 +170,13 @@ They do not add a decision criterion.
   with the same declared seeds and the same 12 calibration geometries, on the
   code that includes both fixes. A second attempt, started on `eb73949` before
   the window fix, was stopped within minutes, before any shard completed, and
-  its partial output was deleted unused.
+  its partial output was deleted unused. A third attempt on `e241eaf`, on the
+  shared GPU 0, was stopped after one geometry because of GPU contention, and
+  its partial output was deleted unused. The calibration was restarted from
+  scratch on the idle GPU 1 (H100 NVL, UUID
+  `GPU-509d8ab3-0c8e-8b98-fbf8-0c55f6ba9058`). That fourth attempt was stopped
+  before any geometry completed, and its output was deleted unused. The run
+  was restarted from scratch with the 12 slots in parallel worker processes
+  on the same GPU (`docs/DEVIATIONS.md` P8-6). This is an execution change
+  only; the computation and seeds are unchanged.
 - **Held-out:** no held-out geometry has been generated, solved or run.
