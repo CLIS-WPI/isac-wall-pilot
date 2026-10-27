@@ -19,6 +19,24 @@ def _preflight(args: argparse.Namespace) -> int:
     return run_preflight(require_h100=args.require_h100, output_path=args.output)
 
 
+def _run(args: argparse.Namespace) -> int:
+    from .experiments import run_phase7
+
+    return run_phase7(
+        config_path=args.config,
+        stage=args.stage,
+        output_path=args.output,
+        require_h100=args.require_h100,
+        record_limit=args.record_limit,
+    )
+
+
+def _report(args: argparse.Namespace) -> int:
+    from .report import build_report
+
+    return build_report(args.input, args.output)
+
+
 def _validate(args: argparse.Namespace) -> int:
     from .experiments import run_validation
 
@@ -90,6 +108,55 @@ def build_parser() -> argparse.ArgumentParser:
         help="directory for Phase 6 measured receiver summary",
     )
     validate.set_defaults(handler=_validate)
+
+    run = subparsers.add_parser(
+        "run",
+        help="run a scientific stage; currently smoke",
+    )
+    run.add_argument(
+        "--config",
+        default="configs/pilot.yaml",
+        help="pilot YAML configuration",
+    )
+    run.add_argument(
+        "--stage",
+        default="smoke",
+        choices=["smoke"],
+        help="stage to run",
+    )
+    run.add_argument(
+        "--output",
+        default="results/phase7",
+        help="directory for Phase 7 artifacts",
+    )
+    run.add_argument(
+        "--require-h100",
+        action="store_true",
+        help="fail unless the visible GPU name contains H100",
+    )
+    run.add_argument(
+        "--record-limit",
+        type=int,
+        default=None,
+        help="optional smoke record limit for tests",
+    )
+    run.set_defaults(handler=_run)
+
+    report = subparsers.add_parser(
+        "report",
+        help="rebuild the smoke report from saved results",
+    )
+    report.add_argument(
+        "--input",
+        default="results/phase7",
+        help="directory containing trials.parquet",
+    )
+    report.add_argument(
+        "--output",
+        default="results/phase7/report",
+        help="report output directory",
+    )
+    report.set_defaults(handler=_report)
 
     return parser
 

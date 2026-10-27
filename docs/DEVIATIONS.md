@@ -334,3 +334,46 @@ declared processing choices, not post-hoc tuning.
 - **Evidence:** `src/isac_verify/axis.py`; `receiver._zero_padded_delay_profile`;
   `tests/test_phase6.py::test_delay_axis_agrees_across_receiver_modules`;
   `results/phase6/phase6_summary.json`.
+
+## Phase 7 pre-run corrections
+
+### P7-1 — Map-free two-beam control uses one seeded extra look
+
+- **Type:** experiment declaration.
+- **What:** For map-free two-beam control, the transmitter uses the shared
+  direct action (the normal 64-symbol probe) plus exactly one extra 64-symbol
+  wall/scan action aimed at one angle chosen from the codebook
+  `{-60, -50, ..., -10, +10, ..., +60}` degrees by a fixed seeded
+  `random.Random(beam_selection_seed).choice(...)` rule. This is two beams in
+  total, but only one extra action. Coarse-to-fine remains `4 x 8 + 2 x 16 =
+  64` extra symbols after the shared direct action. Every method therefore
+  spends `64` extra wall/scan symbols, and mapped/extra-action rows record
+  `128` symbols total including the shared direct probe.
+- **Why:** The original implementation sampled two directions and split the
+  `64` extra symbols as `32 + 32`, which changed both the action count and the
+  per-angle integration time relative to the mapped methods. The smoke stage
+  needs an equal-extra-symbol control.
+- **BRIEF section:** §12.3 map-free two-beam control; §13.1 smoke stage.
+- **Evidence:** `phase7._mapfree_look_plan`;
+  `phase7._scan_looks`; `beam.map_free.total_extra_symbols`.
+
+### P7-2 — `S` and `wall_excess_snr` are separate, availability-masked columns
+
+- **Type:** statistics and output schema correction.
+- **What:** `S` is populated only for mapped methods with a twin reference.
+  `wall_excess_snr = (E_W - N_W) / N_W` is computed the same predeclared way
+  for every method that spends an extra wall/scan action, mapped or map-free.
+  The direct-only method has no wall action. Each column has an explicit
+  boolean audit flag, `S_available` and `wall_excess_snr_available`.
+  Not-applicable entries are `NaN`, never `0.0`. Integrity checks require each
+  score column to be finite wherever its flag is true and `NaN` wherever it is
+  false. Aggregates and figures use only available rows and print the
+  available counts.
+- **Why:** The earlier plan used a single `score` column and `0.0` for
+  direct-only, which mixed two different metrics and turned a missing
+  wall-probe action into an apparent measured zero. This correction preserves
+  a common wall-excess metric without inventing values.
+- **BRIEF section:** §13.1 smoke outputs; §13.2 metrics; §14 reporting.
+- **Evidence:** `metrics.integrity_checks`; `metrics.summarize_trials`;
+  `report._score_figure`; `trials.parquet` columns `S`, `S_available`,
+  `wall_excess_snr`, `wall_excess_snr_available`.

@@ -1373,3 +1373,23 @@ def run_validation(
         failed = [name for name, passed in checks.items() if not passed]
         raise ValidationError(f"validation failed: {', '.join(failed)}")
     return 0
+
+
+def run_phase7(
+    config_path: str | Path,
+    *,
+    stage: str = "smoke",
+    output_path: str | Path = "results/phase7",
+    require_h100: bool = True,
+    record_limit: int | None = None,
+) -> int:
+    from .phase7 import run_smoke
+
+    if stage != "smoke":
+        raise ValidationError(f"unsupported Phase 7 stage {stage!r}")
+    return run_smoke(
+        config_path,
+        output_path,
+        require_h100=require_h100,
+        record_limit=record_limit,
+    )

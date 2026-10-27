@@ -397,6 +397,21 @@ validation:
   geometry_abs_tolerance: 5.0e-7
   lut_rt_relative_tolerance: 1.0e-3
 
+phase7:
+  scan:
+    post_direct_span_ns: 50.0
+  methods:
+    - direct_only
+    - exact_oracle
+    - imperfect_narrow
+    - imperfect_robust
+    - mapfree_two_beam
+    - mapfree_coarse_to_fine
+  report:
+    dpi: 160
+    confidence_level: 0.95
+    smoke_no_statistical_claim: true
+
 statistics:
   validation:
     deterministic_checks: true
