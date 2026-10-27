@@ -223,6 +223,37 @@ def _wall_offset(plan_input: PlannerInput, side: str) -> float:
     raise VerificationError(f"unknown wall side {side!r}")
 
 
+def direct_gate_window(
+    candidate: CandidateEstimate,
+    point_spread: PointSpread,
+) -> GateWindow:
+    """Build the measured direct reference gate."""
+    return GateWindow(
+        delay_min_s=(
+            candidate.delay_s
+            - point_spread.delay_width_s
+            - 3.0 * candidate.delay_sigma_s
+        ),
+        delay_max_s=(
+            candidate.delay_s
+            + point_spread.delay_width_s
+            + 3.0 * candidate.delay_sigma_s
+        ),
+        aoa_min_deg=(
+            candidate.azimuth_deg
+            - point_spread.aoa_width_deg
+            - 3.0 * candidate.azimuth_sigma_deg
+        ),
+        aoa_max_deg=(
+            candidate.azimuth_deg
+            + point_spread.aoa_width_deg
+            + 3.0 * candidate.azimuth_sigma_deg
+        ),
+        center_delay_s=candidate.delay_s,
+        center_aoa_deg=candidate.azimuth_deg,
+    )
+
+
 def _select_twin_wall_path(
     plan_input: PlannerInput, config: PilotConfig
 ) -> tuple[Any, str]:
@@ -284,30 +315,7 @@ def plan_wall_action(
     )
     if len(quantiles) != 2 or not 0.0 < quantiles[0] < quantiles[1] < 1.0:
         raise VerificationError("wall interval quantiles are invalid")
-    direct_gate = GateWindow(
-        delay_min_s=(
-            plan_input.candidate.delay_s
-            - point_spread.delay_width_s
-            - 3.0 * plan_input.candidate.delay_sigma_s
-        ),
-        delay_max_s=(
-            plan_input.candidate.delay_s
-            + point_spread.delay_width_s
-            + 3.0 * plan_input.candidate.delay_sigma_s
-        ),
-        aoa_min_deg=(
-            plan_input.candidate.azimuth_deg
-            - point_spread.aoa_width_deg
-            - 3.0 * plan_input.candidate.azimuth_sigma_deg
-        ),
-        aoa_max_deg=(
-            plan_input.candidate.azimuth_deg
-            + point_spread.aoa_width_deg
-            + 3.0 * plan_input.candidate.azimuth_sigma_deg
-        ),
-        center_delay_s=plan_input.candidate.delay_s,
-        center_aoa_deg=plan_input.candidate.azimuth_deg,
-    )
+    direct_gate = direct_gate_window(plan_input.candidate, point_spread)
     try:
         selected, side = _select_twin_wall_path(plan_input, config)
     except WallPathError:

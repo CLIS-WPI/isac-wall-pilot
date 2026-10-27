@@ -217,6 +217,26 @@ class PointSpread:
 
 
 @dataclass(frozen=True)
+class PointSpreadTheory:
+    delay_width_s: float
+    aoa_width_deg: float
+    delay_bin_s: float
+    aoa_step_deg: float
+    delay_evaluation_bins: int
+    aoa_evaluation_bins: int
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "delay_width_ns": self.delay_width_s * 1e9,
+            "aoa_width_deg": self.aoa_width_deg,
+            "delay_bin_ns": self.delay_bin_s * 1e9,
+            "aoa_step_deg": self.aoa_step_deg,
+            "delay_evaluation_bins": self.delay_evaluation_bins,
+            "aoa_evaluation_bins": self.aoa_evaluation_bins,
+        }
+
+
+@dataclass(frozen=True)
 class CandidateEstimate:
     detected: bool
     delay_s: float
@@ -560,7 +580,7 @@ def delay_doppler_map(
     lags = torch.arange(
         lag_count, device="cuda", dtype=torch.float64
     )
-    delay_s = lags / sample_rate
+    delay_s = lags * profile.delay_bin_spacing_s
     doppler_hz = torch.fft.fftshift(
         torch.fft.fftfreq(
             profile.num_symbols,
@@ -608,7 +628,7 @@ def angular_delay_map(
         delay_s=delay_doppler.delay_s,
         aoa_deg=angles,
         noise_per_cell_w=float(noise_per_cell_w),
-        delay_bin_s=1.0 / choices.profile.sample_rate_hz,
+        delay_bin_s=choices.profile.delay_bin_spacing_s,
         aoa_step_deg=choices.aoa_grid_step_deg,
     )
 
@@ -706,6 +726,7 @@ def estimate_candidate(
     point_spread: PointSpread | None,
     gnb_position_m: Sequence[float],
     speed_of_light_m_per_s: float,
+    h_eff: torch.Tensor | None = None,
 ) -> CandidateEstimate:
     """Detect and interpolate the direct candidate inside the fixed sector."""
     power = angular_delay.power_w
@@ -747,12 +768,26 @@ def estimate_candidate(
             peak,
             float(power[lag_index, angle_index + 1].item()),
         )
-    delay_s = float(
-        angular_delay.delay_s[lag_index].item()
-    ) + delay_offset * angular_delay.delay_bin_s
     azimuth_deg = float(
         angular_delay.aoa_deg[angle_index].item()
     ) + angle_offset * angular_delay.aoa_step_deg
+    if h_eff is None:
+        delay_s = float(
+            angular_delay.delay_s[lag_index].item()
+        ) + delay_offset * angular_delay.delay_bin_s
+    else:
+        dense_profile, dense_spacing = _zero_padded_delay_profile(
+            h_eff, choices, angle_deg=azimuth_deg
+        )
+        dense_index = int(torch.argmax(dense_profile).item())
+        dense_offset = 0.0
+        if 0 < dense_index < dense_profile.numel() - 1:
+            dense_offset = _log_parabolic_offset(
+                float(dense_profile[dense_index - 1].item()),
+                float(dense_profile[dense_index].item()),
+                float(dense_profile[dense_index + 1].item()),
+            )
+        delay_s = (dense_index + dense_offset) * dense_spacing
     snr = max(peak / noise, 1.0)
     if point_spread is None:
         delay_sigma = 0.0
@@ -787,12 +822,29 @@ def estimate_candidate(
     )
 
 
-def _contiguous_width(
+def _crossing_position(
+    values: torch.Tensor,
+    inside: int,
+    outside: int,
+    cutoff: float,
+) -> float:
+    floor = 1e-300
+    a = math.log(max(float(values[inside].item()), floor))
+    b = math.log(max(float(values[outside].item()), floor))
+    denominator = a - b
+    if abs(denominator) <= 1e-30:
+        return float(inside)
+    fraction = (a - math.log(max(cutoff, floor))) / denominator
+    fraction = min(max(fraction, 0.0), 1.0)
+    return float(inside) + fraction * float(outside - inside)
+
+
+def _interpolated_width_bins(
     values: torch.Tensor,
     peak_index: int,
     *,
     threshold: float,
-) -> int:
+) -> float:
     peak = float(values[peak_index].item())
     if peak <= 0.0:
         raise ReceiverError("point-spread peak is non-positive")
@@ -803,35 +855,167 @@ def _contiguous_width(
     right = peak_index
     while right < values.numel() - 1 and float(values[right + 1].item()) >= cutoff:
         right += 1
-    return right - left + 1
+    if left == 0 or right == values.numel() - 1:
+        raise ReceiverError("point-spread threshold crossing is outside the grid")
+    left_cross = _crossing_position(values, left, left - 1, cutoff)
+    right_cross = _crossing_position(values, right, right + 1, cutoff)
+    width = right_cross - left_cross
+    if width <= 0.0:
+        raise ReceiverError("interpolated point-spread width is not positive")
+    return width
+
+
+def _zero_padded_delay_profile(
+    h_eff: torch.Tensor,
+    choices: ProcessingChoices,
+    *,
+    angle_deg: float,
+) -> tuple[torch.Tensor, float]:
+    pad = 1 << 16
+    window = _delay_window(choices).to(h_eff.dtype)
+    vector = steering_vector(
+        angle_deg,
+        choices.receiver_array,
+        dtype=torch.complex64,
+    )
+    combined = (
+        vector.conj()[:, None] * (h_eff * window[None, None, :])
+    ).sum(dim=0)
+    spectrum = torch.fft.ifft(combined, n=pad, dim=-1)
+    power = spectrum.abs().square().sum(dim=0)
+    spacing_s = 1.0 / (
+        pad * choices.profile.subcarrier_spacing_hz
+    )
+    return power, spacing_s
 
 
 def measure_point_spread(
     angular_delay: AngularDelayMap,
     *,
     choices: ProcessingChoices,
+    h_eff: torch.Tensor | None = None,
 ) -> PointSpread:
     """Measure the delay and angle main-lobe widths of the processor."""
     power = angular_delay.power_w
     lag_index, angle_index = _peak_index(power)
     threshold = 10.0 ** (choices.psf_threshold_db / 10.0)
-    delay_profile = power[:, angle_index]
     angle_profile = power[lag_index, :]
-    delay_bins = _contiguous_width(
-        delay_profile, lag_index, threshold=threshold
-    )
-    angle_bins = _contiguous_width(
+    angle_bins = _interpolated_width_bins(
         angle_profile, angle_index, threshold=threshold
     )
-    delay_width = max(delay_bins * angular_delay.delay_bin_s, angular_delay.delay_bin_s)
-    aoa_width = max(angle_bins * angular_delay.aoa_step_deg, angular_delay.aoa_step_deg)
+    aoa_width = angle_bins * angular_delay.aoa_step_deg
+    peak_aoa_deg = float(angular_delay.aoa_deg[angle_index].item())
+    if 0 < angle_index < angle_profile.numel() - 1:
+        angle_offset = _log_parabolic_offset(
+            float(angle_profile[angle_index - 1].item()),
+            float(angle_profile[angle_index].item()),
+            float(angle_profile[angle_index + 1].item()),
+        )
+        peak_aoa_deg += angle_offset * angular_delay.aoa_step_deg
+    if h_eff is None:
+        delay_profile = power[:, angle_index]
+        delay_bins = _interpolated_width_bins(
+            delay_profile, lag_index, threshold=threshold
+        )
+        delay_width = delay_bins * angular_delay.delay_bin_s
+        peak_delay_s = float(angular_delay.delay_s[lag_index].item())
+    else:
+        delay_profile, spacing_s = _zero_padded_delay_profile(
+            h_eff, choices, angle_deg=peak_aoa_deg
+        )
+        dense_index = int(torch.argmax(delay_profile).item())
+        delay_bins = _interpolated_width_bins(
+            delay_profile, dense_index, threshold=threshold
+        )
+        delay_width = delay_bins * spacing_s
+        peak_delay_s = dense_index * spacing_s
+        if 0 < dense_index < delay_profile.numel() - 1:
+            offset = _log_parabolic_offset(
+                float(delay_profile[dense_index - 1].item()),
+                float(delay_profile[dense_index].item()),
+                float(delay_profile[dense_index + 1].item()),
+            )
+            peak_delay_s += offset * spacing_s
     return PointSpread(
         delay_width_s=delay_width,
         aoa_width_deg=aoa_width,
         delay_half_width_s=0.5 * delay_width,
         aoa_half_width_deg=0.5 * aoa_width,
-        peak_delay_s=float(angular_delay.delay_s[lag_index].item()),
-        peak_aoa_deg=float(angular_delay.aoa_deg[angle_index].item()),
+        peak_delay_s=peak_delay_s,
+        peak_aoa_deg=peak_aoa_deg,
+    )
+
+
+def theoretical_window_widths(
+    choices: ProcessingChoices,
+) -> PointSpreadTheory:
+    """Evaluate the declared window's continuous -3 dB main-lobe width."""
+    threshold = 10.0 ** (choices.psf_threshold_db / 10.0)
+    profile = choices.profile
+    n = profile.fft_size
+    if choices.delay_window == "rectangular":
+        delay_window = torch.ones(n, device="cuda", dtype=torch.float64)
+    else:
+        delay_window = torch.hann_window(
+            n, periodic=False, device="cuda", dtype=torch.float64
+        )
+    pad = 1 << 16
+    impulse = torch.fft.fftshift(
+        torch.fft.ifft(delay_window, n=pad)
+    )
+    impulse_power = impulse.abs().square()
+    delay_peak = pad // 2
+    delay_width_bins = _interpolated_width_bins(
+        impulse_power, delay_peak, threshold=threshold
+    )
+    delay_width = delay_width_bins / (pad * profile.subcarrier_spacing_hz)
+
+    num_rx = choices.receiver_array.num_elements
+    if choices.aoa_window == "rectangular":
+        aoa_window = torch.ones(
+            num_rx, device="cuda", dtype=torch.float64
+        )
+    else:
+        aoa_window = torch.hann_window(
+            num_rx, periodic=False, device="cuda", dtype=torch.float64
+        )
+    aoa_window = aoa_window / torch.linalg.vector_norm(aoa_window)
+    angle_step = 0.001
+    angles = torch.arange(
+        -90.0,
+        90.0 + 0.5 * angle_step,
+        angle_step,
+        device="cuda",
+        dtype=torch.float64,
+    )
+    positions = choices.receiver_array.positions_m(
+        device="cuda", dtype=torch.float64
+    )[:, 1]
+    phase = (
+        2.0
+        * math.pi
+        / choices.receiver_array.wavelength_m
+        * positions[None, :]
+        * torch.sin(torch.deg2rad(angles))[:, None]
+    )
+    array_factor = (
+        aoa_window[None, :] * torch.exp(1j * phase)
+    ).sum(dim=1)
+    aoa_power = array_factor.abs().square()
+    aoa_peak = int(torch.argmax(aoa_power).item())
+    aoa_width = (
+        _interpolated_width_bins(
+            aoa_power, aoa_peak, threshold=threshold
+        )
+        * angle_step
+    )
+    return PointSpreadTheory(
+        delay_width_s=delay_width,
+        aoa_width_deg=aoa_width,
+        delay_bin_s=profile.delay_bin_spacing_s,
+        aoa_step_deg=angle_step,
+        delay_evaluation_bins=pad,
+        aoa_evaluation_bins=int(angles.numel()),
     )
 
 

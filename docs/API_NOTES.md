@@ -981,8 +981,9 @@ the zero-delay padded-FFT roundtrip error was
   `[num_rx, num_symbols, fft_size]`, and calls
   `ofdm_to_delay_doppler_channel(windowed, l_min=0, l_max=103)`.
 - **Output:** `h_dd` has shape `[16, 64, 104]`. The zero-Doppler bin is
-  `num_symbols // 2 = 32`; lag `l` maps to delay `l / sample_rate`, with
-  `sample_rate = 204.8 MHz`.
+  `num_symbols // 2 = 32`; lag `l` maps to delay `l / W`, where
+  `W = fft_size * subcarrier_spacing_hz = 2048 * 60 kHz = 122.88 MHz`.
+  The natural lag spacing is `8.138020833 ns`, not `4.883 ns`.
 - **Guard:** `guard_noise_power` calls the same function with
   `l_min=113, l_max=133` for the declared `[550, 650] ns` guard. Only the
   zero-Doppler, all-lag, all-RX magnitudes are used to form a median noise

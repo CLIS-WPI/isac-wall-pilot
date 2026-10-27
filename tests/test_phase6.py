@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 
 from isac_verify.config import PilotConfig
+from isac_verify.axis import delay_axis_verification
 from isac_verify.phase6 import phase6_diagnostics
+from isac_verify.receiver import ProcessingChoices
 from isac_verify.verification import classify_evidence, planner_field_names
 
 
@@ -11,6 +13,19 @@ from isac_verify.verification import classify_evidence, planner_field_names
 def phase6_summary(config: PilotConfig, tmp_path_factory) -> dict:
     output = tmp_path_factory.mktemp("phase6-tests")
     return phase6_diagnostics(config, output)
+
+
+def test_delay_axis_agrees_across_receiver_modules(
+    config: PilotConfig,
+) -> None:
+    choices = ProcessingChoices.from_config(config)
+    axis = delay_axis_verification(config, choices)
+    assert axis["lag_spacing_ns"] == pytest.approx(8.1380208333, abs=1e-9)
+    assert axis["lag_spacing_error_ns"] <= 1e-9
+    assert axis["max_error_ns"] <= 0.1
+    assert axis["guard_max_error_ns"] <= axis["lag_spacing_ns"]
+    for row in axis["rows"]:
+        assert row["max_module_error_ns"] <= 0.1
 
 
 def test_twin_plan_uses_fixed_gates_and_allowed_fields(
@@ -38,9 +53,19 @@ def test_twin_plan_uses_fixed_gates_and_allowed_fields(
     assert exact["plan"]["beam_phi_deg"] == pytest.approx(
         robust["plan"]["beam_phi_deg"], abs=0.02
     )
-    assert exact["plan"]["wall_gate"]["delay_min_ns"] > (
-        exact["plan"]["direct_gate"]["delay_max_ns"]
+    assert exact["plan"]["wall_gate"]["center_delay_ns"] > (
+        exact["plan"]["direct_gate"]["center_delay_ns"]
     )
+    spread = phase6_summary["point_spread"]
+    theory = phase6_summary["point_spread_theory"]
+    assert spread["delay_width_ns"] == pytest.approx(
+        theory["delay_width_ns"], rel=0.05
+    )
+    assert spread["aoa_width_deg"] == pytest.approx(
+        theory["aoa_width_deg"], rel=0.05
+    )
+    assert phase6_summary["checks"]["delay_axis_agrees"] is True
+    assert phase6_summary["checks"]["guard_axis_agrees"] is True
 
 
 def test_target_and_replay_separate_under_identical_processing(

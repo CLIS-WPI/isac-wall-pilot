@@ -309,3 +309,28 @@ declared processing choices, not post-hoc tuning.
 - **Evidence:** `phase6.processing` in
   `results/phase6/phase6_summary.json`; `receiver._delay_window` and
   `receiver._aoa_window`.
+
+### P6-5 — Zero-padded PSF measurement and lag-axis verification
+
+- **Type:** processing declaration and verification.
+- **What:** The delay PSF peak and Hann width are measured from a finely
+  zero-padded inverse transform (`1 << 16` bins) of the effective channel
+  after the declared subcarrier window and receive steering. The angular PSF
+  is measured on the declared 0.001 deg grid with interpolation. Candidate
+  delay is refined with the same zero-padded profile after the angular
+  estimate. The lag-to-delay mapping is
+  `delay = lag / (fft_size * subcarrier_spacing_hz)`, which is `8.138020833 ns`
+  at the pilot profile. A noiseless V1 check at
+  `300.0, 400.276914, 423.900055, 441.726946, 500.0 ns` verifies acquisition,
+  PSF peak, direct-gate center, and twin prediction; the measured maximum
+  module error is below `0.02 ns` against the declared `0.1 ns` tolerance.
+- **Why:** Sparse-grid interpolation underestimated the Hann delay width
+  (`9.79 ns` versus `11.71 ns`) and a committed API note incorrectly stated a
+  `4.883 ns` lag spacing. The wider measured width moves the direct and wall
+  gates into a `1.27 ns` delay overlap while their centers remain `23.6 ns`
+  apart; replay wall energy remains at the noise floor.
+- **BRIEF section:** §10.2 measured point-spread width; §10.3 evidence score;
+  §15 tests.
+- **Evidence:** `src/isac_verify/axis.py`; `receiver._zero_padded_delay_profile`;
+  `tests/test_phase6.py::test_delay_axis_agrees_across_receiver_modules`;
+  `results/phase6/phase6_summary.json`.

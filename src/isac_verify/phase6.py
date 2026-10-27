@@ -26,6 +26,7 @@ from .beams import (
     direct_beam,
     steering_vector,
 )
+from .axis import delay_axis_verification
 from .config import PilotConfig
 from .geometry import horizontal_range_and_azimuth
 from .receiver import (
@@ -41,6 +42,7 @@ from .receiver import (
     make_observation,
     measure_point_spread,
     noise_calibration,
+    theoretical_window_widths,
 )
 from .replay import calibrate_matched_relay
 from .verification import (
@@ -204,7 +206,9 @@ def _point_spread(
     )
     dd = delay_doppler_map(observation.h_eff, choices)
     angular = angular_delay_map(dd, choices, noise_per_cell_w=0.0)
-    return measure_point_spread(angular, choices=choices)
+    return measure_point_spread(
+        angular, choices=choices, h_eff=observation.h_eff
+    )
 
 
 def _observation_map(
@@ -579,6 +583,7 @@ def phase6_diagnostics(
         point_spread=None,  # type: ignore[arg-type]
         gnb_position_m=gnb,
         speed_of_light_m_per_s=config.speed_of_light,
+        h_eff=direct_observation.h_eff,
     )
     if not direct_candidate.detected:
         raise Phase6Error("nominal direct acquisition failed")
@@ -595,6 +600,8 @@ def phase6_diagnostics(
     point_spread = _point_spread(
         config, choices, direct_candidate, twin_paths
     )
+    point_spread_theory = theoretical_window_widths(choices)
+    delay_axis = delay_axis_verification(config, choices)
     direct_map = _observation_map(
         observation=direct_observation,
         choices=choices,
@@ -606,6 +613,7 @@ def phase6_diagnostics(
         point_spread=point_spread,
         gnb_position_m=gnb,
         speed_of_light_m_per_s=config.speed_of_light,
+        h_eff=direct_observation.h_eff,
     )
     measured_range_sigma_m = (
         0.5
@@ -702,6 +710,10 @@ def phase6_diagnostics(
             point_spread.delay_width_s > 0.0
             and point_spread.aoa_width_deg > 0.0
         ),
+        "delay_axis_agrees": delay_axis["max_error_ns"]
+        <= delay_axis["tolerance_ns"],
+        "guard_axis_agrees": delay_axis["guard_max_error_ns"]
+        <= delay_axis["lag_spacing_ns"],
         "relay_calibration_feasible": calibration.feasible,
         "exact_plan_available": plan_results["exact"].available,
         "robust_plan_available": plan_results["robust"].available,
@@ -765,6 +777,8 @@ def phase6_diagnostics(
         },
         "planner_input": plan_input.as_dict(),
         "point_spread": point_spread.as_dict(),
+        "point_spread_theory": point_spread_theory.as_dict(),
+        "delay_axis": delay_axis,
         "noise": {
             "calibration_per_cell_w": noise_per_cell,
             "guard_median_power_w": guard_power_w,
@@ -829,6 +843,34 @@ def _planner_truth_free() -> bool:
 
 def print_phase6_tables(phase6: dict[str, Any]) -> None:
     print(f"phase 6 status: {phase6['status']}")
+    axis = phase6["delay_axis"]
+    print(
+        "phase 6 V1 delay-axis verification: "
+        f"lag_spacing={axis['lag_spacing_ns']:.9f} ns "
+        f"expected={axis['expected_lag_spacing_ns']:.9f} ns "
+        f"max_module_error={axis['max_error_ns']:.6f} ns "
+        f"tolerance={axis['tolerance_ns']:.3f} ns"
+    )
+    print(
+        "phase 6 V1   input_ns   acquisition_ns   psf_peak_ns   "
+        "gate_center_ns   twin_prediction_ns   max_error_ns"
+    )
+    for row in axis["rows"]:
+        print(
+            f"phase 6 V1 {row['input_ns']:10.6f} "
+            f"{row['acquisition_ns']:15.9f} "
+            f"{row['psf_peak_ns']:13.9f} "
+            f"{row['gate_center_ns']:15.9f} "
+            f"{row['twin_prediction_ns']:19.9f} "
+            f"{row['max_module_error_ns']:13.6f}"
+        )
+    print(
+        "phase 6 V1 guard lag range: "
+        f"{axis['guard_lag_range']} -> "
+        f"[{axis['guard_delay_ns'][0]:.6f}, "
+        f"{axis['guard_delay_ns'][1]:.6f}] ns "
+        f"(configured {axis['guard_configured_ns']})"
+    )
     acquisition = phase6["acquisition"]
     print(
         "phase 6 acquisition: "
@@ -840,12 +882,19 @@ def print_phase6_tables(phase6: dict[str, Any]) -> None:
         f"peak/noise={acquisition['peak_to_noise_db']:.3f} dB"
     )
     spread = phase6["point_spread"]
+    theory = phase6["point_spread_theory"]
     print(
-        "phase 6 measured point spread: "
+        "phase 6 V2 measured point spread: "
         f"delay full={spread['delay_width_ns']:.6f} ns "
         f"half={spread['delay_half_width_ns']:.6f} ns; "
         f"AoA full={spread['aoa_width_deg']:.6f} deg "
         f"half={spread['aoa_half_width_deg']:.6f} deg"
+    )
+    print(
+        "phase 6 V2 theoretical Hann width: "
+        f"delay={theory['delay_width_ns']:.6f} ns "
+        f"(raw bin={theory['delay_bin_ns']:.6f} ns); "
+        f"AoA={theory['aoa_width_deg']:.6f} deg"
     )
     print(
         "phase 6 noise calibration: "
@@ -880,6 +929,30 @@ def print_phase6_tables(phase6: dict[str, Any]) -> None:
             f"{gate['delay_max_ns']:.6f}] ns "
             f"gate_AoA=[{gate['aoa_min_deg']:.6f}, "
             f"{gate['aoa_max_deg']:.6f}] deg"
+        )
+    for mode, entry in phase6["worlds"].items():
+        plan = phase6["wall_beams"][mode]
+        if "worlds" not in entry or plan["wall_gate"] is None:
+            continue
+        target = entry["worlds"]["target"]
+        evidence = target["evidence"]
+        null = target["realized_null"].get(
+            "relay_direction_gain_db_relative_peak"
+        )
+        direct_gate = plan["direct_gate"]
+        wall_gate = plan["wall_gate"]
+        print(
+            f"phase 6 V3 {mode}: planned_AoD={plan['predicted_aod_deg']:.6f} deg "
+            f"direct_gate_delay=[{direct_gate['delay_min_ns']:.6f}, "
+            f"{direct_gate['delay_max_ns']:.6f}] ns "
+            f"direct_gate_AoA=[{direct_gate['aoa_min_deg']:.6f}, "
+            f"{direct_gate['aoa_max_deg']:.6f}] deg "
+            f"wall_gate_delay=[{wall_gate['delay_min_ns']:.6f}, "
+            f"{wall_gate['delay_max_ns']:.6f}] ns "
+            f"wall_gate_AoA=[{wall_gate['aoa_min_deg']:.6f}, "
+            f"{wall_gate['aoa_max_deg']:.6f}] deg "
+            f"cells={evidence['E_D_cells'] + evidence['E_W_cells']} "
+            f"null_true_relay={null if null is None else f'{null:.6f} dB'}"
         )
     print(
         "phase 6 world/beam            E_D (W)      E_W (W)      "
