@@ -731,7 +731,7 @@ def phase4_diagnostics(
         abs(item["delay_error_ns"]) <= 1e-3
         and abs(item["aod_error_deg"]) <= 1e-2
         and abs(item["aoa_error_deg"]) <= 1e-6
-        and item["reflection_point_error_m"] <= 1e-3
+        and item["reflection_point_error_m"] <= 5e-4
         for item in comparisons
     )
     amplitude_checks = all(
@@ -760,7 +760,7 @@ def phase4_diagnostics(
         abs(item["delay_error_ns"]) <= 1e-3
         and abs(item["aod_error_deg"]) <= 1e-2
         and abs(item["aoa_error_deg"]) <= 1e-2
-        and item["reflection_point_error_m"] <= 1e-3
+        and item["reflection_point_error_m"] <= 5e-4
         for item in clutter
     )
     relay_wall = [
@@ -776,7 +776,7 @@ def phase4_diagnostics(
         and all(
             abs(item["delay_error_ns"]) <= 1e-3
             and abs(item["aod_error_deg"]) <= 1e-2
-            and item["reflection_point_error_m"] <= 1e-3
+            and item["reflection_point_error_m"] <= 5e-4
             for item in relay_wall
         )
         and sorted(round(item["aod_deg"], 3) for item in downlink_wall)

@@ -62,10 +62,10 @@ def test_finite_wall_reflection_matches_image_method(
             expected["aod_deg"], abs=1e-2
         )
         assert measured["aoa_deg"] == pytest.approx(0.0, abs=1e-6)
-        assert comparison["reflection_point_error_m"] <= 1e-3
+        assert comparison["reflection_point_error_m"] <= 5e-4
         assert abs(comparison["amplitude_relative_error"]) <= 1e-3
         assert measured["vertex_points_m"][0] == pytest.approx(
-            expected["reflection_point_m"], abs=1e-3
+            expected["reflection_point_m"], abs=5e-4
         )
         reciprocal = find_reciprocal_wall_path(records, side)
         assert reciprocal["delay_ns"] == pytest.approx(
