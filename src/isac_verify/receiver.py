@@ -881,6 +881,15 @@ def _peak_index(power: torch.Tensor) -> tuple[int, int]:
     return lag_index, angle_index
 
 
+def _search_lag_range(delay_s: torch.Tensor, choices: ProcessingChoices) -> tuple[int, int]:
+    """Coarse lag indices inside the declared ``delay_search_ns`` window, both edges inclusive (P8-5)."""
+    low_s, high_s = (value * 1e-9 for value in choices.delay_search_ns)
+    inside = torch.nonzero((delay_s >= low_s) & (delay_s <= high_s)).flatten()
+    if inside.numel() == 0:
+        raise ReceiverError("declared delay search window holds no map lag")
+    return int(inside[0].item()), int(inside[-1].item())
+
+
 def estimate_candidate(
     angular_delay: AngularDelayMap,
     *,
@@ -894,7 +903,9 @@ def estimate_candidate(
     power = angular_delay.power_w
     if power.numel() == 0:
         raise ReceiverError("angular-delay map is empty")
-    lag_index, angle_index = _peak_index(power)
+    lag_low, lag_high = _search_lag_range(angular_delay.delay_s, choices)
+    lag_index, angle_index = _peak_index(power[lag_low : lag_high + 1])
+    lag_index += lag_low
     peak = float(power[lag_index, angle_index].item())
     noise = float(angular_delay.noise_per_cell_w)
     if noise <= 0.0:
@@ -945,6 +956,10 @@ def estimate_candidate(
             dense_profile,
             lag_index,
             int(round(angular_delay.delay_bin_s / dense_spacing)),
+            bounds=(
+                math.ceil(choices.delay_search_ns[0] * 1e-9 / dense_spacing),
+                math.floor(choices.delay_search_ns[1] * 1e-9 / dense_spacing),
+            ),
         )
         dense_offset = 0.0
         if 0 < dense_index < dense_profile.numel() - 1:
@@ -1076,11 +1091,18 @@ def _zero_padded_delay_profile(
 
 
 def _dense_peak_index(
-    dense: torch.Tensor, coarse_lag_index: int, oversample: int
+    dense: torch.Tensor,
+    coarse_lag_index: int,
+    oversample: int,
+    *,
+    bounds: tuple[int, int] | None = None,
 ) -> int:
-    """Dense argmax restricted to +/-1 coarse bin around the coarse peak (P8-4)."""
+    """Dense argmax restricted to +/-1 coarse bin around the coarse peak (P8-4),
+    and to the dense-sample ``bounds`` of the delay search window when given (P8-5)."""
     low = max(0, (coarse_lag_index - 1) * oversample)
     high = min(dense.numel() - 1, (coarse_lag_index + 1) * oversample)
+    if bounds is not None:
+        low, high = max(low, bounds[0]), min(high, bounds[1])
     return low + int(torch.argmax(dense[low : high + 1]).item())
 
 

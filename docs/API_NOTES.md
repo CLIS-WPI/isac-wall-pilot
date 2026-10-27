@@ -990,7 +990,8 @@ the zero-delay padded-FFT roundtrip error was
   sanity estimate.
 - **Windows:** delay uses a non-periodic Hann window over the 2048
   subcarriers, normalized to unit RMS. Angle uses a non-periodic Hann window
-  over the 16 receive elements, normalized to unit L2 norm. The same windows
+  over the 16 receive elements, normalized to unit RMS (corrected from
+  "unit L2 norm"; see `docs/DEVIATIONS.md` P7-3 and P8-5). The same windows
   are applied in `noise_calibration`, so the calibration and measurement
   scaling agree.
 - **Scaling:** the transform uses Sionna's `1/(N*S)` normalization. No

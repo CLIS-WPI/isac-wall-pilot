@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import math
+import threading
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -24,6 +25,7 @@ import yaml
 from . import calibration as cal
 from .beams import ArrayGeometry, dbm_to_watt, direct_beam
 from .config import PilotConfig
+from .environment import _nvml_process_snapshot
 from .geometry import GeometryError, LatencyFloorError, horizontal_range_and_azimuth
 from .phase7 import (
     METHODS,
@@ -437,6 +439,7 @@ def run_calibration(
     timing: dict[str, Any] = {"per_geometry_s": {}}
     run_start = _now()
     timing["nvml_start"] = _nvml_snapshot()
+    gpu_processes, stop_gpu_monitor = _start_gpu_process_monitor(run_start)
     torch.cuda.reset_peak_memory_stats()
     choices = ProcessingChoices.from_config(config)
     noise_records = int(config.get("phase6", "processing", "noise_calibration_records"))
@@ -509,11 +512,67 @@ def run_calibration(
         torch.cuda.empty_cache()
     timing["end_to_end_s"] = _now() - run_start
     timing["nvml_end"] = _nvml_snapshot()
+    stop_gpu_monitor()
+    timing["gpu_processes_observed"] = _summarize_gpu_processes(gpu_processes)
     timing["pytorch_peak_allocated_bytes"] = int(torch.cuda.max_memory_allocated())
     timing["pytorch_peak_reserved_bytes"] = int(torch.cuda.max_memory_reserved())
     return analyze_calibration(
         output, config, timing=timing, expected_geometries=slots, records=records
     )
+
+
+GPU_MONITOR_INTERVAL_S = 30.0
+
+
+def _start_gpu_process_monitor(run_start: float) -> tuple[list[dict[str, Any]], Any]:
+    """Sample NVML's process list on device 0 every GPU_MONITOR_INTERVAL_S until stopped."""
+    samples: list[dict[str, Any]] = []
+    stop = threading.Event()
+
+    def sample() -> None:
+        while True:
+            try:
+                snapshot = _nvml_process_snapshot()
+            except Exception as exc:  # noqa: BLE001
+                snapshot = {"error": f"{type(exc).__name__}: {exc}"}
+            samples.append({"t_s": _now() - run_start, **snapshot})
+            if stop.wait(GPU_MONITOR_INTERVAL_S):
+                return
+
+    thread = threading.Thread(target=sample, name="nvml-process-monitor", daemon=True)
+    thread.start()
+
+    def finish() -> None:
+        stop.set()
+        thread.join()
+
+    return samples, finish
+
+
+def _summarize_gpu_processes(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    processes: dict[str, dict[str, Any]] = {}
+    for sample in samples:
+        for kind in ("compute_processes", "graphics_processes"):
+            for entry in sample.get(kind, []):
+                key = f"{kind.split('_')[0]}:{entry['pid']}"
+                row = processes.setdefault(
+                    key,
+                    {"pid": entry["pid"], "kind": kind.split("_")[0], "first_seen_s": sample["t_s"],
+                     "samples_seen": 0, "max_used_gpu_memory_bytes": None},
+                )
+                row["last_seen_s"] = sample["t_s"]
+                row["samples_seen"] += 1
+                used = entry["used_gpu_memory_bytes"]
+                if used is not None:
+                    row["max_used_gpu_memory_bytes"] = max(row["max_used_gpu_memory_bytes"] or 0, used)
+    return {
+        "label": "NVML process list on device 0, host PIDs. Includes this run's own "
+        "process, whose host PID is not visible inside the container.",
+        "interval_s": GPU_MONITOR_INTERVAL_S,
+        "samples": len(samples),
+        "sample_errors": [sample for sample in samples if "error" in sample],
+        "processes": sorted(processes.values(), key=lambda row: (row["kind"], row["pid"])),
+    }
 
 
 def analyze_calibration(

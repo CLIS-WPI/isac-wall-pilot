@@ -159,8 +159,16 @@ They do not add a decision criterion.
   wall pair instead of the direct return. The refinement now follows the
   coarse angle-delay map's signal path, and its argmax is restricted to
   +/-1 coarse bin around the coarse peak.
+- **Declared delay search window enforced** (`docs/DEVIATIONS.md` P8-5):
+  acquisition now applies the declared `delay_search_ns` window
+  [300, 500] ns at both edges, identically in both worlds. Before this, the
+  lower edge was not applied and the map extended to 504.56 ns. The declared
+  value itself is unchanged.
 - **Calibration re-run:** the first calibration run (harness `4e44d3b`) is
   invalid. It is kept in `results/phase8a_invalid_v1/` and is not merged,
   reused or consulted for any threshold. Calibration is re-run from scratch
-  with the same declared seeds and the same 12 calibration geometries.
+  with the same declared seeds and the same 12 calibration geometries, on the
+  code that includes both fixes. A second attempt, started on `eb73949` before
+  the window fix, was stopped within minutes, before any shard completed, and
+  its partial output was deleted unused.
 - **Held-out:** no held-out geometry has been generated, solved or run.

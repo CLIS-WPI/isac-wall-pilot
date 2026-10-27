@@ -720,3 +720,47 @@ declared processing choices, not post-hoc tuning.
 - **First calibration run:** moved to `results/phase8a_invalid_v1/`, kept and
   never used. Calibration is re-run from scratch with the same seeds
   (`docs/ANALYSIS_PLAN.md` Amendment 1).
+
+### P8-5 — Declared delay search window enforced in acquisition
+
+- **Type:** validity fix. It closes the two audit findings recorded in P8-4
+  and is applied before the calibration re-run. No analysis-plan rule and no
+  declared value changed: `phase6.processing.delay_search_ns` stays
+  `[300.0, 500.0]`.
+- **What was wrong:** `delay_search_ns` only set the map's last lag,
+  `ceil(500 ns * W)` = lag 62 = 504.56 ns at 8.138 ns spacing. The coarse
+  argmax covered lag 0 to 504.56 ns, so neither edge of the declared window
+  was applied as declared: the lower edge was ignored, and the upper edge
+  admitted one lag past 500 ns. (P8-4 says "only `l_max` (500 ns) is
+  enforced"; the measured last lag is 504.56 ns.)
+- **Fix:** `estimate_candidate` takes the coarse argmax only over lags with
+  delay in [300, 500] ns, both edges inclusive (`_search_lag_range`). The
+  dense refinement window (+/-1 coarse bin, P8-4) is further clipped to the
+  same [300, 500] ns. The maps and their noise calibration are unchanged; log-parabolic
+  interpolation still reads the neighbouring cells. Every acquisition path
+  (Phase 6, Phase 7, Phase 8A, delay-axis check) calls `estimate_candidate`,
+  and it applies the same rule in the target and replay worlds.
+  `measure_point_spread` is not acquisition and is unchanged.
+- **Tests** (`tests/test_receiver_refinement.py::test_candidate_respects_declared_delay_search_window`,
+  coarse-only and dense refinement; both cases fail at `eb73949`):
+  - A 0-deg return at 200 ns, 3x the direct amplitude, plus the direct return
+    at 400 ns: the candidate is at 400 ns. Before the fix: 199.918 ns.
+  - A 0-deg return on the last map lag (504.56 ns), 1.5x the direct
+    amplitude, plus the direct return at 400 ns: the candidate is at 400 ns.
+    Before the fix: 504.557 ns. Its measured leakage one lag inside is
+    -6.0 dB (`results/phase8a_diag/window_probe.py`), so it does not win the
+    in-window lag.
+  - A return at 515 ns already passed at `eb73949`: its main lobe peaks outside
+    the map, so it is not a useful regression case and was not kept.
+- **Documentation:** `docs/API_NOTES.md` now says the AoA window is unit-RMS
+  (documentation only; the code was already unit-RMS, per P7-3).
+- **Re-validation:** full pytest passes (66 passed). Phase 6 `validate`
+  passes (`results/validate_p8fix2`), and every numeric field of
+  `validation_summary.json` (13578) and `phase6_summary.json` (472) equals the
+  P8-4 run to within 1e-9 relative. Only the output paths differ. The nominal
+  direct return (about 438 ns) and wall return (about 424 ns) both lie inside
+  [300, 500] ns, so the smoke was not re-run.
+- **Run record:** `calibrate` now samples NVML's process list on device 0
+  every 30 s during the run and writes the per-PID summary to
+  `timing.json` as `gpu_processes_observed` (host PIDs, including the run's own
+  process). It does not affect any computed value.

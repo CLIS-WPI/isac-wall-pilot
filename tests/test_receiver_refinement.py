@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 import torch
 
@@ -163,4 +165,60 @@ def test_narrow_corridor_candidate_is_the_direct_return(config: PilotConfig) -> 
             world,
             candidate.delay_s * 1e9,
             true_delay_s * 1e9,
+        )
+
+
+@pytest.mark.parametrize("decoy", ["below_300ns", "last_map_lag_beyond_500ns"])
+def test_candidate_respects_declared_delay_search_window(
+    config: PilotConfig, decoy: str
+) -> None:
+    """A stronger return outside delay_search_ns [300, 500] ns must not be acquired (P8-5)."""
+    choices = ProcessingChoices.from_config(config)
+    assert choices.delay_search_ns == (300.0, 500.0)
+    if decoy == "below_300ns":
+        decoy_delay_s, decoy_amplitude = 200e-9, 3e-6
+    else:
+        # The map's last lag (504.56 ns) is past 500 ns. The decoy wins that lag,
+        # but its leakage one lag inside (-6.0 dB measured) stays below the direct return.
+        spacing = choices.profile.delay_bin_spacing_s
+        decoy_delay_s, decoy_amplitude = math.ceil(500e-9 / spacing) * spacing, 1.5e-6
+        assert decoy_delay_s > 500e-9
+    weights = _direct_weights(config)
+    direct = _plane_wave(choices, weights, aoa_deg=0.0, delay_s=400e-9, amplitude=1e-6)
+    decoy_path = _plane_wave(
+        choices, weights, aoa_deg=0.0, delay_s=decoy_delay_s, amplitude=decoy_amplitude
+    )
+    observation = make_observation(
+        world="target",
+        beam_name="test",
+        beam_weights=weights,
+        symbols=torch.ones(
+            (choices.profile.num_symbols, choices.profile.fft_size),
+            device="cuda",
+            dtype=torch.complex64,
+        ),
+        target_paths=(direct, decoy_path),
+        profile=choices.profile,
+        config=config,
+        noise_seed=4242,
+        relay_noise_seed=4243,
+        noiseless=True,
+    )
+    angular = angular_delay_map(
+        delay_doppler_map(observation.h_eff, choices), choices, noise_per_cell_w=1e-30
+    )
+    for h_eff in (None, observation.h_eff):
+        candidate = estimate_candidate(
+            angular,
+            choices=choices,
+            point_spread=None,
+            gnb_position_m=config.get("physical", "gnb_position_m"),
+            speed_of_light_m_per_s=config.speed_of_light,
+            h_eff=h_eff,
+        )
+        tolerance_s = 0.1e-9 if h_eff is not None else 0.5 * angular.delay_bin_s
+        assert abs(candidate.delay_s - 400e-9) <= tolerance_s, (
+            decoy,
+            h_eff is None,
+            candidate.delay_s * 1e9,
         )
