@@ -1007,18 +1007,73 @@ def _print_phase5_tables(phase5: dict[str, Any]) -> None:
             f"total={power['downlink_input_power_w']:.6e} W; {families}"
         )
     vulnerability = phase5["vulnerability"]
+    print(
+        "phase 5 C1 downlink x uplink table "
+        "(arrival AoA; gate-consistent; required delay/shift; "
+        "gain change; TX power; power feasible):"
+    )
     if vulnerability.get("available"):
         print(
-            "phase 5 vulnerability (UNTESTED): "
+            "phase 5 C1 selected gate: "
+            f"target wall delay={vulnerability['target_wall_delay_ns']:.9f} ns, "
+            f"AoA={vulnerability['gate_aoa_deg']:.6f} deg, "
+            f"paths={vulnerability['target_gate']['path_count']}, "
             f"required processing delay="
             f"{vulnerability['required_processing_delay_ns']:.9f} ns, "
-            f"delay shift={vulnerability['required_delay_shift_ns']:.9f} ns, "
+            f"analytic={vulnerability['analytic_required_processing_delay_ns']:.9f} ns, "
+            f"shift={vulnerability['required_delay_shift_ns']:.9f} ns, "
             f"causal={vulnerability['causal_feasible']}, "
             f"gain change={vulnerability['required_gain_change_db']:.6f} dB, "
+            f"TX={vulnerability['required_relay_transmit_power_w']:.6e} W, "
             f"power feasible={vulnerability['power_feasible']}"
         )
+        for row in vulnerability["pair_table"]:
+            gain = row["required_gain_change_db"]
+            gain_text = "nan" if gain is None else f"{gain:.6f}"
+            print(
+                f"phase 5 C1 pair {row['downlink_family']:<56} "
+                f"{row['uplink_family']:<56} "
+                f"delay={row['pair_echo_delay_ns']:12.6f} ns "
+                f"AoA={row['arrival_aoa_deg']:10.6f} deg "
+                f"gate={row['gate_consistent']!s:<5} "
+                f"req={row['required_processing_delay_ns']:12.6f} ns "
+                f"shift={row['required_delay_shift_ns']:12.6f} ns "
+                f"causal={row['causal_feasible']!s:<5} "
+                f"gain={gain_text:>14} dB "
+                f"TX={row['required_relay_transmit_power_w']:.6e} W "
+                f"feasible={row['power_feasible']}"
+            )
     else:
-        print(f"phase 5 vulnerability (UNTESTED): unavailable: {vulnerability['reason']}")
+        print(f"phase 5 C1 unavailable: {vulnerability['reason']}")
+    c2 = phase5["beam_weighted_depth"]
+    print(
+        "phase 5 C2 beam-weighted depth convergence: "
+        f"tolerance={c2['tolerance']:.6f}, "
+        f"selected={c2['selected_depths']}, "
+        f"configured={c2['configured_depths']}, "
+        f"consistent={c2['consistent']}"
+    )
+    for beam in ("direct", "wall"):
+        for row in c2["target_wall_gate"][beam]:
+            change = row.get("power_change_fraction")
+            print(
+                f"phase 5 C2 target {beam} depth={row['depth']} "
+                f"wall-gate coherent={row['gate_coherent_power_w']:.6e} W "
+                f"change={change if change is not None else 'n/a'}"
+            )
+        for row in c2["relay_input"][beam]:
+            change = row.get("power_change_fraction")
+            print(
+                f"phase 5 C2 relay {beam} depth={row['depth']} "
+                f"input={row['relay_input_power_w']:.6e} W "
+                f"change={change if change is not None else 'n/a'}"
+            )
+        for row in c2["background_gates"][beam]:
+            print(
+                f"phase 5 C2 background {beam} depth={row['depth']} "
+                f"direct-gate={row['direct_gate']['gate_coherent_power_w']:.6e} W "
+                f"wall-gate={row['wall_gate']['gate_coherent_power_w']:.6e} W"
+            )
     noise = phase5["noise"]
     print(
         "phase 5 noise: "
@@ -1100,6 +1155,10 @@ def run_validation(
         ),
         "phase5_no_duplicates": phase5["duplicates"]["total_duplicate_groups"] == 0,
         "phase5_d9": phase5["depth_decision"]["selected_depths"]
+        == phase5["d9_depths"],
+        "phase5_beam_weighted_d9": phase5["beam_weighted_depth"][
+            "selected_depths"
+        ]
         == phase5["d9_depths"],
     }
     status = "PASS" if all(checks.values()) else "FAIL"

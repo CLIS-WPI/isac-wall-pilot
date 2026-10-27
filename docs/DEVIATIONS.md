@@ -189,9 +189,9 @@ Each entry: what changed, why, and which BRIEF section it affects.
 - **Why:** The strict per-link rule gives relay depth `1` (`downlink`
   `d1->d2 = 0.0033771`, `uplink = 0.0033771`), but a depth-1 relay would
   discard the wall-return paths needed for the two-action wall test. At depth
-  `2`, `d2->d3` is `0.0005584` for both relay links, still below `1%`.
-  Target depth `3` has `d3->d4 = 0.0014610`; background depth `2` has
-  `d2->d3 = 0.0037175`. Both are below `1%`.
+  `2`, the raw-path `d2->d3` change is `0.0005584` for both relay links, still
+  below `1%`. Target depth `3` has raw `d3->d4 = 0.0014610`; background depth
+  `2` has raw `d2->d3 = 0.0037175`. Both are below `1%`.
 - **BRIEF section:** §7.1 actual Sionna components; §7.2 received-signal
   model; §15 required validation tests.
 - **Phase 5 evidence:** `results/phase4/geometry_reference.json` and
@@ -199,6 +199,30 @@ Each entry: what changed, why, and which BRIEF section it affects.
   `selected_depths`; `depth_power_decision` raises if the configured depths
   differ from the computed depths. The P1 duplicate audit found no duplicate
   paths at depths 3 or 4, so no D10 deduplication entry is needed.
+- **Phase 5 C2 correction:** raw path power is not the power received under
+  the actual beams. At the configured depths, the beam-weighted checks give:
+  - wall-beam relay input `d1=7.809439e-13 W`, `d2=9.584364e-13 W`,
+    `d3=9.632587e-13 W`, `d4=9.656921e-13 W`; `d1->d2=22.727944%`,
+    `d2->d3=0.503141%`, `d3->d4=0.252617%`;
+  - direct-beam relay input `d2->d3=2.142e-06`, `d3->d4=1.491e-07`;
+  - target wall-gate coherent power is `2.723302e-13 W` at depths `2`, `3`,
+    and `4` under the wall beam, and `1.048250e-14 W` at all three depths
+    under the direct beam;
+  - background direct-gate and wall-gate coherent powers are zero at depths
+    `1` through `4` for both beams.
+  Starting from the configured depths and raising only when a next-depth
+  beam-weighted change reaches `1%`, the selected depths remain
+  `target=3`, `background=2`, `downlink=2`, `uplink=2`.
+- **C1 correction:** the gate-consistent relay pairs use the measured direct
+  uplink at AoA `0 deg`, not the wall uplink at `±45 deg`. The selected
+  wall-downlink group contains both first-order wall paths at
+  `141.519251 ns`; with the direct uplink at `100.069229 ns`, the measured
+  required added delay is `182.311567 ns` (analytic
+  `423.900055 - 141.519251 - 100.069229 = 182.311575 ns`), a shift of
+  `-17.826892 ns`. The gate-coherent required gain change is `47.279065 dB`;
+  the required relay TX power using its total input is `5.483458e-06 W`,
+  below the `0.01 W` cap. The previous `140.861545 ns` value used a wall
+  uplink and did not lie at the verifier gate AoA.
 
 The selected background depth `2` also excludes the depth-4 four-bounce
 wall-wall monostatic clutter at `400.2769173894194 ns`; that path appears only

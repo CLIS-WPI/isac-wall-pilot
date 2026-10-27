@@ -63,6 +63,8 @@ class PathTerm:
     power_w: float
     interaction_names: tuple[str, ...]
     object_names: tuple[str, ...]
+    aod_deg: float = float("nan")
+    aoa_deg: float = float("nan")
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -73,6 +75,8 @@ class PathTerm:
             "power_w": self.power_w,
             "interaction_names": list(self.interaction_names),
             "object_names": list(self.object_names),
+            "aod_deg": self.aod_deg,
+            "aoa_deg": self.aoa_deg,
         }
 
 
@@ -328,6 +332,8 @@ def path_terms(
                 power_w=abs(value) ** 2,
                 interaction_names=tuple(record["interaction_names"]),
                 object_names=tuple(record["object_names"]),
+                aod_deg=float(record["aod_deg"]),
+                aoa_deg=float(record["aoa_deg"]),
             )
         )
     return terms
@@ -380,6 +386,8 @@ def relay_pair_terms(
                     power_w=abs(coefficient) ** 2,
                     interaction_names=down.interaction_names + up.interaction_names,
                     object_names=down.object_names + up.object_names,
+                    aod_deg=down.aod_deg,
+                    aoa_deg=up.aoa_deg,
                 )
             )
     return pairs
@@ -635,63 +643,454 @@ def _gain_sweep(
     return rows
 
 
+def _gate_terms(
+    terms: Sequence[PathTerm],
+    *,
+    delay_center_s: float,
+    aoa_center_deg: float,
+    delay_half_width_s: float,
+    aoa_tolerance_deg: float,
+) -> list[PathTerm]:
+    return [
+        term
+        for term in terms
+        if abs(term.delay_s - delay_center_s) <= delay_half_width_s
+        and abs(term.aoa_deg - aoa_center_deg) <= aoa_tolerance_deg
+    ]
+
+
+def _gate_power(terms: Sequence[PathTerm]) -> dict[str, Any]:
+    coherent = sum((term.coefficient for term in terms), 0.0 + 0.0j)
+    return {
+        "gate_power_sum_w": float(sum(term.power_w for term in terms)),
+        "gate_coherent_power_w": float(abs(coherent) ** 2),
+        "coherent_coefficient": [coherent.real, coherent.imag],
+        "path_count": len(terms),
+        "families": sorted({term.family for term in terms}),
+        "paths": [term.as_dict() for term in terms],
+    }
+
+
 def _vulnerability(
     config: PilotConfig,
     world: dict[str, list[PathTerm]],
-    pairs: Sequence[PathTerm],
     calibration: RelayCalibration,
 ) -> dict[str, Any]:
-    target_wall = _find_term(world["target"], "outgoing_wall_positive_wall")
-    down_wall = _find_term(world["downlink"], "wall_clutter_positive_wall")
-    up_wall = _find_term(world["uplink"], "wall_clutter_positive_wall")
-    relay_wall = None
-    if down_wall is not None and up_wall is not None:
-        relay_wall = next(
-            (
-                term
-                for term in pairs
-                if term.family
-                == "relay_wall_clutter_positive_wall__wall_clutter_positive_wall"
-            ),
-            None,
-        )
-    if target_wall is None or down_wall is None or up_wall is None or relay_wall is None:
+    target_walls = [
+        term
+        for term in world["target"]
+        if term.family.startswith("outgoing_wall_")
+    ]
+    target_direct = _find_term(world["target"], "direct")
+    if not target_walls or target_direct is None:
         return {
             "available": False,
             "adaptive_relay": "UNTESTED",
-            "reason": "positive-wall target/downlink/uplink path unavailable",
+            "reason": "target direct or outgoing-wall path unavailable",
         }
-    required_delay = (
-        target_wall.delay_s - down_wall.delay_s - up_wall.delay_s
+    half_width = float(
+        config.get("phase5", "vulnerability_gate_delay_half_width_ns")
+    ) * 1e-9
+    aoa_tolerance = float(
+        config.get("phase5", "vulnerability_gate_aoa_tolerance_deg")
     )
+    gate_aoa = float(target_direct.aoa_deg)
+    target_wall = max(target_walls, key=lambda term: term.power_w)
+    target_gate_delay = target_wall.delay_s
+    target_gate = _gate_terms(
+        world["target"],
+        delay_center_s=target_gate_delay,
+        aoa_center_deg=gate_aoa,
+        delay_half_width_s=half_width,
+        aoa_tolerance_deg=aoa_tolerance,
+    )
+    if not target_gate:
+        return {
+            "available": False,
+            "adaptive_relay": "UNTESTED",
+            "reason": "target wall gate is empty",
+        }
+    direct_uplinks = [
+        term
+        for term in world["uplink"]
+        if abs(term.aoa_deg - gate_aoa) <= aoa_tolerance
+    ]
+    if not direct_uplinks:
+        direct_uplinks = [
+            min(world["uplink"], key=lambda term: abs(term.aoa_deg - gate_aoa))
+        ]
+    uplink = max(direct_uplinks, key=lambda term: term.power_w)
+    anchor = max(world["downlink"], key=lambda term: term.power_w)
+    required_delay = target_gate_delay - anchor.delay_s - uplink.delay_s
+    downlink_gate = [
+        term
+        for term in world["downlink"]
+        if abs(
+            term.delay_s + required_delay + uplink.delay_s - target_gate_delay
+        )
+        <= half_width
+    ]
+    if not downlink_gate:
+        return {
+            "available": False,
+            "adaptive_relay": "UNTESTED",
+            "reason": "downlink gate group is empty",
+        }
+    target_sum = sum((term.coefficient for term in target_gate), 0.0 + 0.0j)
+    downlink_sum = sum(
+        (term.coefficient for term in downlink_gate), 0.0 + 0.0j
+    )
+    uplink_sum = sum(
+        (term.coefficient for term in direct_uplinks), 0.0 + 0.0j
+    )
+    required_gain = target_sum / (downlink_sum * uplink_sum)
+    total_input_power = float(
+        sum(term.power_w for term in world["downlink"])
+    )
+    tx_power = abs(required_gain) ** 2 * total_input_power
+    gate_energy = abs(required_gain * downlink_sum * uplink_sum) ** 2
     floor = calibration.latency_floor_s
-    gain_ratio = target_wall.coefficient / (
-        calibration.gain * down_wall.coefficient * up_wall.coefficient
+    reference_target_delay_ns = float(
+        config.get("phase5", "vulnerability_wall_delay_ns")
     )
-    required_gain = calibration.gain * gain_ratio
-    tx_power = abs(required_gain) ** 2 * (
-        abs(down_wall.coefficient) ** 2
+    analytic_delay_ns = (
+        reference_target_delay_ns
+        - round(anchor.delay_s * 1e9, 6)
+        - round(uplink.delay_s * 1e9, 6)
     )
+
+    table = []
+    for down in world["downlink"]:
+        for up in world["uplink"]:
+            pair_delay = down.delay_s + up.delay_s
+            pair_required_delay = target_gate_delay - pair_delay
+            aoa_consistent = (
+                abs(up.aoa_deg - gate_aoa) <= aoa_tolerance
+            )
+            denominator = down.coefficient * up.coefficient
+            pair_gain = (
+                target_sum / denominator if denominator != 0.0 else complex(0.0)
+            )
+            pair_tx_power = abs(pair_gain) ** 2 * total_input_power
+            table.append(
+                {
+                    "downlink_family": down.family,
+                    "uplink_family": up.family,
+                    "downlink_delay_ns": down.delay_s * 1e9,
+                    "uplink_delay_ns": up.delay_s * 1e9,
+                    "pair_echo_delay_ns": pair_delay * 1e9,
+                    "arrival_aoa_deg": up.aoa_deg,
+                    "gate_aoa_deg": gate_aoa,
+                    "gate_aoa_consistent": aoa_consistent,
+                    "gate_consistent": aoa_consistent,
+                    "required_processing_delay_ns": pair_required_delay * 1e9,
+                    "required_delay_shift_ns": (
+                        pair_required_delay
+                        - calibration.measured_added_delay_s
+                    )
+                    * 1e9,
+                    "latency_floor_ns": floor * 1e9,
+                    "causal_feasible": pair_required_delay >= floor,
+                    "required_gain_abs": abs(pair_gain),
+                    "required_gain_change_db": (
+                        20.0 * math.log10(abs(pair_gain / calibration.gain))
+                        if pair_gain != 0.0
+                        else None
+                    ),
+                    "required_relay_transmit_power_w": pair_tx_power,
+                    "required_relay_transmit_power_dbm": _power_db(
+                        pair_tx_power
+                    ),
+                    "max_transmit_power_w": calibration.max_transmit_power_w,
+                    "power_feasible": pair_tx_power
+                    <= calibration.max_transmit_power_w * (1.0 + 1e-12),
+                }
+            )
     return {
         "available": True,
         "adaptive_relay": "UNTESTED",
-        "gate_aoa_deg": 0.0,
-        "target_wall_delay_ns": target_wall.delay_s * 1e9,
-        "relay_downlink_wall_delay_ns": down_wall.delay_s * 1e9,
-        "relay_uplink_wall_delay_ns": up_wall.delay_s * 1e9,
-        "fixed_processing_delay_ns": calibration.measured_added_delay_s * 1e9,
+        "gate_aoa_deg": gate_aoa,
+        "gate_aoa_tolerance_deg": aoa_tolerance,
+        "gate_delay_half_width_ns": half_width * 1e9,
+        "gate_consistent_pair_count": sum(
+            1 for row in table if row["gate_consistent"]
+        ),
+        "target_wall_delay_ns": target_gate_delay * 1e9,
+        "relay_downlink_wall_delay_ns": anchor.delay_s * 1e9,
+        "relay_uplink_direct_delay_ns": uplink.delay_s * 1e9,
+        "reference_target_wall_delay_ns": reference_target_delay_ns,
+        "analytic_required_processing_delay_ns": analytic_delay_ns,
+        "analytic_required_delay_shift_ns": (
+            analytic_delay_ns - calibration.measured_added_delay_s * 1e9
+        ),
+        "fixed_processing_delay_ns": (
+            calibration.measured_added_delay_s * 1e9
+        ),
         "required_processing_delay_ns": required_delay * 1e9,
-        "required_delay_shift_ns": (required_delay - calibration.measured_added_delay_s) * 1e9,
+        "required_delay_shift_ns": (
+            required_delay - calibration.measured_added_delay_s
+        )
+        * 1e9,
         "latency_floor_ns": floor * 1e9,
         "causal_feasible": required_delay >= floor,
+        "target_gate": _gate_power(target_gate),
+        "downlink_gate": _gate_power(downlink_gate),
+        "uplink_gate": _gate_power(direct_uplinks),
+        "gate_energy_w": gate_energy,
+        "total_downlink_input_power_w": total_input_power,
         "required_gain_abs": abs(required_gain),
-        "required_gain_change_db": 20.0 * math.log10(abs(gain_ratio)),
+        "required_gain_change_db": 20.0
+        * math.log10(abs(required_gain / calibration.gain)),
         "required_relay_transmit_power_w": tx_power,
         "required_relay_transmit_power_dbm": _power_db(tx_power),
-        "power_feasible": tx_power <= calibration.max_transmit_power_w * (1.0 + 1e-12),
+        "power_feasible": tx_power
+        <= calibration.max_transmit_power_w * (1.0 + 1e-12),
+        "pair_table": table,
         "note": (
             "Diagnostic only: the primary relay has one fixed gain and delay. "
-            "A stronger adaptive relay is not simulated."
+            "A stronger adaptive relay is not simulated. Gate-consistent "
+            "rows use the measured direct-return AoA. TX power uses the "
+            "relay's total downlink input; gate energy uses all downlink "
+            "paths inside the declared delay window."
+        ),
+    }
+
+
+def _change_fraction(current: float, previous: float) -> float | None:
+    if previous == 0.0:
+        return 0.0 if current == 0.0 else float("inf")
+    return (current - previous) / previous
+
+
+def beam_weighted_depth_diagnostics(
+    config: PilotConfig,
+    *,
+    direct_weights: torch.Tensor,
+    wall_weights: torch.Tensor,
+    rx_weights: torch.Tensor,
+) -> dict[str, Any]:
+    tolerance = float(
+        config.get("scene", "d9_path_power_relative_tolerance")
+    )
+    half_width = float(
+        config.get("phase5", "vulnerability_gate_delay_half_width_ns")
+    ) * 1e-9
+    aoa_tolerance = float(
+        config.get("phase5", "vulnerability_gate_aoa_tolerance_deg")
+    )
+    target_gate_delay = float(
+        config.get("phase5", "vulnerability_wall_delay_ns")
+    ) * 1e-9
+    direct_gate_delay = float(
+        config.get("geometry_reference", "candidate_direct_round_trip_delay_ns")
+    ) * 1e-9
+    gate_aoa = float(
+        config.get("experiment_a", "reference_beam_phi_deg")
+    )
+    depth_values = [
+        int(value) for value in config.get("scene", "phase4_max_depth")
+    ]
+    target_depths = [depth for depth in depth_values if depth >= 2]
+    beams = {"direct": direct_weights, "wall": wall_weights}
+    target_rows: dict[str, list[dict[str, Any]]] = {
+        beam: [] for beam in beams
+    }
+    downlink_rows: dict[str, list[dict[str, Any]]] = {
+        beam: [] for beam in beams
+    }
+    background_rows: dict[str, list[dict[str, Any]]] = {
+        beam: [] for beam in beams
+    }
+    for depth in target_depths:
+        path_set = solve_target_paths(config, max_depth=depth)
+        for beam, weights in beams.items():
+            terms = path_terms(
+                path_set,
+                tx_weights=weights,
+                rx_weights=rx_weights,
+                mode="target",
+                label=f"c2_target_{beam}_{depth}",
+            )
+            gate = _gate_terms(
+                terms,
+                delay_center_s=target_gate_delay,
+                aoa_center_deg=gate_aoa,
+                delay_half_width_s=half_width,
+                aoa_tolerance_deg=aoa_tolerance,
+            )
+            target_rows[beam].append({"depth": depth, **_gate_power(gate)})
+    for depth in depth_values:
+        downlink_set = solve_background_paths(
+            config, direction="downlink", max_depth=depth
+        )
+        background_set = solve_background_paths(
+            config, direction="monostatic", max_depth=depth
+        )
+        for beam, weights in beams.items():
+            down_terms = path_terms(
+                downlink_set,
+                tx_weights=weights,
+                rx_weights=rx_weights,
+                mode="downlink",
+                label=f"c2_downlink_{beam}_{depth}",
+            )
+            downlink_rows[beam].append(
+                {
+                    "depth": depth,
+                    "relay_input_power_w": float(
+                        sum(term.power_w for term in down_terms)
+                    ),
+                    "families": sorted(
+                        {term.family for term in down_terms}
+                    ),
+                }
+            )
+            background_terms = path_terms(
+                background_set,
+                tx_weights=weights,
+                rx_weights=rx_weights,
+                mode="background",
+                label=f"c2_background_{beam}_{depth}",
+            )
+            direct_gate = _gate_terms(
+                background_terms,
+                delay_center_s=direct_gate_delay,
+                aoa_center_deg=gate_aoa,
+                delay_half_width_s=half_width,
+                aoa_tolerance_deg=aoa_tolerance,
+            )
+            wall_gate = _gate_terms(
+                background_terms,
+                delay_center_s=target_gate_delay,
+                aoa_center_deg=gate_aoa,
+                delay_half_width_s=half_width,
+                aoa_tolerance_deg=aoa_tolerance,
+            )
+            background_rows[beam].append(
+                {
+                    "depth": depth,
+                    "direct_gate": _gate_power(direct_gate),
+                    "wall_gate": _gate_power(wall_gate),
+                }
+            )
+    for rows in (target_rows, downlink_rows):
+        for beam_rows in rows.values():
+            for index in range(1, len(beam_rows)):
+                previous = beam_rows[index - 1]
+                current = beam_rows[index]
+                key = (
+                    "gate_coherent_power_w"
+                    if "gate_coherent_power_w" in current
+                    else "relay_input_power_w"
+                )
+                current["power_change_fraction"] = _change_fraction(
+                    float(current[key]), float(previous[key])
+                )
+    for beam_rows in background_rows.values():
+        for index in range(1, len(beam_rows)):
+            previous = beam_rows[index - 1]
+            current = beam_rows[index]
+            current["direct_gate_change_fraction"] = _change_fraction(
+                float(current["direct_gate"]["gate_coherent_power_w"]),
+                float(previous["direct_gate"]["gate_coherent_power_w"]),
+            )
+            current["wall_gate_change_fraction"] = _change_fraction(
+                float(current["wall_gate"]["gate_coherent_power_w"]),
+                float(previous["wall_gate"]["gate_coherent_power_w"]),
+            )
+
+    configured = {
+        name: int(config.get("scene", "d9_depths", name))
+        for name in ("target", "background", "downlink", "uplink")
+    }
+    decisions: dict[str, Any] = {}
+    target_choice = configured["target"]
+    target_index = target_depths.index(target_choice)
+    if target_index + 1 < len(target_depths):
+        changes = [
+            abs(
+                float(
+                    target_rows[beam][target_index + 1][
+                        "gate_coherent_power_w"
+                    ]
+                )
+                - float(
+                    target_rows[beam][target_index]["gate_coherent_power_w"]
+                )
+            )
+            / max(
+                float(target_rows[beam][target_index]["gate_coherent_power_w"]),
+                np.finfo(float).tiny,
+            )
+            for beam in beams
+        ]
+        if max(changes) >= tolerance:
+            target_choice = target_depths[target_index + 1]
+    decisions["target"] = target_choice
+    decisions["downlink"] = configured["downlink"]
+    for index in range(len(depth_values) - 1):
+        if depth_values[index] < configured["downlink"]:
+            continue
+        changes = [
+            abs(
+                _change_fraction(
+                    float(downlink_rows[beam][index + 1]["relay_input_power_w"]),
+                    float(downlink_rows[beam][index]["relay_input_power_w"]),
+                )
+            )
+            for beam in beams
+        ]
+        if max(changes) < tolerance:
+            break
+        decisions["downlink"] = depth_values[index + 1]
+    decisions["background"] = configured["background"]
+    for index in range(len(depth_values) - 1):
+        if depth_values[index] < configured["background"]:
+            continue
+        changes = []
+        for beam in beams:
+            row = background_rows[beam][index]
+            next_row = background_rows[beam][index + 1]
+            for gate in ("direct_gate", "wall_gate"):
+                changes.append(
+                    abs(
+                        _change_fraction(
+                            float(next_row[gate]["gate_coherent_power_w"]),
+                            float(row[gate]["gate_coherent_power_w"]),
+                        )
+                    )
+                )
+        if max(changes) < tolerance:
+            break
+        decisions["background"] = depth_values[index + 1]
+    decisions["uplink"] = configured["uplink"]
+    selected = {
+        name: int(decisions[name])
+        for name in ("target", "background", "downlink", "uplink")
+    }
+    return {
+        "tolerance": tolerance,
+        "rule": (
+            "start from the configured depth and raise only when the "
+            "next-depth beam-weighted change is at least the tolerance"
+        ),
+        "gate_window": {
+            "delay_half_width_ns": half_width * 1e9,
+            "aoa_tolerance_deg": aoa_tolerance,
+            "target_wall_gate_delay_ns": target_gate_delay * 1e9,
+            "direct_gate_delay_ns": direct_gate_delay * 1e9,
+            "gate_aoa_deg": gate_aoa,
+        },
+        "target_wall_gate": target_rows,
+        "relay_input": downlink_rows,
+        "background_gates": background_rows,
+        "configured_depths": configured,
+        "selected_depths": selected,
+        "consistent": selected == configured,
+        "note": (
+            "Uplink depth is retained at the configured value because the "
+            "declared beam-weighted checks cover target wall-gate echo, "
+            "downlink relay input, and background gate energy."
         ),
     }
 
@@ -747,6 +1146,12 @@ def phase5_diagnostics(
         calibration.measured_added_delay_s, calibration.latency_floor_s
     )
 
+    beam_weighted_depth = beam_weighted_depth_diagnostics(
+        config,
+        direct_weights=direct.weights,
+        wall_weights=wall.weights,
+        rx_weights=rx_weights,
+    )
     record = generate_continuous_record(
         profile,
         seed,
@@ -831,9 +1236,7 @@ def phase5_diagnostics(
             )
         )
         if beam_name == "wall":
-            vulnerability = _vulnerability(
-                config, world, pairs, calibration
-            )
+            vulnerability = _vulnerability(config, world, calibration)
 
     # Physical relay noise is injected at the relay input before gain and
     # propagated through the full uplink; ideal mode remains noiseless.
@@ -884,6 +1287,7 @@ def phase5_diagnostics(
         "d9_depths": depths,
         "duplicates": duplicate,
         "depth_decision": decision,
+        "beam_weighted_depth": beam_weighted_depth,
         "calibration": calibration.as_dict(),
         "agreements": agreements,
         "relay_power": relay_power,
@@ -910,6 +1314,9 @@ def phase5_diagnostics(
             <= agreements["direct"]["relay"]["tolerance"],
             "no_duplicate_paths": duplicate["total_duplicate_groups"] == 0,
             "configured_d9_matches": decision["selected_depths"] == depths,
+            "beam_weighted_d9_matches": (
+                beam_weighted_depth["selected_depths"] == depths
+            ),
         },
     }
     summary["status"] = "PASS" if all(summary["checks"].values()) else "FAIL"
