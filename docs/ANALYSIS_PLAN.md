@@ -146,3 +146,21 @@ They do not add a decision criterion.
 - **Part A scope.** Part A runs only the baseline calibration geometries.
   The rule-9 stresses and all held-out evaluation are Part B and are not
   implemented or executed here.
+
+## Amendment 1 — 2026-10-27
+
+- **No rule in this plan changed.** No threshold, candidate value, seed,
+  geometry, coverage definition or decision rule was edited, and no
+  `phase8` config key changed.
+- **What changed:** a receiver bug was fixed (`docs/DEVIATIONS.md` P8-4).
+  The dense delay refinement summed the channel over OFDM symbols instead of
+  RX antennas. That made it angularly blind, so in narrow corridors
+  (`2h/D` below about 0.47) the candidate delay locked onto the reciprocal
+  wall pair instead of the direct return. The refinement now follows the
+  coarse angle-delay map's signal path, and its argmax is restricted to
+  +/-1 coarse bin around the coarse peak.
+- **Calibration re-run:** the first calibration run (harness `4e44d3b`) is
+  invalid. It is kept in `results/phase8a_invalid_v1/` and is not merged,
+  reused or consulted for any threshold. Calibration is re-run from scratch
+  with the same declared seeds and the same 12 calibration geometries.
+- **Held-out:** no held-out geometry has been generated, solved or run.

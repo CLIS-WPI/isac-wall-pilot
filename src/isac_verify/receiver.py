@@ -325,6 +325,15 @@ def link_paths(
     return tuple(selected)
 
 
+def _require_shape(name: str, value: torch.Tensor, **axes: int) -> None:
+    """Fail unless ``value`` has exactly the named axes, in order, before a reduction."""
+    if tuple(value.shape) != tuple(axes.values()):
+        named = ", ".join(f"{key}={size}" for key, size in axes.items())
+        raise ReceiverError(
+            f"{name}: expected shape [{named}], got {tuple(value.shape)}"
+        )
+
+
 def _require_cuda(name: str, value: torch.Tensor) -> None:
     if not value.is_cuda:
         raise ReceiverError(f"{name} must stay on CUDA")
@@ -580,6 +589,13 @@ def delay_doppler_map(
         windowed.permute(1, 0, 2), l_min=0, l_max=l_max
     )
     lag_count = l_max + 1
+    _require_shape(
+        "h_dd",
+        h_dd,
+        rx=choices.receiver_array.num_elements,
+        doppler=profile.num_symbols,
+        lag=lag_count,
+    )
     lags = torch.arange(
         lag_count, device="cuda", dtype=torch.float64
     )
@@ -613,6 +629,12 @@ def angular_delay_map(
         raise ReceiverError("noise power must be non-negative")
     zero = delay_doppler.zero_doppler
     _require_cuda("delay-Doppler map", zero)
+    _require_shape(
+        "zero-Doppler map",
+        zero,
+        rx=choices.receiver_array.num_elements,
+        lag=delay_doppler.delay_s.numel(),
+    )
     angles = choices.aoa_grid_deg
     window = _aoa_window(choices).to(zero.dtype)[:, None]
     windowed = window * zero
@@ -626,6 +648,12 @@ def angular_delay_map(
         combined = (vector.conj()[:, None] * windowed).sum(dim=0)
         powers.append(combined.abs().square())
     power_w = torch.stack(powers, dim=1)
+    _require_shape(
+        "angular-delay power",
+        power_w,
+        lag=delay_doppler.delay_s.numel(),
+        aoa=angles.numel(),
+    )
     return AngularDelayMap(
         power_w=power_w,
         delay_s=delay_doppler.delay_s,
@@ -675,6 +703,12 @@ def noise_calibration(
             windowed.permute(1, 0, 2), l_min=0, l_max=l_max
         )
         zero = h_dd[:, choices.profile.num_symbols // 2, :]
+        _require_shape(
+            "noise zero-Doppler map",
+            zero,
+            rx=choices.receiver_array.num_elements,
+            lag=l_max + 1,
+        )
         cells.append(zero.abs().square().reshape(-1))
     measured = torch.cat(cells)
     estimate = float(measured.mean().item())
@@ -803,12 +837,25 @@ def guard_noise_power(
     )
     if l_min < 0 or l_max >= choices.profile.fft_size or l_min > l_max:
         raise ReceiverError("guard interval is outside the transform grid")
+    _require_shape(
+        "h_eff",
+        h_eff,
+        symbols=choices.profile.num_symbols,
+        rx=choices.receiver_array.num_elements,
+        freq=choices.profile.fft_size,
+    )
     window = _delay_window(choices).to(h_eff.dtype)
     windowed = h_eff * window[None, None, :]
     h_dd = ofdm_to_delay_doppler_channel(
         windowed.permute(1, 0, 2), l_min=l_min, l_max=l_max
     )
     zero = h_dd[:, choices.profile.num_symbols // 2, :]
+    _require_shape(
+        "guard zero-Doppler map",
+        zero,
+        rx=choices.receiver_array.num_elements,
+        lag=l_max - l_min + 1,
+    )
     return float(zero.abs().square().flatten().mean().item())
 
 
@@ -827,6 +874,8 @@ def _log_parabolic_offset(left: float, center: float, right: float) -> float:
 
 
 def _peak_index(power: torch.Tensor) -> tuple[int, int]:
+    if power.ndim != 2:
+        raise ReceiverError(f"angular-delay power must be [lag, aoa], got {tuple(power.shape)}")
     flat = int(torch.argmax(power).item())
     lag_index, angle_index = divmod(flat, power.shape[1])
     return lag_index, angle_index
@@ -892,7 +941,11 @@ def estimate_candidate(
         dense_profile, dense_spacing = _zero_padded_delay_profile(
             h_eff, choices, angle_deg=azimuth_deg
         )
-        dense_index = int(torch.argmax(dense_profile).item())
+        dense_index = _dense_peak_index(
+            dense_profile,
+            lag_index,
+            int(round(angular_delay.delay_bin_s / dense_spacing)),
+        )
         dense_offset = 0.0
         if 0 < dense_index < dense_profile.numel() - 1:
             dense_offset = _log_parabolic_offset(
@@ -984,22 +1037,51 @@ def _zero_padded_delay_profile(
     *,
     angle_deg: float,
 ) -> tuple[torch.Tensor, float]:
+    """Zero-Doppler delay profile at one AoA on a finer delay grid (P8-4).
+
+    Same signal path as ``delay_doppler_map`` + ``angular_delay_map``:
+    Hann delay window, coherent sum over symbols (the zero-Doppler bin),
+    Hann AoA window, coherent RX combining with the steering vector, and
+    Sionna's ``1/(N*S)`` scaling. Only the inverse DFT is zero-padded, so
+    every ``pad // fft_size``-th sample equals the coarse map at this AoA.
+    """
+    profile = choices.profile
+    num_rx = choices.receiver_array.num_elements
+    _require_shape(
+        "h_eff",
+        h_eff,
+        symbols=profile.num_symbols,
+        rx=num_rx,
+        freq=profile.fft_size,
+    )
     pad = 1 << 16
-    window = _delay_window(choices).to(h_eff.dtype)
+    if pad % profile.fft_size != 0:
+        raise ReceiverError("dense delay grid must refine the coarse lag grid")
+    delay_window = _delay_window(choices).to(h_eff.dtype)
+    aoa_window = _aoa_window(choices).to(h_eff.dtype)
     vector = steering_vector(
         angle_deg,
         choices.receiver_array,
         dtype=torch.complex64,
     )
-    combined = (
-        vector.conj()[:, None] * (h_eff * window[None, None, :])
-    ).sum(dim=0)
-    spectrum = torch.fft.ifft(combined, n=pad, dim=-1)
-    power = spectrum.abs().square().sum(dim=0)
-    spacing_s = 1.0 / (
-        pad * choices.profile.subcarrier_spacing_hz
+    zero_doppler = (h_eff * delay_window[None, None, :]).sum(dim=0)
+    _require_shape("zero_doppler", zero_doppler, rx=num_rx, freq=profile.fft_size)
+    combined = ((vector.conj() * aoa_window)[:, None] * zero_doppler).sum(dim=0)
+    _require_shape("combined", combined, freq=profile.fft_size)
+    taps = torch.fft.ifft(combined, n=pad, dim=-1) * (
+        pad / (profile.fft_size * profile.num_symbols)
     )
-    return power, spacing_s
+    spacing_s = 1.0 / (pad * profile.subcarrier_spacing_hz)
+    return taps.abs().square(), spacing_s
+
+
+def _dense_peak_index(
+    dense: torch.Tensor, coarse_lag_index: int, oversample: int
+) -> int:
+    """Dense argmax restricted to +/-1 coarse bin around the coarse peak (P8-4)."""
+    low = max(0, (coarse_lag_index - 1) * oversample)
+    high = min(dense.numel() - 1, (coarse_lag_index + 1) * oversample)
+    return low + int(torch.argmax(dense[low : high + 1]).item())
 
 
 def measure_point_spread(
@@ -1036,7 +1118,11 @@ def measure_point_spread(
         delay_profile, spacing_s = _zero_padded_delay_profile(
             h_eff, choices, angle_deg=peak_aoa_deg
         )
-        dense_index = int(torch.argmax(delay_profile).item())
+        dense_index = _dense_peak_index(
+            delay_profile,
+            lag_index,
+            int(round(angular_delay.delay_bin_s / spacing_s)),
+        )
         delay_bins = _interpolated_width_bins(
             delay_profile, dense_index, threshold=threshold
         )
@@ -1141,6 +1227,12 @@ def gate_energy(
     aoa_max_deg: float,
 ) -> GateEnergy:
     """Sum measured power and estimated noise over a fixed gate."""
+    _require_shape(
+        "angular-delay power",
+        angular_delay.power_w,
+        lag=angular_delay.delay_s.numel(),
+        aoa=angular_delay.aoa_deg.numel(),
+    )
     delay_mask = (
         (angular_delay.delay_s >= delay_min_s - 1e-15)
         & (angular_delay.delay_s <= delay_max_s + 1e-15)

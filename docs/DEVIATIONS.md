@@ -615,3 +615,108 @@ declared processing choices, not post-hoc tuning.
   to it would make the rule unsatisfiable by construction.
 - **Evidence:** `docs/ANALYSIS_PLAN.md` operational definitions;
   `src/isac_verify/calibration.py`.
+
+## Phase 8A validity fix after the first calibration run
+
+### P8-4 — Delay refinement used an angular-blind profile
+
+- **Type:** validity fix (receiver bug). It was found after the first Phase 8A
+  calibration run, using calibration geometries only. No analysis-plan rule
+  changed (see `docs/ANALYSIS_PLAN.md`, Amendment 1).
+- **Where:** `src/isac_verify/receiver.py`, `_zero_padded_delay_profile`
+  (before the fix: lines 981-1002 at commit `4e44d3b`; introduced in
+  `866c494`). It is used by `estimate_candidate` (candidate delay) and by
+  `measure_point_spread` (PSF delay width).
+- **Mechanism:** `h_eff` has shape `[symbols, rx, freq]`. The old code
+  steered with `vector.conj()[:, None] * h_eff`, then `.sum(dim=0)` summed over
+  **symbols**, not RX elements. After the zero-padded IFFT,
+  `.abs().square().sum(dim=0)` added the RX elements **incoherently**. Steering
+  only rotated each element's phase, so the refined delay profile was
+  omnidirectional, without the AoA window. Its argmax was also taken over the
+  whole delay axis. The candidate AoA came from the coarse angle-delay map,
+  but the candidate delay came from this omnidirectional profile.
+- **Effect:** at the target delay the reciprocal-wall pair (TX at 0 deg with
+  full beam gain, arriving at +/-theta) adds about `2|a_rec|^2 / |a_dir|^2` of
+  the direct return in that profile. For `2h/D` below about 0.47 this ratio
+  exceeds 1, and the candidate delay jumped to the wall-path delay.
+  - The jump happened in 5 of 12 calibration geometries (`cal_05`-`cal_08`,
+    `cal_10`) in every target-world record, and in 1 of 32 records of `cal_04`.
+    It never happened in the replay world.
+  - It caused the gate-coverage failure (rule 6: 0.72-0.81 for c = 1-2) and
+    the `imperfect_robust` `s_hi` = 103.
+- **Evidence:** `results/phase8a_diag/` (`probe*.py`, `probe*_report.json`,
+  `*_stdout.log`).
+  - `cal_05` record 0 reproduces the run exactly: candidate 454.8450 ns,
+    `E_D` 1.5090e-12; true direct delay 438.101 ns, true wall delay 454.854 ns.
+  - In the coarse map at AoA 0 the direct return is 34.54 dB above the wall
+    bin (`cal_00`: 17.61 dB).
+  - In the old dense profile the wall is 0.376 dB above the direct return
+    (`cal_00`: -0.742 dB). The predicted `2|a_rec|^2/|a_dir|^2` is +0.443 dB
+    (`cal_00`: -0.868 dB).
+  - Solver amplitudes match the analytic `lambda sqrt(sigma)/((4 pi)^1.5 D^2)`
+    and `lambda sqrt(sigma)|Gamma_TE|/((4 pi)^1.5 L1 D)` to 4 digits.
+  - The replay world (`cal_05` record 0) acquires at 438.111 ns.
+- **Fix:**
+  1. `_zero_padded_delay_profile` now follows the coarse-map signal path: Hann
+     delay window, coherent sum over symbols (the zero-Doppler bin), Hann AoA
+     window, coherent RX combining with the steering vector at the candidate
+     AoA, Sionna's `1/(N S)` scaling, a zero-padded IFFT (pad 65536, 32x the
+     coarse lag grid), then `|.|^2`.
+  2. The dense argmax is restricted to +/-1 coarse lag bin around the
+     coarse-map peak (`_dense_peak_index`). This is declared here and applies
+     to both the candidate delay and the PSF peak.
+  3. Named-shape assertions (`_require_shape`) are added wherever an axis is
+     reduced.
+- **Reduction audit (`receiver.py`):**
+
+  | Function | Reduction |
+  |---|---|
+  | `cfr_from_paths` | `matrix @ weights` sums TX elements (beamforming) |
+  | `make_observation` | none (`h_eff = y * conj(symbols)` per element) |
+  | `delay_doppler_map` | Sionna transform over freq (to lag) and symbols (to Doppler) on `[rx, symbols, freq]`; output asserted `[rx, doppler, lag]` |
+  | `angular_delay_map` | sums RX elements of the zero-Doppler `[rx, lag]` map with AoA window and steering; output asserted `[lag, aoa]` |
+  | `noise_calibration` | mean over all `[rx, lag]` zero-Doppler cells of per-element noise maps |
+  | `guard_noise_power` | mean over all `[rx, lag]` cells of the guard lags |
+  | `gate_energy` | sums `[lag, aoa]` cells inside the gate |
+  | `estimate_candidate` / `_peak_index` | argmax over `[lag, aoa]` |
+  | dense profile | sums symbols, then RX (fixed) |
+  | `measure_point_spread` | width walk on the `[aoa]` row and on the dense delay profile |
+
+  The per-element noise means equal the combined-map noise per cell, because
+  the steering vector has unit norm and the AoA window has unit RMS.
+
+  Two findings are recorded but not changed:
+  - `docs/API_NOTES.md` says the AoA window is unit-L2. The code uses unit RMS,
+    and the noise calibration is consistent with the code.
+  - The lower edge of `delay_search_ns` (300 ns) is never applied. The maps
+    and the argmax cover lag 0 to `l_max`, and only `l_max` (500 ns) is
+    enforced. Background clutter (87-225 ns, AoA +/-90 deg) stays below the
+    detection floor in the probe, so this did not affect any calibration
+    trial.
+- **Tests** (`tests/test_receiver_refinement.py`; all three fail at `4e44d3b`
+  and pass after the fix):
+  - (a) The dense profile on the coarse grid equals the coarse map at that AoA.
+    Measured before the fix: max relative error 0.604. After the fix:
+    2.0e-7 at 0 deg and 1.9e-7 at 30 deg (`results/phase8a_diag/test_a_values.json`).
+  - (b) A noiseless `2h/D = 0.40` geometry gives a candidate within 0.1 ns of
+    the true direct delay in the target and replay worlds. Before the fix: the
+    target candidate was 450.330 ns against a true 433.633 ns.
+  - (c) With a 0-deg path and a 3x stronger 30-deg path, the dense profile at
+    0 deg peaks at the 0-deg delay. Before the fix: it peaked at 439.96 ns, on
+    the 30-deg path.
+- **PSF** (`results/phase8a_diag/psf_compare.json`): the direct-path PSF
+  delay width is 11.709316 ns new and 11.709316 ns old (nominal geometry);
+  theory is 11.709580 ns. The PSF is measured on the single twin direct path,
+  where the old profile was already correct, so the gate widths are unchanged.
+- **Re-validation after the fix:** full pytest passes (64 passed). Phase 6
+  `validate` passes (`results/validate_p8fix`), with E_D, E_W and S equal to
+  the old run to about 1e-6 relative and no status changes. The Phase 7 smoke
+  (`results/phase7_p8fix`, 576 rows, `SMOKE_COMPLETE`) matches `results/phase7`
+  trial by trial: 0 of 576 statuses changed (all `UNRESOLVED`, as before),
+  acquisition stays 1.0 in all 36 cells, the largest candidate-delay change is
+  0.048 ns (median 0.019 ns), and the largest S_median change is in
+  imperfect_narrow replay at sigma 1.0 (7.7e-5 to 5.8e-5). The nominal
+  geometry has `2h/D` above the capture region, so it was not affected.
+- **First calibration run:** moved to `results/phase8a_invalid_v1/`, kept and
+  never used. Calibration is re-run from scratch with the same seeds
+  (`docs/ANALYSIS_PLAN.md` Amendment 1).
