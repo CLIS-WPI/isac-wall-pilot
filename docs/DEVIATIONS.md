@@ -228,3 +228,84 @@ The selected background depth `2` also excludes the depth-4 four-bounce
 wall-wall monostatic clutter at `400.2769173894194 ns`; that path appears only
 at depth 4 and is delay-coincident with the direct target return. It is
 recorded as a diagnostic, not used in the selected Phase 5 background.
+
+## Phase 6 pre-declaration fixes
+
+These changes were made before any Phase 6 trial data were inspected. They are
+declared processing choices, not post-hoc tuning.
+
+### P6-1 — Blocked-target test is non-vacuous
+
+- **Type:** verification design.
+- **What:** The blocked-target test now checks measured quantities, not only
+  the null-threshold `UNRESOLVED` label. The declared noise-consistency
+  criterion is `E_W - N_W <= 3 N_W`, a one-sided three-sigma interval around
+  the recorded-calibration noise mean. It also requires
+  `S_blocked < 0.01 S_unblocked` for the same seeds. A test-only threshold
+  fixture (`supported_min=0.5`, `rejected_max=0.05`, `noise_sigmas=3`) is used
+  only inside `tests/test_phase6.py`; it is never written to
+  `configs/pilot.yaml`. With that fixture the blocked case must return
+  `UNRESOLVED` with reason `wall_energy_consistent_with_noise`, and the
+  unblocked target must return `SUPPORTED`. No attack label exists in the
+  decision function.
+- **Why:** With `thresholds: null`, every nominal status is `UNRESOLVED`, so a
+  status-only blocked test would pass even if the receiver saw a wall return.
+- **BRIEF section:** §10.3 evidence score; §10.4 decision rule; §15 tests.
+- **Evidence:** The criterion and test-only thresholds are in
+  `tests/test_phase6.py`; `classify_evidence` is the shared decision mapping.
+
+### P6-2 — Guard interval is disjoint and retains its noise-only purpose
+
+- **Type:** processing declaration.
+- **What:** The guard interval is `[550, 650] ns`, disjoint from the
+  `[300, 500] ns` delay search and from the direct/wall gates. Its sole purpose
+  is a recorded noise sanity check; evidence noise still comes from the
+  recorded noise calibration. `ProcessingChoices` rejects any guard that
+  overlaps the search window, and Phase 6 checks that both frozen gates are
+  disjoint from the guard. The guard median must lie within
+  `[0.5, 2.0]` times the calibration estimate.
+- **Why:** The previous `[250, 350] ns` guard overlapped the search window,
+  so it could not be an independent noise check and could contaminate
+  acquisition.
+- **BRIEF section:** §10.3 evidence score; §10.4 decision rule.
+- **Evidence:** `configs/pilot.yaml`; `receiver.guard_noise_power`;
+  `phase6._guard_disjoint_from_gates`.
+
+### P6-3 — Candidate uncertainty comes from the measured rule
+
+- **Type:** processing declaration.
+- **What:** Candidate range uncertainty is
+  `sigma_range = max(0.5 c sigma_tau, 0.05 m)`, where `sigma_tau` is the
+  measured candidate delay uncertainty from
+  `psf_half_width_over_sqrt_2_snr`. The fixed `1.2 m` (later `0.4 m`) value is
+  removed. The floor is declared explicitly in
+  `phase6.diagnostic.candidate_range_uncertainty_floor_m: 0.05`. Phase 6
+  records and prints the measured standard deviation, the floor, and the used
+  value; both the robust-beam ensemble and the wall gate use the used value.
+- **Why:** The robust ensemble and gates must propagate the measured candidate
+  uncertainty, not an arbitrary fixed range error.
+- **BRIEF section:** §10.2 gates; §10.2 measured point-spread width and
+  candidate-estimation uncertainty.
+- **Evidence:** `phase6.candidate_uncertainty` in
+  `results/phase6/phase6_summary.json`.
+
+### P6-4 — Hann delay and angle windows reduce clutter leakage
+
+- **Type:** processing declaration.
+- **What:** Delay processing uses a non-periodic Hann window over the 2048
+  subcarriers, normalized to unit RMS. Angular processing uses a non-periodic
+  Hann window over the 16 receive elements, normalized to unit L2 norm. Both
+  are declared in `phase6.processing.delay_window: hann` and
+  `aoa_window: hann`. The noise calibration, delay-Doppler transform, angular
+  scan, guard check, and point-spread measurement all use these same windows.
+  The window choice is rectangular-or-Hann; Hann is selected because the
+  background wall clutter is about `32 dB` stronger than the target wall
+  return.
+- **Why:** A rectangular window leaks strong low-delay clutter into the wall
+  gate. Hann suppresses that leakage at the cost of a wider measured PSF; the
+  PSF is remeasured with the declared windows and drives the gate expansion.
+- **BRIEF section:** §10.1 declared window and scaling; §10.2 measured
+  point-spread width.
+- **Evidence:** `phase6.processing` in
+  `results/phase6/phase6_summary.json`; `receiver._delay_window` and
+  `receiver._aoa_window`.

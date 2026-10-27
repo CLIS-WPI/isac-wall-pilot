@@ -392,9 +392,14 @@ def target_corridor_scene(
     wall_offsets_m: dict[str, float] | None = None,
     with_target: bool = True,
     blocker: BlockerSpec | None = None,
+    target_position_m: Sequence[float] | None = None,
 ) -> CorridorScene:
     gnb = config.get("physical", "gnb_position_m")
-    candidate = config.get("physical", "candidate_position_m")
+    candidate = (
+        config.get("physical", "candidate_position_m")
+        if target_position_m is None
+        else list(target_position_m)
+    )
     return build_corridor_scene(
         config,
         wall_offsets_m=wall_offsets_m,

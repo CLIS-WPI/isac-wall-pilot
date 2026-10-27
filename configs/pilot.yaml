@@ -1,5 +1,5 @@
 schema_version: 1
-phase: 5
+phase: 6
 brief_sections:
   geometry: ["5", "5.1", "5.2", "5.3"]
   waveform: ["6.1", "6.2", "6.3", "6.4"]
@@ -228,6 +228,53 @@ phase5:
   vulnerability_beam_phi_deg: 26.565051
   vulnerability_gate_delay_half_width_ns: 4.069010416666667
   vulnerability_gate_aoa_tolerance_deg: 1.0
+
+phase6:
+  processing:
+    profile: baseline
+    delay_search_ns: [300.0, 500.0]
+    aoa_search_deg: [-60.0, 60.0]
+    aoa_grid_step_deg: 0.25
+    detection_floor_db: 10.0
+    # Guard is a noise sanity check only; it is disjoint from search and gates.
+    guard_delay_ns: [550.0, 650.0]
+    guard_ratio_bounds: [0.5, 2.0]
+    noise_calibration_records: 4
+    noise_calibration_seed: 9001
+    doppler_bin: zero
+    # Hann reduces strong-clutter leakage into the wall gate; PSF uses it.
+    delay_window: hann
+    aoa_window: hann
+    delay_interpolation: three_point_parabolic_log_power
+    aoa_interpolation: three_point_parabolic_log_power
+    psf_threshold_db: -3.0
+    uncertainty_rule: psf_half_width_over_sqrt_2_snr
+    min_departure_separation_deg: 10.0
+    candidate_height_source: gnb_position_z
+  gates:
+    direct_delay_expansion: measured_psf_full_width
+    direct_aoa_expansion: measured_psf_full_width
+    wall_interval_quantiles: [0.005, 0.995]
+    wall_delay_expansion: measured_psf_full_width
+    wall_aoa_expansion: measured_psf_full_width
+    fixed_during_action: true
+  evidence:
+    noise_source: recorded_noise_calibration
+    ratio_source: twin_noiseless_same_processing
+    epsilon_w: 1.0e-24
+    reference_floor_snr_db: 10.0
+    thresholds: null
+  diagnostic:
+    sigma_map_m: 0.0
+    candidate_range_uncertainty_floor_m: 0.05
+    num_robust_samples: 257
+    worlds: [target, replay]
+    wall_beams: [exact, robust]
+    probe_seed: 6301
+    receiver_noise_seed: 6302
+    relay_noise_seed: 6303
+    blocked_target_noise_seed: 6304
+    one_probe_and_noise_seed_per_world: true
 
 geometry_reference:
   candidate_range_m: 60.0

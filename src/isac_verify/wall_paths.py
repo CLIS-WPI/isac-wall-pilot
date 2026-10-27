@@ -62,12 +62,14 @@ def solve_target_paths(
     wall_offsets_m: dict[str, float] | None = None,
     blocker: BlockerSpec | None = None,
     max_depth: int | None = None,
+    target_position_m: Sequence[float] | None = None,
 ) -> PathSet:
     scene = target_corridor_scene(
         config,
         wall_offsets_m=wall_offsets_m,
         with_target=True,
         blocker=blocker,
+        target_position_m=target_position_m,
     )
     flags = _solver_flags(config, "rcs_solver")
     depth = int(

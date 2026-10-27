@@ -272,6 +272,9 @@ def robust_wall_beam(
             for angle in angles
         ]
     )
+    nominal_angle_deg = float(
+        np.degrees(np.arctan2(2.0 * wall_offset_m, candidate_range_m))
+    )
     reference = vectors[:, reference_index]
     aligned = vectors * torch.exp(-1j * torch.angle(reference))[:, None]
     average = aligned.mean(dim=0)
@@ -284,7 +287,7 @@ def robust_wall_beam(
         return BeamResult(
             weights=None,
             status="unusable_projected_norm",
-            phi_deg=float("nan"),
+            phi_deg=nominal_angle_deg,
             projected_norm=projected_norm,
             num_samples=num_samples,
             sample_angles_deg=angles,
@@ -293,7 +296,7 @@ def robust_wall_beam(
     return BeamResult(
         weights=weights,
         status="ok",
-        phi_deg=float("nan"),
+        phi_deg=nominal_angle_deg,
         projected_norm=projected_norm,
         num_samples=num_samples,
         sample_angles_deg=angles,

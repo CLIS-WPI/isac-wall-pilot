@@ -970,3 +970,28 @@ frequency quantization error that produced uncompensated time shifts on the
 order of `2e-4` relative sample error here. With `dtype` set at construction,
 the zero-delay padded-FFT roundtrip error was
 `2.701289205785704e-15` in complex128.
+
+## Phase 6 delay-Doppler and windowing
+
+- **Source:** `/opt/venv/lib/python3.12/site-packages/sionna/phy/channel/utils.py`
+  line 790, `ofdm_to_delay_doppler_channel`.
+- **Executed shape:** the receiver forms
+  `h_eff` as `[num_symbols, num_rx, fft_size]` = `[64, 16, 2048]`, applies the
+  declared delay window over the last axis, permutes to
+  `[num_rx, num_symbols, fft_size]`, and calls
+  `ofdm_to_delay_doppler_channel(windowed, l_min=0, l_max=103)`.
+- **Output:** `h_dd` has shape `[16, 64, 104]`. The zero-Doppler bin is
+  `num_symbols // 2 = 32`; lag `l` maps to delay `l / sample_rate`, with
+  `sample_rate = 204.8 MHz`.
+- **Guard:** `guard_noise_power` calls the same function with
+  `l_min=113, l_max=133` for the declared `[550, 650] ns` guard. Only the
+  zero-Doppler, all-lag, all-RX magnitudes are used to form a median noise
+  sanity estimate.
+- **Windows:** delay uses a non-periodic Hann window over the 2048
+  subcarriers, normalized to unit RMS. Angle uses a non-periodic Hann window
+  over the 16 receive elements, normalized to unit L2 norm. The same windows
+  are applied in `noise_calibration`, so the calibration and measurement
+  scaling agree.
+- **Scaling:** the transform uses Sionna's `1/(N*S)` normalization. No
+  additional scaling is applied after the transform; PSF widths and gate
+  energies are therefore measured under the declared windows.

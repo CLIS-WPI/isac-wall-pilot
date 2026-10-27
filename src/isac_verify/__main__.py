@@ -2,8 +2,8 @@
 
 Phase 0 implements ``preflight``. The current milestone implements
 ``validate`` for the Phase 2/3 checks, Phase 4 finite-wall diagnostics, and
-Phase 5 continuous-waveform replay checks; ``run`` and ``report`` follow in
-later phases.
+Phase 5 continuous-waveform replay checks and Phase 6 measured receiver checks;
+``run`` and ``report`` follow in later phases.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ def _validate(args: argparse.Namespace) -> int:
         output_path=args.output,
         phase4_output_path=args.phase4_output,
         phase5_output_path=args.phase5_output,
+        phase6_output_path=args.phase6_output,
     )
 
 
@@ -56,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate = subparsers.add_parser(
         "validate",
-        help="run Phase 2/3 validation, Phase 4 checks, and Phase 5 replay checks",
+        help="run Phase 2/3 validation and Phase 4/5/6 checks",
     )
     validate.add_argument(
         "--config",
@@ -82,6 +83,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--phase5-output",
         default="results/phase5",
         help="directory for Phase 5 continuous-waveform replay summary",
+    )
+    validate.add_argument(
+        "--phase6-output",
+        default="results/phase6",
+        help="directory for Phase 6 measured receiver summary",
     )
     validate.set_defaults(handler=_validate)
 

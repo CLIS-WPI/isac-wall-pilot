@@ -1095,6 +1095,7 @@ def run_validation(
     output_path: str | Path = "results/validate",
     phase4_output_path: str | Path = "results/phase4",
     phase5_output_path: str | Path = "results/phase5",
+    phase6_output_path: str | Path = "results/phase6",
 ) -> int:
     config = PilotConfig.load(config_path)
     output = Path(output_path)
@@ -1110,6 +1111,9 @@ def run_validation(
     from .phase5 import phase5_diagnostics
 
     phase5 = phase5_diagnostics(config, phase5_output_path)
+    from .phase6 import phase6_diagnostics, print_phase6_tables
+
+    phase6 = phase6_diagnostics(config, phase6_output_path)
     c128_tolerance = float(
         config.get("experiment_a", "analytical_c128_tolerance")
     )
@@ -1160,6 +1164,11 @@ def run_validation(
             "selected_depths"
         ]
         == phase5["d9_depths"],
+        "phase6": phase6["status"] == "PASS",
+        **{
+            f"phase6_{name}": bool(value)
+            for name, value in phase6["checks"].items()
+        },
     }
     status = "PASS" if all(checks.values()) else "FAIL"
     summary = {
@@ -1251,6 +1260,7 @@ def run_validation(
         },
         "phase4": phase4,
         "phase5": phase5,
+        "phase6": phase6,
         "noise": {
             "variance_w": noise.variance_w,
             "relay_variance_w": noise.relay_variance_w,
@@ -1350,11 +1360,13 @@ def run_validation(
     print(f"phase 4 status: {phase4['status']}")
     _print_phase4_tables(phase4)
     _print_phase5_tables(phase5)
+    print_phase6_tables(phase6)
     print(f"wrote {output / 'validation_summary.json'}")
     print(f"wrote {Path(phase4_output_path) / 'phase4_summary.json'}")
     print(f"wrote {Path(phase4_output_path) / 'paths_diagnostic.parquet'}")
     print(f"wrote {Path(phase4_output_path) / 'geometry_reference.json'}")
     print(f"wrote {Path(phase5_output_path) / 'phase5_summary.json'}")
+    print(f"wrote {Path(phase6_output_path) / 'phase6_summary.json'}")
     print(f"wrote {output / 'experiment_a.png'}")
     print(f"wrote {output / 'experiment_a.pdf'}")
     if status != "PASS":
