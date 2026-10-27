@@ -360,6 +360,116 @@ def _timing_figure(output: Path, *, timing: dict[str, Any], dpi: int) -> None:
     _save(fig, output, "09_runtime_memory", dpi)
 
 
+def _mapfree_directions(trials: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for _, row in trials[trials["method"].str.startswith("mapfree")].iterrows():
+        discovery = row.get("discovery")
+        if isinstance(discovery, str):
+            discovery = json.loads(discovery)
+        if not isinstance(discovery, dict):
+            continue
+        refinement = tuple(
+            round(float(value), 6)
+            for value in discovery.get("refinement_angles_deg", [])
+        )
+        rows.append(
+            {
+                "method": str(row["method"]),
+                "world": str(row["world"]),
+                "sigma_map_m": float(row["sigma_map_m"]),
+                "record_index": int(row["record_index"]),
+                "selected_exploration_deg": float(
+                    discovery["selected_exploration_angle_deg"]
+                ),
+                "refinement_angles_deg": refinement,
+                "selected_final_deg": float(
+                    discovery["selected_final_angle_deg"]
+                ),
+                "extra_symbols": int(discovery["total_symbols"]),
+                "extra_energy_j": float(discovery["extra_energy_j"]),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _mapfree_looks(trials: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for _, row in trials[trials["method"].str.startswith("mapfree")].iterrows():
+        discovery = row.get("discovery")
+        if isinstance(discovery, str):
+            discovery = json.loads(discovery)
+        if not isinstance(discovery, dict):
+            continue
+        total_symbols = float(discovery.get("total_symbols", 0))
+        total_energy = float(discovery.get("extra_energy_j", 0.0))
+        energy_per_symbol = total_energy / total_symbols if total_symbols else 0.0
+        final_angle = round(float(discovery["selected_final_angle_deg"]), 6)
+        for look_index, attempt in enumerate(discovery.get("attempts", [])):
+            angle = round(float(attempt["angle_deg"]), 6)
+            symbols = int(attempt["symbols"])
+            rows.append(
+                {
+                    "method": str(row["method"]),
+                    "world": str(row["world"]),
+                    "sigma_map_m": float(row["sigma_map_m"]),
+                    "record_index": int(row["record_index"]),
+                    "look_index": look_index,
+                    "stage": (
+                        "refinement" if symbols == 16 else "exploration"
+                    ),
+                    "angle_deg": angle,
+                    "symbols": symbols,
+                    "energy_j": energy_per_symbol * symbols,
+                    "E_W": float(attempt["E_W"]),
+                    "N_W": float(attempt["N_W"]),
+                    "net_energy_w": float(attempt["net_energy_w"]),
+                    "cells": int(attempt["cells"]),
+                    "excess_snr": float(attempt["excess_snr"]),
+                    "selected_final": angle == final_angle,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _direction_summary(directions: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for keys, group in directions.groupby(["method", "world", "sigma_map_m"], sort=False):
+        method, world, sigma = keys
+        exploration = (
+            group["selected_exploration_deg"]
+            .round(6)
+            .value_counts()
+            .sort_index()
+        )
+        refinement = (
+            group["refinement_angles_deg"]
+            .map(lambda value: tuple(value) if len(value) else ())
+            .value_counts()
+            .sort_index()
+        )
+        rows.append(
+            {
+                "method": method,
+                "world": world,
+                "sigma_map_m": float(sigma),
+                "records": int(len(group)),
+                "selected_exploration_counts": "; ".join(
+                    f"{angle:g} deg x{count}"
+                    for angle, count in exploration.items()
+                ),
+                "refinement_pair_counts": "; ".join(
+                    f"{'[' + ', '.join(f'{angle:g}' for angle in pair) + ']'} x{count}"
+                    for pair, count in refinement.items()
+                ),
+                "extra_symbols_median": float(group["extra_symbols"].median()),
+                "extra_symbols_min": int(group["extra_symbols"].min()),
+                "extra_symbols_max": int(group["extra_symbols"].max()),
+                "extra_energy_j_median": float(group["extra_energy_j"].median()),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def _format_number(value: Any, digits: int = 3) -> str:
     if value is None or (isinstance(value, float) and not math.isfinite(value)):
         return "n/a"
@@ -383,6 +493,14 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
     records_per_cell = int(trials.groupby(["method", "sigma_map_m", "world"]).size().max())
     summary = summarize_trials(trials)
     summary.to_csv(output / "aggregate_metrics.csv", index=False)
+    directions = _mapfree_directions(trials)
+    directions.to_csv(output / "mapfree_directions.csv", index=False)
+    looks = _mapfree_looks(trials)
+    looks.to_csv(output / "mapfree_looks.csv", index=False)
+    direction_summary = _direction_summary(directions)
+    direction_summary.to_csv(output / "mapfree_direction_summary.csv", index=False)
+    noise_path = source / "noise_normalization.csv"
+    noise = pd.read_csv(noise_path) if noise_path.exists() else pd.DataFrame()
     arrays: dict[str, Any] = {}
     npz_path = source / "representative_waveforms.npz"
     if npz_path.exists():
@@ -412,6 +530,16 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "- Twin realizations per sigma: "
         + str(int(config.get("phase7_runtime", "twin_realizations_per_sigma"))),
         "- Scientific decision: " + str(decision.get("scientific_decision")),
+        f"- Pairing: {int(config.get('phase7_runtime', 'twin_realizations_per_sigma'))} "
+        "twin map-error realizations exist per sigma. `record_index % "
+        f"{int(config.get('phase7_runtime', 'twin_realizations_per_sigma'))}` "
+        "selects the realization, so each realization is reused "
+        f"{records_per_cell // int(config.get('phase7_runtime', 'twin_realizations_per_sigma'))} "
+        f"times within a {records_per_cell}-record cell, paired across methods "
+        f"and worlds. The {len(trials)} rows are "
+        f"`{trials['method'].nunique()} methods x "
+        f"{trials['sigma_map_m'].nunique()} sigma x "
+        f"{trials['world'].nunique()} worlds x {records_per_cell} records`.",
         "",
         "## Integrity",
         "",
@@ -421,8 +549,8 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "",
         "## Aggregate table",
         "",
-        "| method | world | sigma [m] | n | acquisition | not observable | S n | S median | S 5-95% | wall-excess n | wall-excess median | null depth [dB] |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|",
+        "| method | world | sigma [m] | n | acquisition | not observable | unusable beam | S n | S median | S 5-95% | wall-excess n | wall-excess median | wall-excess 5-95% | null depth [dB] |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---|---:|",
     ]
     for _, row in summary.iterrows():
         s_range = (
@@ -430,30 +558,153 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
             if pd.notna(row.get("S_q05"))
             else "n/a"
         )
+        ex_range = (
+            f"{_format_number(row['wall_excess_snr_q05'])} to "
+            f"{_format_number(row['wall_excess_snr_q95'])}"
+            if pd.notna(row.get("wall_excess_snr_q05"))
+            else "n/a"
+        )
         lines.append(
             "| {method} | {world} | {sigma:.3g} | {records} | {acq:.1%} | {no:.1%} | "
-            "{sn} | {smed} | {srange} | {exn} | {exmed} | {null} |".format(
+            "{unusable:.1%} | {sn} | {smed} | {srange} | {exn} | {exmed} | "
+            "{exrange} | {null} |".format(
                 method=METHOD_LABELS.get(row["method"], row["method"]),
                 world=row["world"],
                 sigma=float(row["sigma_map_m"]),
                 records=int(row["records"]),
                 acq=float(row["acquisition_rate"]),
                 no=float(row["not_observable_rate"]),
+                unusable=float(row["unusable_beam_rate"]),
                 sn=int(row["S_available_count"]),
                 smed=_format_number(row.get("S_median")),
                 srange=s_range,
                 exn=int(row["wall_excess_snr_available_count"]),
                 exmed=_format_number(row.get("wall_excess_snr_median")),
+                exrange=ex_range,
                 null=_format_number(row.get("null_depth_db_median")),
             )
         )
+    noise_lines: list[str] = []
+    if not noise.empty:
+        noise_lines = [
+            "",
+            "## Noise-normalization validity",
+            "",
+            "Noise-only actions were passed through the same receiver pipeline "
+            "for each method/gate. `E` is the measured noise gate energy and "
+            "`N̂` is the production mean-per-cell calibration times the gate "
+            "cell count. The 95% interval is for the mean over records.",
+            "",
+            "| method | gate | symbols | records | cells | mean E/N̂ | 95% interval |",
+            "|---|---|---:|---:|---:|---:|---|",
+        ]
+        for _, row in noise.iterrows():
+            noise_lines.append(
+                "| {method} | {gate} | {symbols} | {records} | {cells} | "
+                "{mean:.4f} | {lo:.4f} to {hi:.4f} |".format(
+                    method=METHOD_LABELS.get(row["method"], row["method"]),
+                    gate=row["gate"],
+                    symbols=int(row["symbols"]),
+                    records=int(row["records"]),
+                    cells=int(row["cells"]),
+                    mean=float(row["mean_e_over_n"]),
+                    lo=float(row["ci95_low"]),
+                    hi=float(row["ci95_high"]),
+                )
+            )
+        noise_lines += [
+            "",
+            "The pass criterion is that every mean is compatible with one; the "
+            "scientific thresholds remain null.",
+        ]
+
+    direction_lines: list[str] = []
+    if not direction_summary.empty:
+        direction_lines = [
+            "",
+            "## Map-free direction and budget accounting",
+            "",
+            "Each row reports the selected exploration direction(s), the "
+            "refinement pair(s), and the extra symbols/energy beyond the shared "
+            "direct probe. Coarse-to-fine exploration candidates are fixed at "
+            "`-50, -30, +30, +50 deg`; refinement uses the two neighbours at "
+            "`best +/- 10 deg`.",
+            "",
+            "| method | world | sigma [m] | records | selected exploration counts | refinement pairs | extra symbols median | extra energy median [J] |",
+            "|---|---|---:|---:|---|---|---:|---:|",
+        ]
+        for _, row in direction_summary.iterrows():
+            direction_lines.append(
+                "| {method} | {world} | {sigma:g} | {records} | {expl} | {ref} | "
+                "{symbols:g} | {energy:.3g} |".format(
+                    method=METHOD_LABELS.get(row["method"], row["method"]),
+                    world=row["world"],
+                    sigma=float(row["sigma_map_m"]),
+                    records=int(row["records"]),
+                    expl=row["selected_exploration_counts"] or "none",
+                    ref=row["refinement_pair_counts"] or "none",
+                    symbols=float(row["extra_symbols_median"]),
+                    energy=float(row["extra_energy_j_median"]),
+                )
+            )
+        direction_lines += [
+            "",
+            "`mapfree_looks.csv` records every exploration/refinement look "
+            "with its angle, symbols, energy, cells, `E_W`, `N_W`, and "
+            "excess SNR; `mapfree_directions.csv` records the selected final "
+            "direction per trial.",
+        ]
+
+    timing_lines = [
+        "",
+        "## Timing and memory",
+        "",
+        "| timing stage | seconds |",
+        "|---|---:|",
+    ]
+    for key in (
+        "cold_jit_s",
+        "true_scene_solve_s",
+        "twin_scene_solve_s",
+        "planning_s",
+        "propagation_s",
+        "receiver_s",
+        "serialization_s",
+        "warm_steady_state_s",
+        "end_to_end_s",
+    ):
+        timing_lines.append(
+            f"| `{key}` | {_format_number(timing.get(key), 6)} |"
+        )
+    nvml_start = timing.get("nvml_start", {})
+    nvml_end = timing.get("nvml_end", {})
+    timing_lines += [
+        "",
+        "Cold JIT is the first receiver map; warm steady state is the median "
+        "trial runtime after the first ten rows.",
+        "",
+        "| memory source | bytes |",
+        "|---|---:|",
+        f"| NVML used at start | {int(nvml_start.get('used_bytes', 0) or 0)} |",
+        f"| NVML used at end | {int(nvml_end.get('used_bytes', 0) or 0)} |",
+        f"| PyTorch peak allocated | {int(timing.get('pytorch_peak_allocated_bytes', 0) or 0)} |",
+        f"| PyTorch peak reserved | {int(timing.get('pytorch_peak_reserved_bytes', 0) or 0)} |",
+        "",
+        "NVML reports whole-device memory and includes other allocations; the "
+        "PyTorch allocator peak is process-local and is not comparable to the "
+        "NVML delta.",
+    ]
+
     lines += [
         "",
         "`S` is populated only where `S_available=True` (mapped methods). "
         "`wall_excess_snr` is computed the same way for every method that spends "
         "an extra wall/scan action and is populated only where "
         "`wall_excess_snr_available=True`. All unavailable entries are NaN; the "
-        "table reports the available count for each column.",
+        "table reports the available count for each column. `unusable beam` is the "
+        "fraction of records where no transmit beam could be formed from the "
+        "available estimate or map-free selection.",
+    ] + noise_lines + direction_lines + [
         "",
         "## Figures",
         "",
@@ -465,12 +716,7 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "6. `06_score_distributions` — score distributions without a threshold.",
         "7. `07_status_rates` — acquisition and NOT_OBSERVABLE rates versus sigma.",
         "9. `09_runtime_memory` — timing categories and separate memory measurements.",
-        "",
-        "## Timing",
-        "",
-        "```json",
-        json.dumps(timing, indent=2),
-        "```",
+    ] + timing_lines + [
         "",
         "## Claim limits",
         "",
@@ -490,6 +736,10 @@ def build_report(input_path: str | Path, output_path: str | Path) -> int:
         "- `timing.json`",
         "- `paths_diagnostic.parquet`",
         "- `representative_waveforms.npz`",
+        "- `noise_normalization.csv`",
+        "- `mapfree_directions.csv`",
+        "- `mapfree_direction_summary.csv`",
+        "- `mapfree_looks.csv`",
         "",
     ]
     (output / "report.md").write_text("\n".join(lines), encoding="utf-8")

@@ -294,8 +294,10 @@ declared processing choices, not post-hoc tuning.
 - **Type:** processing declaration.
 - **What:** Delay processing uses a non-periodic Hann window over the 2048
   subcarriers, normalized to unit RMS. Angular processing uses a non-periodic
-  Hann window over the 16 receive elements, normalized to unit L2 norm. Both
-  are declared in `phase6.processing.delay_window: hann` and
+  Hann window over the 16 receive elements, normalized to unit L2 norm in the
+  original declaration; the implemented normalization is unit RMS, corrected
+  in P7-3. Both are declared in
+  `phase6.processing.delay_window: hann` and
   `aoa_window: hann`. The noise calibration, delay-Doppler transform, angular
   scan, guard check, and point-spread measurement all use these same windows.
   The window choice is rectangular-or-Hann; Hann is selected because the
@@ -377,3 +379,29 @@ declared processing choices, not post-hoc tuning.
 - **Evidence:** `metrics.integrity_checks`; `metrics.summarize_trials`;
   `report._score_figure`; `trials.parquet` columns `S`, `S_available`,
   `wall_excess_snr`, `wall_excess_snr_available`.
+
+### P7-3 — Receiver noise normalization corrected to unit-RMS window and mean calibration
+
+- **Type:** validity fix.
+- **What:** The angular Hann window is normalized to unit RMS, not unit L2.
+  `noise_calibration` returns the mean per-cell noise over
+  `phase6.processing.noise_calibration_records: 64` records, not a median over
+  four records. Phase 7 writes `noise_normalization.csv` with 128 independent
+  noise-only records per method/gate variant, reporting mean `E/N̂`, its 95%
+  interval, and the cells used; the implementation-validity check requires
+  every interval to contain one.
+- **Why:** The receive steering vector has unit norm. A unit-L2 angular window
+  multiplied by that steering vector gives a sum of squares near `1/M`
+  (`M=16`), so the calibrated no-target energy was about `1/16` too low. A
+  four-record median added a further low bias. The pre-fix smoke therefore
+  reported noise-only `E/N` near `0.1`, not `1`.
+- **BRIEF section:** §10.1 declared window and scaling; §13.1 smoke outputs;
+  §14 reporting.
+- **Evidence:** Pre-fix direct `E/N=0.1001`, wall `0.0940`. Post-fix gate
+  means span `0.9624–1.0202`; all ten 95% intervals contain one; maximum
+  absolute deviation from one is `0.0376`. Phase 6 now reports
+  `noise_calibration=1.884609e-17 W/cell from 64 records`; V2 measured
+  `delay full=11.709431 ns, half=5.854716 ns; AoA full=11.004057 deg`;
+  acquisition `peak/noise=41.865 dB`.
+  Evidence: `results/phase7/noise_normalization.csv`;
+  `results/phase7/report/report.md`; `results/phase6/phase6_summary.json`.

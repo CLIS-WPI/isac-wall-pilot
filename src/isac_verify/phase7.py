@@ -40,6 +40,7 @@ from .receiver import (
     make_observation,
     measure_point_spread,
     noise_calibration,
+    noise_gate_validation,
 )
 from .verification import (
     PlannerInput,
@@ -721,6 +722,8 @@ def _coarse_to_fine(
         "attempts": attempts,
         "coarse_attempts": coarse["attempts"],
         "refined_attempts": refined["attempts"],
+        "coarse_selected": coarse["selected"],
+        "refined_selected": refined["selected"],
         "total_symbols": coarse["total_symbols"] + refined["total_symbols"],
         "total_energy_j": coarse["total_energy_j"] + refined["total_energy_j"],
     }
@@ -814,6 +817,11 @@ def _finish_row(
             "status": status,
             "status_reason": reason,
             "path_availability": path_availability,
+            "beam_usable": bool(
+                plan.beam.usable
+                if plan is not None and plan.beam is not None
+                else selected_weights is not None
+            ),
             "beam_phi_deg": (
                 float(plan.beam.phi_deg)
                 if plan is not None and plan.beam is not None
@@ -826,6 +834,16 @@ def _finish_row(
             ),
             "wall_gate_delay_max_ns": (
                 plan.wall_gate.delay_max_s * 1e9
+                if plan is not None and plan.wall_gate is not None
+                else None
+            ),
+            "wall_gate_aoa_min_deg": (
+                plan.wall_gate.aoa_min_deg
+                if plan is not None and plan.wall_gate is not None
+                else None
+            ),
+            "wall_gate_aoa_max_deg": (
+                plan.wall_gate.aoa_max_deg
                 if plan is not None and plan.wall_gate is not None
                 else None
             ),
@@ -869,6 +887,98 @@ def _nvml_snapshot() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         return {"error": f"{type(exc).__name__}: {exc}"}
 
+
+
+def _noise_validation_gates(
+    frame: pd.DataFrame,
+    *,
+    base: dict[str, Any],
+    config: PilotConfig,
+) -> list[dict[str, Any]]:
+    direct = base["direct_gate"]
+    psf = base["point_spread"]
+    gates: list[dict[str, Any]] = []
+
+    def add(
+        method: str,
+        gate: str,
+        symbols: int,
+        *,
+        delay_min_ns: float,
+        delay_max_ns: float,
+        aoa_min_deg: float,
+        aoa_max_deg: float,
+        variant: str,
+    ) -> None:
+        gates.append(
+            {
+                "method": method,
+                "gate": gate,
+                "symbols": int(symbols),
+                "delay_min_ns": float(delay_min_ns),
+                "delay_max_ns": float(delay_max_ns),
+                "aoa_min_deg": float(aoa_min_deg),
+                "aoa_max_deg": float(aoa_max_deg),
+                "variant": variant,
+            }
+        )
+
+    add(
+        "direct_only",
+        "direct",
+        64,
+        delay_min_ns=direct.delay_min_s * 1e9,
+        delay_max_ns=direct.delay_max_s * 1e9,
+        aoa_min_deg=direct.aoa_min_deg,
+        aoa_max_deg=direct.aoa_max_deg,
+        variant="base",
+    )
+    for method in ("exact_oracle", "imperfect_narrow", "imperfect_robust"):
+        method_rows = frame[
+            (frame["method"] == method) & (frame["world"] == "target")
+        ]
+        validation_sigma = float(method_rows["sigma_map_m"].max())
+        row = method_rows[
+            method_rows["sigma_map_m"] == validation_sigma
+        ].iloc[0]
+        add(
+            method,
+            "direct",
+            64,
+            delay_min_ns=float(row["direct_gate_delay_min_ns"]),
+            delay_max_ns=float(row["direct_gate_delay_max_ns"]),
+            aoa_min_deg=float(row["direct_gate_aoa_min_deg"]),
+            aoa_max_deg=float(row["direct_gate_aoa_max_deg"]),
+            variant=f"sigma={validation_sigma:g}",
+        )
+        add(
+            method,
+            "wall",
+            64,
+            delay_min_ns=float(row["wall_gate_delay_min_ns"]),
+            delay_max_ns=float(row["wall_gate_delay_max_ns"]),
+            aoa_min_deg=float(row["wall_gate_aoa_min_deg"]),
+            aoa_max_deg=float(row["wall_gate_aoa_max_deg"]),
+            variant=f"sigma={validation_sigma:g}",
+        )
+    span_s = float(config.get("phase7", "scan", "post_direct_span_ns")) * 1e-9
+    mapfree_aoa = float(psf.aoa_width_deg)
+    for method, symbols in (
+        ("mapfree_two_beam", 64),
+        ("mapfree_coarse_to_fine", 8),
+        ("mapfree_coarse_to_fine", 16),
+    ):
+        add(
+            method,
+            "post_direct",
+            symbols,
+            delay_min_ns=direct.delay_max_s * 1e9,
+            delay_max_ns=(direct.delay_max_s + span_s) * 1e9,
+            aoa_min_deg=-mapfree_aoa,
+            aoa_max_deg=mapfree_aoa,
+            variant=f"symbols={symbols}",
+        )
+    return gates
 
 def run_smoke(
     config_path: str | Path,
@@ -935,7 +1045,7 @@ def run_smoke(
                 choices, profile=replace(choices.profile, num_symbols=count)
             ),
             config=config,
-            records=4,
+            records=int(config.get("phase6", "processing", "noise_calibration_records")),
             seed=7900 + count,
         )
         for count in (8, 16, 32, choices.profile.num_symbols)
@@ -1143,6 +1253,19 @@ def run_smoke(
                                     for attempt in scan["attempts"]
                                 ],
                                 "total_symbols": scan["total_symbols"],
+                                "extra_energy_j": scan["total_energy_j"],
+                                "selected_exploration_angle_deg": (
+                                    float(scan["selected"]["angle_deg"])
+                                    if method == "mapfree_two_beam"
+                                    else float(scan["coarse_selected"]["angle_deg"])
+                                ),
+                                "refinement_angles_deg": [
+                                    float(item["angle_deg"])
+                                    for item in scan.get("refined_attempts", [])
+                                ],
+                                "selected_final_angle_deg": float(
+                                    scan["selected"]["angle_deg"]
+                                ),
                             },
                         )
                     else:
@@ -1239,6 +1362,20 @@ def run_smoke(
     timing["record_limit"] = record_count
     frame = pd.DataFrame(trials)
     expected = len(METHODS) * len(sigmas) * len(worlds) * record_count
+    noise_rows = noise_gate_validation(
+        config=config,
+        choices=choices,
+        gates=_noise_validation_gates(
+            frame, base=base_worlds["target"], config=config
+        ),
+        records=128,
+        seed=9201,
+        calibration_records=int(
+            config.get("phase6", "processing", "noise_calibration_records")
+        ),
+    )
+    noise_frame = pd.DataFrame(noise_rows)
+    noise_frame.to_csv(output / "noise_normalization.csv", index=False)
     from .metrics import integrity_checks, summarize_trials
 
     checks = integrity_checks(
@@ -1248,6 +1385,15 @@ def run_smoke(
         sigmas=sigmas,
         worlds=worlds,
         records=record_count,
+    )
+    checks["noise_normalization_ci_includes_one"] = bool(
+        (
+            (noise_frame["ci95_low"] <= 1.0)
+            & (noise_frame["ci95_high"] >= 1.0)
+        ).all()
+    )
+    checks["noise_normalization_max_abs_error"] = float(
+        (noise_frame["mean_e_over_n"] - 1.0).abs().max()
     )
     write_start = _now()
     frame.to_parquet(output / "trials.parquet", index=False)

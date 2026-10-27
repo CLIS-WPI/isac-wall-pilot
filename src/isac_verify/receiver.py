@@ -10,9 +10,10 @@ steering vectors with the transmit dimension already collapsed by the beam.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Sequence
 
+import numpy as np
 import torch
 from sionna.phy.channel import (
     ofdm_to_delay_doppler_channel,
@@ -23,7 +24,7 @@ from .beams import ArrayGeometry, steering_vector
 from .config import PilotConfig
 from .replay import noise_variance_w, proper_complex_noise
 from .wall_paths import PathSet, WallPathError, path_records
-from .waveform import OfdmProfile, profile_from_config
+from .waveform import OfdmProfile, profile_from_config, qpsk_symbols
 
 
 class ReceiverError(ValueError):
@@ -487,8 +488,9 @@ def make_observation(
             )
         )
     if signal is None:
+        num_rx = int(config.get("arrays", "gnb_rx", "num_elements"))
         signal = torch.zeros(
-            (1, profile.fft_size),
+            (num_rx, profile.fft_size),
             device="cuda",
             dtype=torch.complex64,
         )
@@ -547,7 +549,8 @@ def _aoa_window(choices: ProcessingChoices) -> torch.Tensor:
     window = torch.hann_window(
         count, periodic=False, device="cuda", dtype=torch.float64
     )
-    return window / torch.linalg.vector_norm(window)
+    rms = torch.sqrt(torch.mean(window.square()))
+    return window / rms
 
 
 def delay_doppler_map(
@@ -640,7 +643,11 @@ def noise_calibration(
     records: int,
     seed: int,
 ) -> float:
-    """Estimate delay-Doppler noise power from recorded noise-only actions."""
+    """Estimate mean delay-Doppler noise power per receive cell.
+
+    The estimator uses the mean, not the median, so a gate containing many
+    cells has the declared expected noise energy.
+    """
     if records < 1:
         raise ReceiverError("noise calibration needs at least one record")
     variance = noise_variance_w(
@@ -670,11 +677,117 @@ def noise_calibration(
         zero = h_dd[:, choices.profile.num_symbols // 2, :]
         cells.append(zero.abs().square().reshape(-1))
     measured = torch.cat(cells)
-    estimate = float(measured.median().item())
+    estimate = float(measured.mean().item())
     if not math.isfinite(estimate) or estimate <= 0.0:
         raise ReceiverError("noise calibration returned a non-positive power")
     return estimate
 
+
+
+def noise_gate_validation(
+    *,
+    config: PilotConfig,
+    choices: ProcessingChoices,
+    gates: Sequence[dict[str, Any]],
+    records: int = 128,
+    seed: int = 9201,
+    calibration_records: int = 64,
+) -> list[dict[str, Any]]:
+    """Measure E/N through the actual no-target receiver pipeline.
+
+    Each gate is evaluated on independent receiver-noise-only actions at its
+    declared OFDM look length. The result is per gate variant; callers may
+    aggregate variants for one method/gate.
+    """
+    if records < 64:
+        raise ReceiverError("noise validation requires at least 64 records")
+    if not gates:
+        raise ReceiverError("noise validation requires at least one gate")
+    array = choices.receiver_array
+    weights = torch.ones(
+        array.num_elements, device="cuda", dtype=torch.complex64
+    ) / math.sqrt(array.num_elements)
+    by_symbols: dict[int, list[dict[str, Any]]] = {}
+    for gate in gates:
+        by_symbols.setdefault(int(gate["symbols"]), []).append(dict(gate))
+    results: list[dict[str, Any]] = []
+    for symbols_count, local_gates in sorted(by_symbols.items()):
+        local_choices = replace(
+            choices,
+            profile=replace(choices.profile, num_symbols=int(symbols_count)),
+        )
+        n_cell = noise_calibration(
+            choices=local_choices,
+            config=config,
+            records=int(calibration_records),
+            seed=int(seed),
+        )
+        symbols = qpsk_symbols(local_choices.profile, int(seed))
+        ratios: dict[int, list[float]] = {index: [] for index in range(len(local_gates))}
+        energies: dict[int, list[float]] = {index: [] for index in range(len(local_gates))}
+        for record_index in range(int(records)):
+            observation = make_observation(
+                world="target",
+                beam_name="noise-only",
+                beam_weights=weights,
+                symbols=symbols,
+                target_paths=(),
+                background_paths=(),
+                relay_downlink=(),
+                relay_uplink=(),
+                include_relay=False,
+                profile=local_choices.profile,
+                config=config,
+                noise_seed=int(seed) + 100000 + record_index,
+                relay_noise_seed=int(seed) + 200000 + record_index,
+                probe_seed=int(seed),
+            )
+            delay_doppler = delay_doppler_map(observation.h_eff, local_choices)
+            angular = angular_delay_map(
+                delay_doppler,
+                local_choices,
+                noise_per_cell_w=n_cell,
+            )
+            for index, gate in enumerate(local_gates):
+                energy = gate_energy(
+                    angular,
+                    delay_min_s=float(gate["delay_min_ns"]) * 1e-9,
+                    delay_max_s=float(gate["delay_max_ns"]) * 1e-9,
+                    aoa_min_deg=float(gate["aoa_min_deg"]),
+                    aoa_max_deg=float(gate["aoa_max_deg"]),
+                )
+                ratios[index].append(energy.energy_w / energy.noise_w)
+                energies[index].append(energy.energy_w)
+        for index, gate in enumerate(local_gates):
+            values = np.asarray(ratios[index], dtype=float)
+            gate_energies = np.asarray(energies[index], dtype=float)
+            standard_error = float(values.std(ddof=1) / math.sqrt(values.size))
+            mean_ratio = float(values.mean())
+            results.append(
+                {
+                    "method": str(gate.get("method", "")),
+                    "gate": str(gate["gate"]),
+                    "variant": str(gate.get("variant", "default")),
+                    "symbols": int(symbols_count),
+                    "records": int(records),
+                    "cells": int(
+                        gate_energy(
+                            angular,
+                            delay_min_s=float(gate["delay_min_ns"]) * 1e-9,
+                            delay_max_s=float(gate["delay_max_ns"]) * 1e-9,
+                            aoa_min_deg=float(gate["aoa_min_deg"]),
+                            aoa_max_deg=float(gate["aoa_max_deg"]),
+                        ).cells
+                    ),
+                    "noise_estimate_per_cell_w": float(n_cell),
+                    "mean_energy_w": float(gate_energies.mean()),
+                    "mean_e_over_n": mean_ratio,
+                    "ci95_low": mean_ratio - 1.96 * standard_error,
+                    "ci95_high": mean_ratio + 1.96 * standard_error,
+                    "std_e_over_n": float(values.std(ddof=1)),
+                }
+            )
+    return results
 
 def guard_noise_power(
     h_eff: torch.Tensor,

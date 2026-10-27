@@ -59,6 +59,9 @@ def summarize_trials(trials: pd.DataFrame) -> pd.DataFrame:
                 "not_observable_rate": float(
                     np.mean(group["path_availability"].eq("NOT_OBSERVABLE"))
                 ),
+                "unusable_beam_rate": float(
+                    np.mean(~group["beam_usable"].astype(bool))
+                ),
                 "S_available_count": int(s_available.sum()),
                 "S_available_rate": float(np.mean(s_available)),
                 "S_median": float(s_values.median()) if not s_values.empty else None,

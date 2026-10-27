@@ -150,3 +150,14 @@ def test_mapfree_two_beam_spends_one_extra_action(config: PilotConfig) -> None:
     )
     assert len(plan) == 1
     assert plan[0][1] == int(config.get("beam", "map_free", "total_extra_symbols"))
+
+
+def test_noise_normalization_is_unity_within_interval(
+    smoke_run: dict[str, Path],
+) -> None:
+    noise = pd.read_csv(smoke_run["output"] / "noise_normalization.csv")
+    assert len(noise) >= 10
+    assert noise["records"].min() >= 128
+    assert noise["ci95_low"].le(1.0).all()
+    assert noise["ci95_high"].ge(1.0).all()
+    assert noise["mean_e_over_n"].between(0.5, 2.0).all()

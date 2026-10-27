@@ -239,7 +239,7 @@ phase6:
     # Guard is a noise sanity check only; it is disjoint from search and gates.
     guard_delay_ns: [550.0, 650.0]
     guard_ratio_bounds: [0.5, 2.0]
-    noise_calibration_records: 4
+    noise_calibration_records: 64
     noise_calibration_seed: 9001
     doppler_bin: zero
     # Hann reduces strong-clutter leakage into the wall gate; PSF uses it.
