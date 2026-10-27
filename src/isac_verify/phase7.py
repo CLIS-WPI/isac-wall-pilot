@@ -8,7 +8,7 @@ import random
 import time
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -852,15 +852,46 @@ def _row_base(
     base: dict[str, Any],
     true_candidate_deg: float,
     true_relay_deg: float,
+    geometry_id: str = "smoke_nominal",
+    split: str = "smoke",
+    inflations: Sequence[float] = (1.0,),
 ) -> dict[str, Any]:
     candidate = base["candidate"]
     psf = base["point_spread"]
     direct_gate = base["direct_gate"]
     true_positive = float(config.get("physical", "walls", "positive", "offset_m"))
     true_negative = float(config.get("physical", "walls", "negative", "offset_m"))
+    nan = float("nan")
+    extra: dict[str, Any] = {
+        "direct_reliable": nan,
+        "reference_detectable": nan,
+        "r_dt": nan,
+        "wall_side": None,
+        "predicted_wall_delay_ns": nan,
+        "twin_interval_low_ns": nan,
+        "twin_interval_high_ns": nan,
+        "true_wall_delay_ns": nan,
+        "true_wall_aoa_deg": nan,
+        "wall_gate_truncated": nan,
+    }
+    for factor in inflations:
+        tag = _c_tag(factor)
+        for name in (
+            "E_W",
+            "N_W",
+            "S",
+            "r_dt",
+            "ref_det",
+            "wall_excess_snr",
+            "cover_delay",
+            "cover_aoa",
+            "floor_excess",
+        ):
+            extra[f"{name}_{tag}"] = nan
     return {
-        "geometry_id": "smoke_nominal",
-        "split": "smoke",
+        **extra,
+        "geometry_id": geometry_id,
+        "split": split,
         "world": world,
         "method": method,
         "sigma_map_m": float(sigma_m),
@@ -1117,6 +1148,467 @@ def _noise_validation_gates(
         )
     return gates
 
+def _c_tag(factor: float) -> str:
+    return "c" + f"{float(factor):g}".replace(".", "p")
+
+
+def _noise_only_map(
+    *,
+    config: PilotConfig,
+    choices: ProcessingChoices,
+    direct_weights: torch.Tensor,
+    noise_full: float,
+    seed: int,
+    timing: dict[str, float],
+) -> AngularDelayMap:
+    profile = choices.profile
+    observation = _observe(
+        config=config,
+        world="target",
+        beam_weights=direct_weights,
+        symbols=qpsk_symbols(profile, int(seed)),
+        profile=profile,
+        target_links=(),
+        background_links=(),
+        downlink_links=(),
+        uplink_links=(),
+        calibration=None,
+        probe_seed=int(seed),
+        noise_seed=int(seed),
+        relay_noise_seed=0,
+    )
+    return _map(observation, choices, noise_full, timing)
+
+
+def _mapped_extras(
+    *,
+    plan: WallPlan,
+    base_evidence: Any,
+    base: dict[str, Any],
+    wall_map: AngularDelayMap,
+    direct_twin: AngularDelayMap,
+    wall_twin: AngularDelayMap,
+    config: PilotConfig,
+    inflations: Sequence[float],
+    true_wall: dict[str, dict[str, float]] | None,
+    noise_map: AngularDelayMap | None,
+) -> dict[str, Any]:
+    extras: dict[str, Any] = {
+        "direct_reliable": float(bool(base_evidence.direct_reliable)),
+        "reference_detectable": float(bool(base_evidence.reference_detectable)),
+        "r_dt": float(base_evidence.r_dt),
+        "wall_side": plan.wall_side,
+        "predicted_wall_delay_ns": plan.predicted_delay_s * 1e9,
+        "wall_gate_truncated": float(
+            plan.wall_gate.delay_max_s > float(wall_map.delay_s[-1]) + 1e-15
+        ),
+    }
+    if plan.twin_interval_delay_s is not None:
+        extras["twin_interval_low_ns"] = plan.twin_interval_delay_s[0] * 1e9
+        extras["twin_interval_high_ns"] = plan.twin_interval_delay_s[1] * 1e9
+    truth = None
+    if true_wall is not None and plan.wall_side is not None:
+        truth = true_wall[plan.wall_side]
+        extras["true_wall_delay_ns"] = float(truth["delay_ns"])
+        extras["true_wall_aoa_deg"] = float(truth["aoa_deg"])
+    for factor in inflations:
+        tag = _c_tag(factor)
+        plan_c = plan.with_inflation(factor)
+        evidence = (
+            base_evidence
+            if factor == 1.0
+            else evidence_score(
+                direct_measured=base["direct_map"],
+                wall_measured=wall_map,
+                direct_twin=direct_twin,
+                wall_twin=wall_twin,
+                plan=plan_c,
+                config=config,
+            )
+        )
+        data = evidence.as_dict()
+        gate = plan_c.wall_gate
+        extras[f"E_W_{tag}"] = data["E_W"]
+        extras[f"N_W_{tag}"] = data["N_W"]
+        extras[f"S_{tag}"] = data["score"]
+        extras[f"r_dt_{tag}"] = data["r_dt"]
+        extras[f"ref_det_{tag}"] = float(bool(data["reference_detectable"]))
+        extras[f"wall_excess_snr_{tag}"] = (
+            (data["E_W"] - data["N_W"]) / data["N_W"]
+            if data["N_W"] > 0.0
+            else float("nan")
+        )
+        if truth is not None:
+            extras[f"cover_delay_{tag}"] = float(
+                gate.delay_min_s * 1e9
+                <= float(truth["delay_ns"])
+                <= gate.delay_max_s * 1e9
+            )
+            extras[f"cover_aoa_{tag}"] = float(
+                gate.aoa_min_deg <= float(truth["aoa_deg"]) <= gate.aoa_max_deg
+            )
+        if noise_map is not None:
+            noise_energy = gate_energy(
+                noise_map,
+                delay_min_s=gate.delay_min_s,
+                delay_max_s=gate.delay_max_s,
+                aoa_min_deg=gate.aoa_min_deg,
+                aoa_max_deg=gate.aoa_max_deg,
+            )
+            extras[f"floor_excess_{tag}"] = (
+                (noise_energy.energy_w - noise_energy.noise_w)
+                / noise_energy.noise_w
+            )
+    return extras
+
+
+def evaluate_record(
+    *,
+    config: PilotConfig,
+    choices: ProcessingChoices,
+    world: str,
+    record_index: int,
+    base: dict[str, Any],
+    sigmas: Sequence[float],
+    twin_z: Sequence[dict[str, float]],
+    seeds: dict[str, Any],
+    direct_weights: torch.Tensor,
+    links: dict[str, tuple[LinkPath, ...]],
+    calibration: Any,
+    noise_full: float,
+    noise_by_symbols: dict[int, float],
+    timing: dict[str, float],
+    representative: dict[str, Any],
+    true_candidate_deg: float,
+    true_relay_deg: float,
+    methods: Sequence[str] = METHODS,
+    geometry_id: str = "smoke_nominal",
+    split: str = "smoke",
+    inflations: Sequence[float] = (1.0,),
+    true_wall: dict[str, dict[str, float]] | None = None,
+    noise_only_seed: Callable[[str, int, int], int] | None = None,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    noise_cache: dict[float, AngularDelayMap] = {}
+    profile = choices.profile
+    for sigma_m in sigmas:
+        twin_idx = record_index % len(twin_z)
+        twin_offsets = _twin_offsets(
+            config,
+            sigma_m,
+            twin_z[twin_idx]["positive"],
+            twin_z[twin_idx]["negative"],
+        )
+        for method in methods:
+            method_start = _now()
+            row = _row_base(
+                config=config,
+                world=world,
+                method=method,
+                sigma_m=sigma_m,
+                record_index=record_index,
+                seeds=seeds,
+                direct_seeds=base["direct_seeds"],
+                twin_idx=twin_idx,
+                twin_offsets=twin_offsets,
+                base=base,
+                true_candidate_deg=true_candidate_deg,
+                true_relay_deg=true_relay_deg,
+                geometry_id=geometry_id,
+                split=split,
+                inflations=inflations,
+            )
+            if base["candidate"].status != "ACQUIRED":
+                path_availability = (
+                    "NOT_ATTEMPTED"
+                    if method != "mapfree_two_beam"
+                    and method != "mapfree_coarse_to_fine"
+                    else "NOT_APPLICABLE_NO_TWIN"
+                )
+                row = _finish_row(
+                    row,
+                    E_D=float("nan"),
+                    N_D=float("nan"),
+                    E_W=float("nan"),
+                    N_W=float("nan"),
+                    S=float("nan"),
+                    S_available=False,
+                    wall_excess_snr=float("nan"),
+                    wall_excess_snr_available=False,
+                    status="ACQUISITION_FAILED",
+                    reason="direct_acquisition_failed",
+                    path_availability=path_availability,
+                    plan=None,
+                    selected_weights=None,
+                    config=config,
+                    true_relay_deg=true_relay_deg,
+                    runtime_s=_now() - method_start,
+                    total_symbols=profile.num_symbols,
+                    total_energy_j=0.0,
+                )
+                rows.append(row)
+                continue
+            direct_energy = base["direct_energy"]
+            if method == "direct_only":
+                row = _finish_row(
+                    row,
+                    E_D=direct_energy.energy_w,
+                    N_D=direct_energy.noise_w,
+                    E_W=float("nan"),
+                    N_W=float("nan"),
+                    S=float("nan"),
+                    S_available=False,
+                    wall_excess_snr=float("nan"),
+                    wall_excess_snr_available=False,
+                    status="UNRESOLVED",
+                    reason="no_wall_probe",
+                    path_availability="NOT_ATTEMPTED",
+                    plan=None,
+                    selected_weights=None,
+                    config=config,
+                    true_relay_deg=true_relay_deg,
+                    runtime_s=_now() - method_start,
+                    total_symbols=profile.num_symbols,
+                    total_energy_j=(
+                        dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
+                        * profile.symbol_duration_s
+                        * profile.num_symbols
+                    ),
+                )
+            elif method_is_mapfree(method):
+                if method == "mapfree_two_beam":
+                    look_plan = _mapfree_look_plan(
+                        method,
+                        config=config,
+                        beam_seed=int(seeds["streams"]["beam_selection"][record_index]),
+                    )
+                    stream = seeds["streams"]["mapfree"][method]
+                    look_seeds = [
+                        {
+                            "probe_symbols": stream["probe_symbols"][record_index],
+                            "receiver_noise": stream["receiver_noise"][record_index],
+                            "relay_noise": stream["relay_noise"][record_index],
+                        }
+                    ]
+                    scan = _scan_looks(
+                        config=config,
+                        choices=choices,
+                        base=base,
+                        world=world,
+                        links=links,
+                        calibration=calibration,
+                        look_plan=look_plan,
+                        look_seeds=look_seeds,
+                        scan_span_s=float(
+                            config.get("phase7", "scan", "post_direct_span_ns")
+                        )
+                        * 1e-9,
+                        noise_by_symbols=noise_by_symbols,
+                        timing=timing,
+                    )
+                else:
+                    scan = _coarse_to_fine(
+                        config=config,
+                        choices=choices,
+                        base=base,
+                        world=world,
+                        links=links,
+                        calibration=calibration,
+                        record_index=record_index,
+                        action_seeds=seeds["streams"]["mapfree"][method],
+                        noise_by_symbols=noise_by_symbols,
+                        timing=timing,
+                    )
+                best = scan["selected"]
+                snr = float(best["excess_snr"])
+                row = _finish_row(
+                    row,
+                    E_D=direct_energy.energy_w,
+                    N_D=direct_energy.noise_w,
+                    E_W=float(best["E_W"]),
+                    N_W=float(best["N_W"]),
+                    S=float("nan"),
+                    S_available=False,
+                    wall_excess_snr=snr,
+                    wall_excess_snr_available=bool(
+                        math.isfinite(snr) and float(best["N_W"]) > 0.0
+                    ),
+                    status="UNRESOLVED",
+                    reason="mapfree_scan_no_map_reference",
+                    path_availability="NOT_APPLICABLE_NO_TWIN",
+                    plan=None,
+                    selected_weights=best["weights"],
+                    config=config,
+                    true_relay_deg=true_relay_deg,
+                    runtime_s=_now() - method_start,
+                    total_symbols=profile.num_symbols + int(scan["total_symbols"]),
+                    total_energy_j=(
+                        dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
+                        * profile.symbol_duration_s
+                        * (profile.num_symbols + int(scan["total_symbols"]))
+                    ),
+                    discovery={
+                        "scan_kind": method,
+                        "selected_angle_deg": best["angle_deg"],
+                        "selected_symbols": best["symbols"],
+                        "attempts": [
+                            {
+                                key: value
+                                for key, value in attempt.items()
+                                if key != "weights"
+                            }
+                            for attempt in scan["attempts"]
+                        ],
+                        "total_symbols": scan["total_symbols"],
+                        "extra_energy_j": scan["total_energy_j"],
+                        "selected_exploration_angle_deg": (
+                            float(scan["selected"]["angle_deg"])
+                            if method == "mapfree_two_beam"
+                            else float(scan["coarse_selected"]["angle_deg"])
+                        ),
+                        "refinement_angles_deg": [
+                            float(item["angle_deg"])
+                            for item in scan.get("refined_attempts", [])
+                        ],
+                        "selected_final_angle_deg": float(
+                            scan["selected"]["angle_deg"]
+                        ),
+                    },
+                )
+            else:
+                plan, direct_twin, wall_twin = _plan_for(
+                    config=config,
+                    choices=choices,
+                    base=base,
+                    world=world,
+                    method=method,
+                    sigma_m=sigma_m,
+                    twin_offsets=twin_offsets,
+                    direct_weights=direct_weights,
+                    timing=timing,
+                )
+                if plan.beam is None or plan.beam.weights is None:
+                    row = _finish_row(
+                        row,
+                        E_D=direct_energy.energy_w,
+                        N_D=direct_energy.noise_w,
+                        E_W=float("nan"),
+                        N_W=float("nan"),
+                        S=float("nan"),
+                        S_available=False,
+                        wall_excess_snr=float("nan"),
+                        wall_excess_snr_available=False,
+                        status="UNRESOLVED",
+                        reason="twin_path_not_observable",
+                        path_availability=plan.status,
+                        plan=plan,
+                        selected_weights=None,
+                        config=config,
+                        true_relay_deg=true_relay_deg,
+                        runtime_s=_now() - method_start,
+                        total_symbols=profile.num_symbols,
+                        total_energy_j=(
+                            dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
+                            * profile.symbol_duration_s
+                            * profile.num_symbols
+                        ),
+                    )
+                    rows.append(row)
+                    continue
+                wall_seeds = seeds["streams"]["wall_action"][method]
+                wall_observation = _observe(
+                    config=config,
+                    world=world,
+                    beam_weights=plan.beam.weights,
+                    symbols=qpsk_symbols(
+                        profile,
+                        int(wall_seeds["probe_symbols"][record_index]),
+                    ),
+                    profile=profile,
+                    target_links=links["target"],
+                    background_links=links["background"],
+                    downlink_links=links["downlink"],
+                    uplink_links=links["uplink"],
+                    calibration=calibration,
+                    probe_seed=int(wall_seeds["probe_symbols"][record_index]),
+                    noise_seed=int(wall_seeds["receiver_noise"][record_index]),
+                    relay_noise_seed=int(wall_seeds["relay_noise"][record_index]),
+                )
+                wall_map = _map(wall_observation, choices, noise_full, timing)
+                if record_index == 0 and method in {"exact_oracle", "imperfect_robust"}:
+                    representative[f"{world}_{method}_wall_h_eff"] = wall_observation.h_eff
+                    representative[f"{world}_{method}_weights"] = plan.beam.weights
+                evidence = evidence_score(
+                    direct_measured=base["direct_map"],
+                    wall_measured=wall_map,
+                    direct_twin=direct_twin,
+                    wall_twin=wall_twin,
+                    plan=plan,
+                    config=config,
+                )
+                data = evidence.as_dict()
+                excess = (
+                    (data["E_W"] - data["N_W"]) / data["N_W"]
+                    if data["N_W"] > 0.0
+                    else float("nan")
+                )
+                row = _finish_row(
+                    row,
+                    E_D=data["E_D"],
+                    N_D=data["N_D"],
+                    E_W=data["E_W"],
+                    N_W=data["N_W"],
+                    S=data["score"],
+                    S_available=bool(math.isfinite(data["score"])),
+                    wall_excess_snr=excess,
+                    wall_excess_snr_available=bool(
+                        math.isfinite(excess) and data["N_W"] > 0.0
+                    ),
+                    status=data["status"],
+                    reason=data["reason"],
+                    path_availability=plan.status,
+                    plan=plan,
+                    selected_weights=plan.beam.weights,
+                    config=config,
+                    true_relay_deg=true_relay_deg,
+                    runtime_s=_now() - method_start,
+                    total_symbols=profile.num_symbols + profile.num_symbols,
+                    total_energy_j=(
+                        dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
+                        * profile.symbol_duration_s
+                        * (profile.num_symbols + profile.num_symbols)
+                    ),
+                    discovery=None,
+                )
+                if noise_only_seed is not None and sigma_m not in noise_cache:
+                    noise_cache[sigma_m] = _noise_only_map(
+                        config=config,
+                        choices=choices,
+                        direct_weights=direct_weights,
+                        noise_full=noise_full,
+                        seed=noise_only_seed(
+                            world, list(sigmas).index(sigma_m), record_index
+                        ),
+                        timing=timing,
+                    )
+                row.update(
+                    _mapped_extras(
+                        plan=plan,
+                        base_evidence=evidence,
+                        base=base,
+                        wall_map=wall_map,
+                        direct_twin=direct_twin,
+                        wall_twin=wall_twin,
+                        config=config,
+                        inflations=inflations,
+                        true_wall=true_wall,
+                        noise_map=noise_cache.get(sigma_m),
+                    )
+                )
+            rows.append(row)
+    return rows
+
+
 def _write_experiment_a_beams(config: PilotConfig, output: Path) -> None:
     from .experiments import analytical_comparison, beam_actions, sionna_comparison
 
@@ -1282,294 +1774,27 @@ def run_smoke(
                 representative[f"{world}_direct_h_eff"] = base["observation"].h_eff
                 if world == "target":
                     representative["direct_weights"] = direct_weights
-            profile = choices.profile
-            for sigma_m in sigmas:
-                twin_idx = record_index % len(twin_z)
-                twin_offsets = _twin_offsets(
-                    config,
-                    sigma_m,
-                    twin_z[twin_idx]["positive"],
-                    twin_z[twin_idx]["negative"],
+            trials.extend(
+                evaluate_record(
+                    config=config,
+                    choices=choices,
+                    world=world,
+                    record_index=record_index,
+                    base=base,
+                    sigmas=sigmas,
+                    twin_z=twin_z,
+                    seeds=seeds,
+                    direct_weights=direct_weights,
+                    links=links,
+                    calibration=calibration,
+                    noise_full=noise_full,
+                    noise_by_symbols=noise_by_symbols,
+                    timing=timing,
+                    representative=representative,
+                    true_candidate_deg=true_candidate_deg,
+                    true_relay_deg=true_relay_deg,
                 )
-                for method in METHODS:
-                    method_start = _now()
-                    row = _row_base(
-                        config=config,
-                        world=world,
-                        method=method,
-                        sigma_m=sigma_m,
-                        record_index=record_index,
-                        seeds=seeds,
-                        direct_seeds=base["direct_seeds"],
-                        twin_idx=twin_idx,
-                        twin_offsets=twin_offsets,
-                        base=base,
-                        true_candidate_deg=true_candidate_deg,
-                        true_relay_deg=true_relay_deg,
-                    )
-                    if base["candidate"].status != "ACQUIRED":
-                        path_availability = (
-                            "NOT_ATTEMPTED"
-                            if method != "mapfree_two_beam"
-                            and method != "mapfree_coarse_to_fine"
-                            else "NOT_APPLICABLE_NO_TWIN"
-                        )
-                        row = _finish_row(
-                            row,
-                            E_D=float("nan"),
-                            N_D=float("nan"),
-                            E_W=float("nan"),
-                            N_W=float("nan"),
-                            S=float("nan"),
-                            S_available=False,
-                            wall_excess_snr=float("nan"),
-                            wall_excess_snr_available=False,
-                            status="ACQUISITION_FAILED",
-                            reason="direct_acquisition_failed",
-                            path_availability=path_availability,
-                            plan=None,
-                            selected_weights=None,
-                            config=config,
-                            true_relay_deg=true_relay_deg,
-                            runtime_s=_now() - method_start,
-                            total_symbols=profile.num_symbols,
-                            total_energy_j=0.0,
-                        )
-                        trials.append(row)
-                        continue
-                    direct_energy = base["direct_energy"]
-                    if method == "direct_only":
-                        row = _finish_row(
-                            row,
-                            E_D=direct_energy.energy_w,
-                            N_D=direct_energy.noise_w,
-                            E_W=float("nan"),
-                            N_W=float("nan"),
-                            S=float("nan"),
-                            S_available=False,
-                            wall_excess_snr=float("nan"),
-                            wall_excess_snr_available=False,
-                            status="UNRESOLVED",
-                            reason="no_wall_probe",
-                            path_availability="NOT_ATTEMPTED",
-                            plan=None,
-                            selected_weights=None,
-                            config=config,
-                            true_relay_deg=true_relay_deg,
-                            runtime_s=_now() - method_start,
-                            total_symbols=profile.num_symbols,
-                            total_energy_j=(
-                                dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
-                                * profile.symbol_duration_s
-                                * profile.num_symbols
-                            ),
-                        )
-                    elif method_is_mapfree(method):
-                        if method == "mapfree_two_beam":
-                            look_plan = _mapfree_look_plan(
-                                method,
-                                config=config,
-                                beam_seed=int(seeds["streams"]["beam_selection"][record_index]),
-                            )
-                            stream = seeds["streams"]["mapfree"][method]
-                            look_seeds = [
-                                {
-                                    "probe_symbols": stream["probe_symbols"][record_index],
-                                    "receiver_noise": stream["receiver_noise"][record_index],
-                                    "relay_noise": stream["relay_noise"][record_index],
-                                }
-                            ]
-                            scan = _scan_looks(
-                                config=config,
-                                choices=choices,
-                                base=base,
-                                world=world,
-                                links=links,
-                                calibration=calibration,
-                                look_plan=look_plan,
-                                look_seeds=look_seeds,
-                                scan_span_s=float(
-                                    config.get("phase7", "scan", "post_direct_span_ns")
-                                )
-                                * 1e-9,
-                                noise_by_symbols=noise_by_symbols,
-                                timing=timing,
-                            )
-                        else:
-                            scan = _coarse_to_fine(
-                                config=config,
-                                choices=choices,
-                                base=base,
-                                world=world,
-                                links=links,
-                                calibration=calibration,
-                                record_index=record_index,
-                                action_seeds=seeds["streams"]["mapfree"][method],
-                                noise_by_symbols=noise_by_symbols,
-                                timing=timing,
-                            )
-                        best = scan["selected"]
-                        snr = float(best["excess_snr"])
-                        row = _finish_row(
-                            row,
-                            E_D=direct_energy.energy_w,
-                            N_D=direct_energy.noise_w,
-                            E_W=float(best["E_W"]),
-                            N_W=float(best["N_W"]),
-                            S=float("nan"),
-                            S_available=False,
-                            wall_excess_snr=snr,
-                            wall_excess_snr_available=bool(
-                                math.isfinite(snr) and float(best["N_W"]) > 0.0
-                            ),
-                            status="UNRESOLVED",
-                            reason="mapfree_scan_no_map_reference",
-                            path_availability="NOT_APPLICABLE_NO_TWIN",
-                            plan=None,
-                            selected_weights=best["weights"],
-                            config=config,
-                            true_relay_deg=true_relay_deg,
-                            runtime_s=_now() - method_start,
-                            total_symbols=profile.num_symbols + int(scan["total_symbols"]),
-                            total_energy_j=(
-                                dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
-                                * profile.symbol_duration_s
-                                * (profile.num_symbols + int(scan["total_symbols"]))
-                            ),
-                            discovery={
-                                "scan_kind": method,
-                                "selected_angle_deg": best["angle_deg"],
-                                "selected_symbols": best["symbols"],
-                                "attempts": [
-                                    {
-                                        key: value
-                                        for key, value in attempt.items()
-                                        if key != "weights"
-                                    }
-                                    for attempt in scan["attempts"]
-                                ],
-                                "total_symbols": scan["total_symbols"],
-                                "extra_energy_j": scan["total_energy_j"],
-                                "selected_exploration_angle_deg": (
-                                    float(scan["selected"]["angle_deg"])
-                                    if method == "mapfree_two_beam"
-                                    else float(scan["coarse_selected"]["angle_deg"])
-                                ),
-                                "refinement_angles_deg": [
-                                    float(item["angle_deg"])
-                                    for item in scan.get("refined_attempts", [])
-                                ],
-                                "selected_final_angle_deg": float(
-                                    scan["selected"]["angle_deg"]
-                                ),
-                            },
-                        )
-                    else:
-                        plan, direct_twin, wall_twin = _plan_for(
-                            config=config,
-                            choices=choices,
-                            base=base,
-                            world=world,
-                            method=method,
-                            sigma_m=sigma_m,
-                            twin_offsets=twin_offsets,
-                            direct_weights=direct_weights,
-                            timing=timing,
-                        )
-                        if plan.beam is None or plan.beam.weights is None:
-                            row = _finish_row(
-                                row,
-                                E_D=direct_energy.energy_w,
-                                N_D=direct_energy.noise_w,
-                                E_W=float("nan"),
-                                N_W=float("nan"),
-                                S=float("nan"),
-                                S_available=False,
-                                wall_excess_snr=float("nan"),
-                                wall_excess_snr_available=False,
-                                status="UNRESOLVED",
-                                reason="twin_path_not_observable",
-                                path_availability=plan.status,
-                                plan=plan,
-                                selected_weights=None,
-                                config=config,
-                                true_relay_deg=true_relay_deg,
-                                runtime_s=_now() - method_start,
-                                total_symbols=profile.num_symbols,
-                                total_energy_j=(
-                                    dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
-                                    * profile.symbol_duration_s
-                                    * profile.num_symbols
-                                ),
-                            )
-                            trials.append(row)
-                            continue
-                        wall_seeds = seeds["streams"]["wall_action"][method]
-                        wall_observation = _observe(
-                            config=config,
-                            world=world,
-                            beam_weights=plan.beam.weights,
-                            symbols=qpsk_symbols(
-                                profile,
-                                int(wall_seeds["probe_symbols"][record_index]),
-                            ),
-                            profile=profile,
-                            target_links=links["target"],
-                            background_links=links["background"],
-                            downlink_links=links["downlink"],
-                            uplink_links=links["uplink"],
-                            calibration=calibration,
-                            probe_seed=int(wall_seeds["probe_symbols"][record_index]),
-                            noise_seed=int(wall_seeds["receiver_noise"][record_index]),
-                            relay_noise_seed=int(wall_seeds["relay_noise"][record_index]),
-                        )
-                        wall_map = _map(wall_observation, choices, noise_full, timing)
-                        if record_index == 0 and method in {"exact_oracle", "imperfect_robust"}:
-                            representative[f"{world}_{method}_wall_h_eff"] = wall_observation.h_eff
-                            representative[f"{world}_{method}_weights"] = plan.beam.weights
-                        evidence = evidence_score(
-                            direct_measured=base["direct_map"],
-                            wall_measured=wall_map,
-                            direct_twin=direct_twin,
-                            wall_twin=wall_twin,
-                            plan=plan,
-                            config=config,
-                        )
-                        data = evidence.as_dict()
-                        excess = (
-                            (data["E_W"] - data["N_W"]) / data["N_W"]
-                            if data["N_W"] > 0.0
-                            else float("nan")
-                        )
-                        row = _finish_row(
-                            row,
-                            E_D=data["E_D"],
-                            N_D=data["N_D"],
-                            E_W=data["E_W"],
-                            N_W=data["N_W"],
-                            S=data["score"],
-                            S_available=bool(math.isfinite(data["score"])),
-                            wall_excess_snr=excess,
-                            wall_excess_snr_available=bool(
-                                math.isfinite(excess) and data["N_W"] > 0.0
-                            ),
-                            status=data["status"],
-                            reason=data["reason"],
-                            path_availability=plan.status,
-                            plan=plan,
-                            selected_weights=plan.beam.weights,
-                            config=config,
-                            true_relay_deg=true_relay_deg,
-                            runtime_s=_now() - method_start,
-                            total_symbols=profile.num_symbols + profile.num_symbols,
-                            total_energy_j=(
-                                dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
-                                * profile.symbol_duration_s
-                                * (profile.num_symbols + profile.num_symbols)
-                            ),
-                            discovery=None,
-                        )
-                    trials.append(row)
+            )
     timing["end_to_end_s"] = _now() - run_start
     timing["nvml_start"] = nvml_start
     timing["nvml_end"] = _nvml_snapshot()

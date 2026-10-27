@@ -567,3 +567,51 @@ declared processing choices, not post-hoc tuning.
   `validation status: PASS`, `phase 6 status: PASS`.
 - `ISAC_DEV=1 scripts/drun.sh python -m pytest -q tests`:
   `44 passed`.
+
+## Phase 8A pre-calibration notes
+
+### P8-1 — Twin reference detectability uses the twin wall reference
+
+- **Type:** validity fix (applied before any calibration trial).
+- **What:** `evidence_score` now marks the twin reference detectable only when
+  the twin wall energy `E_W,twin` exceeds the 10 dB floor over `N_W_hat` and the
+  twin direct energy exceeds the same floor over `N_D_hat`.
+- **Before:** `reference_detectable` tested only `E_D,twin > floor * N_D_hat`,
+  which duplicates the direct-reliability check and never tested the predicted
+  wall reference path that `r_DT` is built from.
+- **After:** a weak predicted wall path now returns UNRESOLVED instead of
+  letting `S = (E_W - N_W)/(E_D - N_D)/r_DT` divide by a near-zero `r_DT`.
+- **BRIEF section:** §10.3 ("if ... r_DT predicts an undetectable reference
+  path, return unresolved status").
+- **Evidence:** `src/isac_verify/verification.py` (`evidence_score`); the full
+  Phase 7 smoke rerun after this change is numerically identical in all 56
+  pre-existing trial columns (no smoke trial was affected).
+
+### P8-2 — Per-record trial function shared by smoke and calibration
+
+- **Type:** implementation refactor, no behavior change.
+- **What:** the per-record body of `run_smoke` is now
+  `phase7.evaluate_record`; the calibration run calls the same function with
+  per-geometry configuration, seeds, and extra columns (per-`c` evidence,
+  coverage flags, noise-only floor excess).
+- **Evidence:** a full Phase 7 smoke rerun matches the approved run in all 56
+  pre-existing trial columns (`rtol=1e-5`).
+
+### P8-3 — Reading of rules 3 and 6 where the plan is silent
+
+- **Type:** interpretation (most conservative reading, BRIEF §10.2/§10.3).
+- **What:** (a) The floor `k` is computed for the three mapped methods, the
+  only methods whose decision uses it; the map-free methods use the common rule
+  (rule 5), which has no floor. (b) The twin interval inflated by `c` is the
+  delay ensemble interval; the AoA gate has no twin-ensemble component, so
+  `c` leaves it unchanged. (c) The `>= 99%` coverage requirement is evaluated
+  on the primary method (`imperfect_robust`) pooled over sigma and geometries;
+  per-method x sigma coverage is reported for all mapped methods. `c` is one
+  global value, so it also widens the delay gate of the other mapped methods
+  where their twin interval is non-degenerate (the narrow planner uses
+  `sigma_plan = 0`, so `c` cannot change its interval).
+- **Why:** the plan states one frozen `c` and a pooled requirement; the narrow
+  planner's degenerate interval cannot be repaired by inflation, so tying `c`
+  to it would make the rule unsatisfiable by construction.
+- **Evidence:** `docs/ANALYSIS_PLAN.md` operational definitions;
+  `src/isac_verify/calibration.py`.

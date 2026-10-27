@@ -31,6 +31,21 @@ def _run(args: argparse.Namespace) -> int:
     )
 
 
+def _calibrate(args: argparse.Namespace) -> int:
+    from .config import PilotConfig
+    from .phase8a import analyze_calibration, run_calibration
+
+    if args.analyze_only:
+        return analyze_calibration(args.output, PilotConfig.load(args.config))
+    return run_calibration(
+        args.config,
+        args.output,
+        require_h100=args.require_h100,
+        geometry_limit=args.geometry_limit,
+        record_limit=args.record_limit,
+    )
+
+
 def _report(args: argparse.Namespace) -> int:
     from .report import build_report
 
@@ -141,6 +156,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="optional smoke record limit for tests",
     )
     run.set_defaults(handler=_run)
+
+    calibrate = subparsers.add_parser(
+        "calibrate",
+        help="Phase 8A: run the calibration geometries and compute thresholds",
+    )
+    calibrate.add_argument("--config", default="configs/pilot.yaml")
+    calibrate.add_argument("--output", default="results/phase8a")
+    calibrate.add_argument("--require-h100", action="store_true")
+    calibrate.add_argument("--geometry-limit", type=int, default=None)
+    calibrate.add_argument("--record-limit", type=int, default=None)
+    calibrate.add_argument(
+        "--analyze-only",
+        action="store_true",
+        help="recompute thresholds from saved shards",
+    )
+    calibrate.set_defaults(handler=_calibrate)
 
     report = subparsers.add_parser(
         "report",

@@ -9,7 +9,7 @@ smuggled through a keyword argument.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from typing import Any, Sequence
 
 import numpy as np
@@ -104,6 +104,36 @@ class WallPlan:
     beam: BeamResult | None
     uncertainty_samples: int
     uncertainty_description: str
+    twin_interval_delay_s: tuple[float, float] | None = None
+    gate_expansion_delay_s: float = 0.0
+    gate_expansion_aoa_deg: float = 0.0
+
+    def with_inflation(self, factor: float) -> "WallPlan":
+        """Scale the twin-ensemble delay interval about the predicted delay.
+
+        The fixed measured expansion is added after scaling. ``factor == 1``
+        returns the plan unchanged. The AoA gate has no twin-ensemble
+        component and is not modified.
+        """
+        if factor < 1.0:
+            raise VerificationError("gate inflation must be at least one")
+        if factor == 1.0 or self.wall_gate is None:
+            return self
+        if self.twin_interval_delay_s is None:
+            raise VerificationError("plan has no twin interval to inflate")
+        low, high = self.twin_interval_delay_s
+        center = self.wall_gate.center_delay_s
+        gate = GateWindow(
+            delay_min_s=center - factor * (center - low)
+            - self.gate_expansion_delay_s,
+            delay_max_s=center + factor * (high - center)
+            + self.gate_expansion_delay_s,
+            aoa_min_deg=self.wall_gate.aoa_min_deg,
+            aoa_max_deg=self.wall_gate.aoa_max_deg,
+            center_delay_s=center,
+            center_aoa_deg=self.wall_gate.center_aoa_deg,
+        )
+        return replace(self, wall_gate=gate)
 
     @property
     def available(self) -> bool:
@@ -197,6 +227,9 @@ def classify_evidence(
     if wall_noise_w > 0.0 and net_wall_w <= noise_sigmas * wall_noise_w:
         return "UNRESOLVED", "wall_energy_consistent_with_noise"
     supported_min = float(thresholds["supported_min"])
+    supported_max = thresholds.get("supported_max")
+    if supported_max is not None and score > float(supported_max):
+        return "UNRESOLVED", "above_admissible_band"
     if score >= supported_min:
         return "SUPPORTED", "above_supported_threshold"
     return "UNRESOLVED", "below_support_threshold"
@@ -277,6 +310,17 @@ def _select_twin_wall_path(
     return selected, _wall_side(str(selected["family"]))
 
 
+def _twin_interval(
+    values: Sequence[float],
+    *,
+    quantiles: tuple[float, float],
+    center: float,
+) -> tuple[float, float]:
+    low = float(np.quantile(np.asarray(values), quantiles[0]))
+    high = float(np.quantile(np.asarray(values), quantiles[1]))
+    return min(low, center), max(high, center)
+
+
 def _gate_from_quantiles(
     values: Sequence[float],
     *,
@@ -348,15 +392,15 @@ def plan_wall_action(
         wall_delay_s(float(radius), float(offset), plan_input.speed_of_light_m_per_s)
         for radius, offset in zip(sampled_ranges, sampled_offsets)
     ]
-    delay_low, delay_high = _gate_from_quantiles(
-        sampled_delays,
-        quantiles=quantiles,
-        expansion=(
-            point_spread.delay_width_s
-            + 3.0 * plan_input.candidate.delay_sigma_s
-        ),
-        center=delay_s,
+    delay_expansion = (
+        point_spread.delay_width_s
+        + 3.0 * plan_input.candidate.delay_sigma_s
     )
+    twin_low, twin_high = _twin_interval(
+        sampled_delays, quantiles=quantiles, center=delay_s
+    )
+    delay_low = twin_low - delay_expansion
+    delay_high = twin_high + delay_expansion
     aoa_expansion = (
         point_spread.aoa_width_deg
         + 3.0 * plan_input.candidate.azimuth_sigma_deg
@@ -408,6 +452,9 @@ def plan_wall_action(
         beam=beam,
         uncertainty_samples=plan_input.robust_num_samples,
         uncertainty_description=description,
+        twin_interval_delay_s=(twin_low, twin_high),
+        gate_expansion_delay_s=delay_expansion,
+        gate_expansion_aoa_deg=aoa_expansion,
     )
 
 
@@ -468,8 +515,9 @@ def evidence_score(
         else float("nan")
     )
     direct_reliable = direct.net_energy_w > direct.noise_w * floor_linear
-    reference_detectable = (
-        twin_direct.energy_w > direct.noise_w * floor_linear
+    reference_detectable = bool(
+        twin_wall.energy_w > wall.noise_w * floor_linear
+        and twin_direct.energy_w > direct.noise_w * floor_linear
     )
     thresholds = config.get("phase6", "evidence", "thresholds")
     status, reason = classify_evidence(
