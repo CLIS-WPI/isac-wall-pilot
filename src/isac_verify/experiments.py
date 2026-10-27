@@ -969,11 +969,77 @@ def _print_phase4_tables(phase4: dict[str, Any]) -> None:
         )
 
 
+def _print_phase5_tables(phase5: dict[str, Any]) -> None:
+    print(f"phase 5 status: {phase5['status']}")
+    print(
+        "phase 5 D9 depths: "
+        f"target={phase5['d9_depths']['target']} "
+        f"background={phase5['d9_depths']['background']} "
+        f"downlink={phase5['d9_depths']['downlink']} "
+        f"uplink={phase5['d9_depths']['uplink']}"
+    )
+    calibration = phase5["calibration"]
+    print(
+        "phase 5 relay: measured delta "
+        f"{calibration['measured_added_delay_ns']:.9f} ns, "
+        f"|g|={calibration['gain_abs']:.9f}, "
+        f"TX power {calibration['relay_transmit_power_w']:.6e} W "
+        f"(cap {calibration['max_transmit_power_w']:.6e} W, "
+        f"feasible={calibration['power_feasible']})"
+    )
+    for beam in ("direct", "wall"):
+        row = phase5["agreements"][beam]
+        print(
+            f"phase 5 agreement {beam}: "
+            f"target max={row['target']['max_relative_error']:.3e} "
+            f"median={row['target']['median_relative_error']:.3e}; "
+            f"relay max={row['relay']['max_relative_error']:.3e} "
+            f"median={row['relay']['median_relative_error']:.3e}; "
+            f"tolerance={row['target']['tolerance']:.1e}"
+        )
+        power = phase5["relay_power"][beam]
+        families = ", ".join(
+            f"{name}={value:.6e} W"
+            for name, value in sorted(power["family_power_w"].items())
+        )
+        print(
+            f"phase 5 relay input {beam}: "
+            f"total={power['downlink_input_power_w']:.6e} W; {families}"
+        )
+    vulnerability = phase5["vulnerability"]
+    if vulnerability.get("available"):
+        print(
+            "phase 5 vulnerability (UNTESTED): "
+            f"required processing delay="
+            f"{vulnerability['required_processing_delay_ns']:.9f} ns, "
+            f"delay shift={vulnerability['required_delay_shift_ns']:.9f} ns, "
+            f"causal={vulnerability['causal_feasible']}, "
+            f"gain change={vulnerability['required_gain_change_db']:.6f} dB, "
+            f"power feasible={vulnerability['power_feasible']}"
+        )
+    else:
+        print(f"phase 5 vulnerability (UNTESTED): unavailable: {vulnerability['reason']}")
+    noise = phase5["noise"]
+    print(
+        "phase 5 noise: "
+        f"relay variance={noise['relay_variance_w']:.6e} W, "
+        f"forwarded relay noise mean power="
+        f"{noise['forwarded_relay_noise_mean_power_w']:.6e} W"
+    )
+    for row in phase5["gain_sweep"]:
+        print(
+            f"phase 5 gain {row['beam']} {row['gain_offset_db']:+.1f} dB: "
+            f"TX={row['relay_transmit_power_w']:.6e} W, "
+            f"feasible={row['feasible']}"
+        )
+
+
 def run_validation(
     config_path: str | Path,
     require_h100: bool,
     output_path: str | Path = "results/validate",
     phase4_output_path: str | Path = "results/phase4",
+    phase5_output_path: str | Path = "results/phase5",
 ) -> int:
     config = PilotConfig.load(config_path)
     output = Path(output_path)
@@ -986,6 +1052,9 @@ def run_validation(
     noise = noise_comparison(config, experiment)
     ratio_noise = ratio_noise_comparison(config, experiment)
     phase4 = phase4_diagnostics(config, phase4_output_path)
+    from .phase5 import phase5_diagnostics
+
+    phase5 = phase5_diagnostics(config, phase5_output_path)
     c128_tolerance = float(
         config.get("experiment_a", "analytical_c128_tolerance")
     )
@@ -1013,6 +1082,25 @@ def run_validation(
             <= c64_tolerance
         ),
         **phase4["checks"],
+        "phase5": phase5["status"] == "PASS",
+        "phase5_target_agreement": all(
+            values["target"]["max_relative_error"]
+            <= values["target"]["tolerance"]
+            for values in phase5["agreements"].values()
+        ),
+        "phase5_relay_agreement": all(
+            values["relay"]["max_relative_error"]
+            <= values["relay"]["tolerance"]
+            for values in phase5["agreements"].values()
+        ),
+        "phase5_validity": all(
+            values["target"]["cp_valid"] and values["target"]["doppler_valid"]
+            and values["relay"]["cp_valid"] and values["relay"]["doppler_valid"]
+            for values in phase5["validity"].values()
+        ),
+        "phase5_no_duplicates": phase5["duplicates"]["total_duplicate_groups"] == 0,
+        "phase5_d9": phase5["depth_decision"]["selected_depths"]
+        == phase5["d9_depths"],
     }
     status = "PASS" if all(checks.values()) else "FAIL"
     summary = {
@@ -1103,6 +1191,7 @@ def run_validation(
             ),
         },
         "phase4": phase4,
+        "phase5": phase5,
         "noise": {
             "variance_w": noise.variance_w,
             "relay_variance_w": noise.relay_variance_w,
@@ -1201,10 +1290,12 @@ def run_validation(
     )
     print(f"phase 4 status: {phase4['status']}")
     _print_phase4_tables(phase4)
+    _print_phase5_tables(phase5)
     print(f"wrote {output / 'validation_summary.json'}")
     print(f"wrote {Path(phase4_output_path) / 'phase4_summary.json'}")
     print(f"wrote {Path(phase4_output_path) / 'paths_diagnostic.parquet'}")
     print(f"wrote {Path(phase4_output_path) / 'geometry_reference.json'}")
+    print(f"wrote {Path(phase5_output_path) / 'phase5_summary.json'}")
     print(f"wrote {output / 'experiment_a.png'}")
     print(f"wrote {output / 'experiment_a.pdf'}")
     if status != "PASS":

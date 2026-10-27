@@ -1,5 +1,5 @@
 schema_version: 1
-phase: 3
+phase: 5
 brief_sections:
   geometry: ["5", "5.1", "5.2", "5.3"]
   waveform: ["6.1", "6.2", "6.3", "6.4"]
@@ -214,6 +214,18 @@ noise:
   relay_noise_figure_db: 7.0
   temperature_k: 290.0
   noise_only_verification: true
+
+phase5:
+  oversampling_factor: 4
+  guard_symbols: 1
+  relative_agreement_tolerance: 1.0e-3
+  subcarrier_edge_fraction: 0.05
+  max_delay_spread_cp_fraction: 1.0
+  doppler_symbol_cycles_max: 0.01
+  fractional_delay_pre_arrival_floor: 1.0e-2
+  gain_sweep_db: [-10.0, 0.0, 10.0, 20.0]
+  vulnerability_wall_delay_ns: 423.900055
+  vulnerability_beam_phi_deg: 26.565051
 
 geometry_reference:
   candidate_range_m: 60.0

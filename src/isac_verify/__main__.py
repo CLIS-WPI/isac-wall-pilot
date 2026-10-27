@@ -1,8 +1,9 @@
 """CLI entry point.
 
 Phase 0 implements ``preflight``. The current milestone implements
-``validate`` for the Phase 2/3 checks and Phase 4 finite-wall diagnostics;
-``run`` and ``report`` follow in later phases.
+``validate`` for the Phase 2/3 checks, Phase 4 finite-wall diagnostics, and
+Phase 5 continuous-waveform replay checks; ``run`` and ``report`` follow in
+later phases.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ def _validate(args: argparse.Namespace) -> int:
         require_h100=args.require_h100,
         output_path=args.output,
         phase4_output_path=args.phase4_output,
+        phase5_output_path=args.phase5_output,
     )
 
 
@@ -54,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate = subparsers.add_parser(
         "validate",
-        help="run Phase 2/3 validation and Phase 4 finite-wall checks",
+        help="run Phase 2/3 validation, Phase 4 checks, and Phase 5 replay checks",
     )
     validate.add_argument(
         "--config",
@@ -75,6 +77,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--phase4-output",
         default="results/phase4",
         help="directory for Phase 4 path diagnostics and geometry reference",
+    )
+    validate.add_argument(
+        "--phase5-output",
+        default="results/phase5",
+        help="directory for Phase 5 continuous-waveform replay summary",
     )
     validate.set_defaults(handler=_validate)
 

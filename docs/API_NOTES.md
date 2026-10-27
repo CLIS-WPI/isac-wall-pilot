@@ -882,3 +882,91 @@ reciprocal_wall_positive_wall ['SENSING', 'SPECULAR'] ['candidate', 'positive_wa
   the positive-wall outgoing and reciprocal paths, reducing the valid target
   path count from `5` to `3`, with no new path. This is a physical
   recomputation, not path deletion.
+
+## Phase 5 — duplicate-path source audit and continuous-waveform facts
+
+Installed source was read inside the Phase 5 container before relying on the
+pairing behavior:
+
+```python
+import inspect
+from sionna.rt.rcs.solver import RCSSolver
+from sionna.rt.path_solvers.paths_buffer import PathsBuffer
+print(inspect.getsourcefile(RCSSolver), inspect.getsourcelines(RCSSolver._pair_legs)[1])
+print(inspect.getsourcefile(PathsBuffer), inspect.getsourcelines(PathsBuffer.chain)[1])
+```
+
+```
+/opt/venv/lib/python3.12/site-packages/sionna/rt/rcs/solver.py 607
+/opt/venv/lib/python3.12/site-packages/sionna/rt/path_solvers/paths_buffer.py 980
+```
+
+- `RCSSolver._pair_legs` builds the Cartesian product
+  `dr.arange(num_from_tx * num_to_rx)`, maps it to transmitter-side and
+  receiver-side leg indices, and compresses it with only
+  `same_spst & (depth <= max_depth)`. It does not compare vertex sets or
+  remove repeated geometries.
+- `PathsBuffer.chain` combines one selected TX-side leg and one selected
+  RX-side leg into a path. It concatenates their interactions and creates one
+  path per selected pair; it also performs no deduplication.
+- Therefore any duplicate geometry emitted by the pairing step would remain a
+  separate coefficient in `Paths.a` and in the CIR sum. This is executed
+  installed-source behavior, not an inferred intent.
+
+The P1 audit ran target, monostatic-background, downlink, and uplink solves at
+depths 3 and 4 and grouped records by an unordered vertex set with a
+`1e-3 m` vertex tolerance:
+
+```python
+from isac_verify.wall_paths import duplicate_path_diagnostics
+d = duplicate_path_diagnostics(config)
+print(d["total_duplicate_groups"])
+for e in d["entries"]:
+    print(e["label"], e["max_depth"], e["path_count"],
+          e["unique_path_count"], e["duplicate_group_count"],
+          e["duplicate_path_count"], e["extra_copy_count"])
+```
+
+```
+0
+target 3 13 13 0 0 0
+target 4 25 25 0 0 0
+background_monostatic 3 6 6 0 0 0
+background_monostatic 4 8 8 0 0 0
+downlink 3 7 7 0 0 0
+downlink 4 9 9 0 0 0
+uplink 3 7 7 0 0 0
+uplink 4 9 9 0 0 0
+```
+
+No deduplication deviation was required. The four-bounce background note is
+also measured, not assumed: at background depth 4 the wall-wall monostatic
+path is at `120 m`, `400.2769173894194 ns`, AoA `±90°`, delay-coincident with
+the direct target return at `400.2769173894194 ns`, AoA `0°`. It is absent at
+the selected background D9 of 2 and appears only at depth 4.
+
+Continuous-waveform replay used one CP-OFDM record, an integer oversampling
+factor of `4`, `64` symbols, `cp_length=256`, `fft_size=2048`, so the
+oversampled block is `(256+2048)*4 = 9216` samples at `491.52 MHz`. Fractional
+delays were applied by a padded FFT phase ramp. Executed full-diagnostics
+agreement against the diagonal model was:
+
+```
+direct target max=6.166135718470143e-06 median=4.2907160789248875e-06
+direct relay  max=4.913556207127241e-06 median=4.220522330414813e-06
+wall target   max=6.2420721778795794e-06 median=5.011251351653841e-06
+wall relay    max=2.0598339472108808e-05 median=4.331378501944128e-06
+```
+
+All four are below the declared `1e-3` relative tolerance. Validity was
+checked against the `2.0833333333333334e-06 s` CP: target maximum delay
+`4.831769615520898e-07 s`, relay maximum delay `6.476616363215726e-07 s`,
+and Doppler `0` cycles per symbol against the `0.01` limit.
+
+One implementation pitfall was measured while validating the FFT delay:
+`torch.fft.fftfreq(..., dtype=torch.float64)` must be set at construction.
+Calling `.to(torch.float64)` after a default `float32` construction leaves a
+frequency quantization error that produced uncompensated time shifts on the
+order of `2e-4` relative sample error here. With `dtype` set at construction,
+the zero-delay padded-FFT roundtrip error was
+`2.701289205785704e-15` in complex128.

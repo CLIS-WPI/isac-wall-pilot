@@ -4,8 +4,8 @@ GPU-only Sionna 2.2.0 (PyTorch) pilot for active wall-assisted sensing
 verification. Specification: `docs/BRIEF.md` (do not edit). Standing rules:
 `AGENTS.md`.
 
-Status: **Phase 0 only** (repository, container, preflight). There are no
-scientific results yet. Later phases add `validate`, `run`, and `report`.
+Status: **Phases 0-5 implemented** (preflight through continuous-waveform
+replay validation). `run` and `report` follow in later phases.
 
 ## Host prerequisites
 
@@ -51,9 +51,11 @@ prints a licence banner on container startup that would otherwise contaminate
 the redirected stdout. The committed `requirements.lock.txt` is the unedited
 in-container freeze.
 
-## Development loop
+## Validation and development loop
 
 ```bash
+ISAC_DEV=1 scripts/drun.sh python -m isac_verify validate \
+  --config configs/pilot.yaml --require-h100 --phase5-output results/phase5
 ISAC_DEV=1 scripts/drun.sh python -m pytest -q tests
 ```
 
