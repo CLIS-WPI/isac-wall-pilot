@@ -126,6 +126,81 @@ def build_material_reference(config: PilotConfig) -> dict[str, Any]:
     }
 
 
+
+
+def slab_coefficients(
+    config: PilotConfig, angle_deg: float, thickness_m: float | None = None
+) -> dict[str, Any]:
+    wall = config.section("wall")
+    frequency_hz = float(wall["reference_frequency_hz"])
+    if frequency_hz != config.frequency_hz:
+        raise MaterialError(
+            "wall reference frequency does not match the configured carrier"
+        )
+    if wall["material_model"] != "sionna_slab":
+        raise MaterialError(f"unsupported material model {wall['material_model']!r}")
+    thickness = (
+        float(wall["thickness_m"]) if thickness_m is None else float(thickness_m)
+    )
+    if thickness <= 0.0:
+        raise MaterialError("wall thickness must be positive")
+    omega = 2.0 * math.pi * frequency_hz
+    eta = complex_relative_permittivity(
+        mi.Float(float(wall["relative_permittivity"])),
+        mi.Float(float(wall["conductivity_s_per_m"])),
+        mi.Float(omega),
+    )
+    cos_theta = math.cos(math.radians(float(angle_deg)))
+    r_te, r_tm, t_te, t_tm = itu_coefficients_single_layer_slab(
+        mi.Float(cos_theta),
+        eta,
+        mi.Float(thickness),
+        mi.Float(config.wavelength_m),
+    )
+    return {
+        "incidence_angle_deg": float(angle_deg),
+        "incidence_angle_from_normal_deg": float(angle_deg),
+        "cos_theta": cos_theta,
+        "sin_theta": math.sin(math.radians(float(angle_deg))),
+        "thickness_m": thickness,
+        "r_te": _coefficient_entry(r_te),
+        "r_tm": _coefficient_entry(r_tm),
+        "t_te": _coefficient_entry(t_te),
+        "t_tm": _coefficient_entry(t_tm),
+    }
+
+
+def build_wall_thickness_stress(config: PilotConfig) -> dict[str, Any]:
+    thicknesses = [
+        float(value) for value in config.get("stress", "wall_thickness_m")
+    ]
+    if not thicknesses or any(value <= 0.0 for value in thicknesses):
+        raise MaterialError("stress wall thicknesses must be positive")
+    angles = [63.435, 45.0]
+    entries = []
+    for thickness in thicknesses:
+        for angle in angles:
+            entry = slab_coefficients(config, angle, thickness)
+            entries.append(entry)
+    return {
+        "label": "follow-up wall-thickness stress; not the BRIEF baseline",
+        "baseline_thickness_m": float(config.get("wall", "thickness_m")),
+        "angles_deg": angles,
+        "thicknesses_m": thicknesses,
+        "entries": entries,
+        "material": {
+            "relative_permittivity": float(
+                config.get("wall", "relative_permittivity")
+            ),
+            "conductivity_s_per_m": float(
+                config.get("wall", "conductivity_s_per_m")
+            ),
+            "frequency_hz": config.frequency_hz,
+            "wavelength_m": config.wavelength_m,
+        },
+    }
+
+
 def write_material_reference(
     config: PilotConfig, output_path: str | Path | None = None
 ) -> dict[str, Any]:

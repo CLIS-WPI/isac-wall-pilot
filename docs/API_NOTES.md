@@ -828,3 +828,57 @@ torch.complex64 torch.complex128 8.310603334393818e-06 8.66097007216447e-06
   dominated by roundoff in the per-element complex64 path coefficients, their
   array phases, and the calibrated gain product. It remains well inside the
   declared `1e-3` Sionna tolerance; no tolerance was changed.
+
+## Phase 4 — finite-wall scene, path, and background facts
+
+All facts below were executed in the Phase 4 container. The nominal target
+scene used `RCSSolver(deterministic=True)` with `max_depth=2`,
+`synthetic_array=True`, `los=True`, `specular_reflection=True`,
+`refraction=False`, and the configured seed; the background scenes used the
+corresponding `PathSolver` with the same specular-only flags plus
+`diffraction=False` and `diffuse_reflection=False`.
+
+```python
+ps = solve_target_paths(config, max_depth=2)
+print(np.asarray(ps.paths.valid).shape, np.asarray(ps.paths.a[0]).shape,
+      np.asarray(ps.paths.tau).shape, np.asarray(ps.paths.interactions).shape,
+      np.asarray(ps.paths.vertices).shape)
+print({k: int(v.object_id) for k, v in ps.scene.scene.objects.items()})
+for r in path_records(ps, scene_label="x"):
+    print(r["family"], r["interaction_names"], r["object_names"],
+          r["delay_ns"], r["aod_deg"], r["aoa_deg"], r["amplitude"])
+```
+
+```
+valid (1, 1, 5) a (1, 16, 1, 16, 5) tau (1, 1, 5) inter (2, 1, 1, 5) verts (2, 1, 1, 5, 3)
+object_ids {'positive_wall': 1, 'negative_wall': 2, 'candidate': 3}
+direct ['SENSING'] ['candidate'] 400.2769173894194 0.0 0.0 5.341158271221502e-07
+outgoing_wall_negative_wall ['SPECULAR', 'SENSING'] ['negative_wall', 'candidate'] 423.90004750814114 -26.56476593017578 0.0 3.4085442734976823e-07
+outgoing_wall_positive_wall ['SPECULAR', 'SENSING'] ['positive_wall', 'candidate'] 423.90004750814114 26.56476402282715 0.0 3.408543989280588e-07
+reciprocal_wall_negative_wall ['SENSING', 'SPECULAR'] ['candidate', 'negative_wall'] 423.90004750814114 0.0 -26.56476593017578 3.408491409118142e-07
+reciprocal_wall_positive_wall ['SENSING', 'SPECULAR'] ['candidate', 'positive_wall'] 423.90004750814114 0.0 26.56476402282715 3.408489703815576e-07
+```
+
+- With `synthetic_array=True`, `Paths.a` has no time axis in this call:
+  shape `(num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths)`.
+  `Paths.tau` and the target `valid` mask are `(num_rx, num_tx, num_paths)`.
+  `Paths.cir` is the API that adds the time axis.
+- RCSSolver `interactions` pad every path to `max_depth` with `NONE=0`; filter
+  those entries, not only the `valid` mask, when extracting interaction points.
+  `InteractionType` is an enum-like binding but `InteractionType(value)` is not
+  constructible in this version; use the integer values
+  `NONE=0, SPECULAR=1, DIFFUSE=2, REFRACTION=4, DIFFRACTION=8, SENSING=16`.
+- In the target scene, `objects` stores the wall object ID for `SPECULAR` and
+  the invalid sentinel for `SENSING`, so use the interaction names plus the
+  object map to classify outgoing (`SPECULAR>SENSING`) and reciprocal
+  (`SENSING>SPECULAR`) paths.
+- Relay `PathSolver` at `max_depth=2` returned five valid paths in each
+  direction: direct `100.069229 ns`, two single-wall paths at
+  `141.519251 ns` with downlink AoD `±45.000°`, and two
+  positive↔negative-wall double-bounce paths at `223.761589 ns`.
+- The absorber blocker was a `cube` transformed with
+  `translate @ rotate(z, azimuth) @ scale(thickness/2, width/2, height/2)`
+  and assigned `AbsorberRadioMaterial`. At center `[45, 7.5, 2] m` it removed
+  the positive-wall outgoing and reciprocal paths, reducing the valid target
+  path count from `5` to `3`, with no new path. This is a physical
+  recomputation, not path deletion.

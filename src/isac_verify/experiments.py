@@ -1,9 +1,10 @@
-"""Experiment A orchestration and Phase 3 validation.
+"""Experiment A orchestration and Phase 3/4 validation.
 
 Experiment A is a matched LoS negative control.  The analytical and Sionna
 channels are compared after the same beam weights, with no per-link
 normalization and with absolute delays.  The validation command also rechecks
-the Phase 2 material, geometry, beam, and waveform references.
+the Phase 2 material, geometry, beam, and waveform references and the Phase 4
+finite-wall scene and path invariants.
 """
 
 from __future__ import annotations
@@ -704,10 +705,275 @@ def _figure(
     plt.close(figure)
 
 
+def phase4_diagnostics(
+    config: PilotConfig, output_path: str | Path = "results/phase4"
+) -> dict[str, Any]:
+    from .wall_paths import write_phase4_outputs
+
+    data = write_phase4_outputs(config, Path(output_path))
+    nominal = data["nominal"]
+    background = data["background"]
+    convergence = data["convergence"]
+    blocked = data["blocked"]
+    twin = data["twin"]
+    d8 = data["d8"]
+
+    core = nominal["core_paths"]
+    expected_core = {
+        "direct",
+        "outgoing_wall_positive_wall",
+        "outgoing_wall_negative_wall",
+        "reciprocal_wall_positive_wall",
+        "reciprocal_wall_negative_wall",
+    }
+    comparisons = nominal["outgoing_wall_comparisons"]
+    image_checks = all(
+        abs(item["delay_error_ns"]) <= 1e-3
+        and abs(item["aod_error_deg"]) <= 1e-2
+        and abs(item["aoa_error_deg"]) <= 1e-6
+        and item["reflection_point_error_m"] <= 1e-3
+        for item in comparisons
+    )
+    amplitude_checks = all(
+        abs(item["amplitude_relative_error"]) <= 1e-3 for item in comparisons
+    )
+    reciprocity_checks = True
+    for item in comparisons:
+        side = item["wall"]
+        outgoing = item["measured"]
+        reciprocal = core[f"reciprocal_wall_{side}"][0]
+        reciprocity_checks = reciprocity_checks and (
+            abs(reciprocal["delay_ns"] - outgoing["delay_ns"]) <= 1e-6
+            and abs(reciprocal["aod_deg"]) <= 1e-6
+            and abs(
+                reciprocal["aoa_deg"] - item["image_method"]["aod_deg"]
+            )
+            <= 1e-2
+            and abs(
+                reciprocal["amplitude"] - outgoing["amplitude"]
+            )
+            <= 1e-4 * outgoing["amplitude"]
+        )
+
+    clutter = background["monostatic_wall_clutter"]
+    clutter_checks = len(clutter) == 2 and all(
+        abs(item["delay_error_ns"]) <= 1e-3
+        and abs(item["aod_error_deg"]) <= 1e-2
+        and abs(item["aoa_error_deg"]) <= 1e-2
+        and item["reflection_point_error_m"] <= 1e-3
+        for item in clutter
+    )
+    relay_wall = [
+        item
+        for item in background["relay_links"]
+        if item["family"].startswith("wall_clutter_")
+    ]
+    downlink_wall = [
+        item for item in relay_wall if item["direction"] == "downlink"
+    ]
+    relay_checks = (
+        len(downlink_wall) == 2
+        and all(
+            abs(item["delay_error_ns"]) <= 1e-3
+            and abs(item["aod_error_deg"]) <= 1e-2
+            and item["reflection_point_error_m"] <= 1e-3
+            for item in relay_wall
+        )
+        and sorted(round(item["aod_deg"], 3) for item in downlink_wall)
+        == [-45.0, 45.0]
+    )
+    summaries = convergence["summaries"]
+    path_counts = [item["path_count"] for item in summaries]
+    convergence_checks = (
+        int(config.get("scene", "nominal_depth")) == 2
+        and path_counts[0] == 1
+        and path_counts[1] == 5
+        and all(
+            later >= earlier
+            for earlier, later in zip(path_counts, path_counts[1:])
+        )
+        and abs(summaries[-1]["total_power_change_fraction"]) <= 1e-2
+    )
+    blocked_checks = (
+        blocked["positive_outgoing_present"] is False
+        and blocked["positive_reciprocal_present"] is False
+        and blocked["negative_outgoing_present"] is True
+        and set(blocked["removed_families"])
+        == {
+            "outgoing_wall_positive_wall",
+            "reciprocal_wall_positive_wall",
+        }
+        and blocked["blocked_path_count"] < blocked["unblocked_path_count"]
+        and blocked["new_paths"] == []
+    )
+    twin_checks = all(
+        abs(row["rt_delay_shift_ns"] - row["image_delay_shift_ns"]) <= 1e-3
+        and abs(row["rt_aod_shift_deg"] - row["image_aod_shift_deg"]) <= 1e-2
+        and abs(row["image_twin_vs_rt_twin_delay_ns"]) <= 1e-3
+        and abs(row["image_twin_vs_rt_twin_aod_deg"]) <= 1e-2
+        and row["image_delay_shift_ns"] > 0.0
+        for row in twin["rows"]
+    )
+    d8_checks = (
+        d8["thicknesses_m"] == [0.05, 0.10, 0.20]
+        and d8["angles_deg"] == [63.435, 45.0]
+        and len(d8["entries"]) == 6
+        and d8["baseline_thickness_m"]
+        == float(config.get("wall", "thickness_m"))
+    )
+    checks = {
+        "phase4_finite_wall_paths": set(core) == expected_core,
+        "phase4_image_method": image_checks,
+        "phase4_amplitude": amplitude_checks,
+        "phase4_reciprocity": reciprocity_checks,
+        "phase4_background_clutter": clutter_checks,
+        "phase4_relay_wall": relay_checks,
+        "phase4_depth_convergence": convergence_checks,
+        "phase4_blocked_path": blocked_checks,
+        "phase4_twin_shift": twin_checks,
+        "phase4_d8_reference": d8_checks,
+    }
+    status = "PASS" if all(checks.values()) else "FAIL"
+    summary = {
+        "status": status,
+        "checks": checks,
+        "outputs": {
+            "paths_diagnostic": str(Path(output_path) / "paths_diagnostic.parquet"),
+            "geometry_reference": str(Path(output_path) / "geometry_reference.json"),
+        },
+        "finite_wall_reflection": {
+            "core_paths": core,
+            "outgoing_wall_comparisons": comparisons,
+        },
+        "background": {
+            "monostatic_wall_clutter": clutter,
+            "relay_wall_paths": relay_wall,
+            "all_relay_links": background["relay_links"],
+        },
+        "depth_convergence": summaries,
+        "blocked": {
+            "blocker": blocked["blocker_scene_metadata"],
+            "unblocked_path_count": blocked["unblocked_path_count"],
+            "blocked_path_count": blocked["blocked_path_count"],
+            "removed_families": blocked["removed_families"],
+            "new_paths": blocked["new_paths"],
+        },
+        "twin": {
+            "epsilon_plus_m": twin["epsilon_plus_m"],
+            "epsilon_minus_m": twin["epsilon_minus_m"],
+            "rows": twin["rows"],
+            "wall_geometry": twin["wall_geometry"],
+        },
+        "d8_wall_thickness": d8,
+        "labels": {
+            "d8": "follow-up wall-thickness stress; not the BRIEF baseline",
+            "background": (
+                "monostatic self-link is diagnostic only; D6 ideal isolation "
+                "still excludes direct gNB leakage from the experiment"
+            ),
+        },
+    }
+    (Path(output_path) / "phase4_summary.json").write_text(
+        json.dumps(_jsonable(summary), indent=2) + "\n", encoding="utf-8"
+    )
+    return summary
+
+
+def _print_phase4_tables(phase4: dict[str, Any]) -> None:
+    print("Phase 4 finite-wall target paths:")
+    print(
+        "wall              kind         delay_ns     AoD_deg    AoA_deg"
+        "    |a|          interactions"
+    )
+    core = phase4["finite_wall_reflection"]["core_paths"]
+    for family in (
+        "direct",
+        "outgoing_wall_positive_wall",
+        "reciprocal_wall_positive_wall",
+        "outgoing_wall_negative_wall",
+        "reciprocal_wall_negative_wall",
+    ):
+        for record in core[family]:
+            print(
+                f"{family:17s} {record['path_signature']:12s} "
+                f"{record['delay_ns']:10.6f} {record['aod_deg']:10.6f} "
+                f"{record['aoa_deg']:10.6f} {record['amplitude']:.6e} "
+                f"{'>'.join(record['interaction_names'])}"
+            )
+    print("Phase 4 finite-wall image-method comparisons:")
+    print(
+        "wall              delay_err_ns  AoD_err_deg  AoA_err_deg"
+        "  point_err_m  amplitude_rel_err"
+    )
+    for item in phase4["finite_wall_reflection"]["outgoing_wall_comparisons"]:
+        print(
+            f"{item['wall']:17s} {item['delay_error_ns']:12.6e} "
+            f"{item['aod_error_deg']:12.6e} {item['aoa_error_deg']:12.6e} "
+            f"{item['reflection_point_error_m']:12.6e} "
+            f"{item['amplitude_relative_error']:12.6e}"
+        )
+    print("Phase 4 monostatic wall clutter:")
+    print("wall              delay_ns     AoD_deg    AoA_deg")
+    for item in phase4["background"]["monostatic_wall_clutter"]:
+        print(
+            f"{item['family']:17s} {item['delay_ns']:10.6f} "
+            f"{item['aod_deg']:10.6f} {item['aoa_deg']:10.6f}"
+        )
+    print("Phase 4 relay wall paths:")
+    print("direction  wall              delay_ns     AoD_deg    AoA_deg")
+    for item in phase4["background"]["relay_wall_paths"]:
+        print(
+            f"{item['direction']:9s} {item['family']:17s} "
+            f"{item['delay_ns']:10.6f} {item['aod_deg']:10.6f} "
+            f"{item['aoa_deg']:10.6f}"
+        )
+    print("Phase 4 depth convergence:")
+    print("depth  paths  total_power_W  power_change_fraction  families")
+    for item in phase4["depth_convergence"]:
+        fraction = item.get("total_power_change_fraction")
+        print(
+            f"{item['max_depth']:5d} {item['path_count']:6d} "
+            f"{item['total_path_power_w']:.6e} "
+            f"{'n/a' if fraction is None else f'{fraction:.6e}':>21s} "
+            f"{item['family_counts']}"
+        )
+    print("Phase 4 blocked contribution:")
+    print(
+        f"blocker={phase4['blocked']['blocker']['name']} "
+        f"center={phase4['blocked']['blocker']['center_m']}"
+    )
+    print(
+        f"paths {phase4['blocked']['unblocked_path_count']} -> "
+        f"{phase4['blocked']['blocked_path_count']}; "
+        f"removed={phase4['blocked']['removed_families']}; "
+        f"new={len(phase4['blocked']['new_paths'])}"
+    )
+    print("Phase 4 twin sweep:")
+    print(
+        "wall              image_delay_shift_ns  rt_delay_shift_ns"
+        "  image_AoD_shift_deg  rt_AoD_shift_deg"
+    )
+    for item in phase4["twin"]["rows"]:
+        print(
+            f"{item['wall']:17s} {item['image_delay_shift_ns']:20.9f} "
+            f"{item['rt_delay_shift_ns']:17.9f} "
+            f"{item['image_aod_shift_deg']:20.9f} "
+            f"{item['rt_aod_shift_deg']:16.9f}"
+        )
+    print("Phase 4 D8 wall-thickness stress (follow-up, not baseline):")
+    print("thickness_m  angle_deg  |r_TE|      |r_TM|")
+    for item in phase4["d8_wall_thickness"]["entries"]:
+        print(
+            f"{item['thickness_m']:11.3f} {item['incidence_angle_deg']:9.3f} "
+            f"{item['r_te']['magnitude']:.6f} {item['r_tm']['magnitude']:.6f}"
+        )
+
+
 def run_validation(
     config_path: str | Path,
     require_h100: bool,
     output_path: str | Path = "results/validate",
+    phase4_output_path: str | Path = "results/phase4",
 ) -> int:
     config = PilotConfig.load(config_path)
     output = Path(output_path)
@@ -719,6 +985,7 @@ def run_validation(
     delays = delay_checks(config, experiment)
     noise = noise_comparison(config, experiment)
     ratio_noise = ratio_noise_comparison(config, experiment)
+    phase4 = phase4_diagnostics(config, phase4_output_path)
     c128_tolerance = float(
         config.get("experiment_a", "analytical_c128_tolerance")
     )
@@ -745,6 +1012,7 @@ def run_validation(
             experiment.calibration.rx_steering_max_relative_difference
             <= c64_tolerance
         ),
+        **phase4["checks"],
     }
     status = "PASS" if all(checks.values()) else "FAIL"
     summary = {
@@ -755,6 +1023,11 @@ def run_validation(
             "self_link": "excluded from background computations",
             "assumption": "ideal gNB TX/RX isolation; direct leakage cancelled",
             "relay_links": "gNB-to-relay and relay-to-gNB solved separately",
+            "phase4_diagnostic_note": (
+                "monostatic finite-wall self-link solved only to expose "
+                "background clutter; the D6 ideal-isolation model still "
+                "excludes direct gNB leakage from the experiment"
+            ),
         },
         "phase2": phase2,
         "experiment_a": {
@@ -829,6 +1102,7 @@ def run_validation(
                 "proper-complex noise records"
             ),
         },
+        "phase4": phase4,
         "noise": {
             "variance_w": noise.variance_w,
             "relay_variance_w": noise.relay_variance_w,
@@ -925,7 +1199,12 @@ def run_validation(
         f"{noise.variance_w:.6e} W, measured floor ratio "
         f"{noise.floor_ratio:.6f}"
     )
+    print(f"phase 4 status: {phase4['status']}")
+    _print_phase4_tables(phase4)
     print(f"wrote {output / 'validation_summary.json'}")
+    print(f"wrote {Path(phase4_output_path) / 'phase4_summary.json'}")
+    print(f"wrote {Path(phase4_output_path) / 'paths_diagnostic.parquet'}")
+    print(f"wrote {Path(phase4_output_path) / 'geometry_reference.json'}")
     print(f"wrote {output / 'experiment_a.png'}")
     print(f"wrote {output / 'experiment_a.pdf'}")
     if status != "PASS":

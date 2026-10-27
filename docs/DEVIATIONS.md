@@ -148,3 +148,32 @@ Each entry: what changed, why, and which BRIEF section it affects.
   relay average transmit power `8.841942352730346e-7 W` against the
   `0.01 W` cap (feasible). The corresponding target and matched-relay CFRs
   agreed to `8.310603e-6` maximum relative error over the 70 beam actions and every RX element. The target and relay RX steering vectors differed by `1.201e-07` relative L2 difference.
+
+## D8 — Wall-thickness sensitivity is a labelled follow-up stress test
+
+- **Type:** labelled follow-up stress test, not the BRIEF baseline.
+- **What:** The baseline wall remains the Sionna default finite-thickness slab
+  at `0.10000000149011612 m` from D2. A separate diagnostic sweeps
+  `stress.wall_thickness_m` over `[0.05, 0.10, 0.20] m` and evaluates
+  `r_TE` and `r_TM` at `63.435` degrees from the inward normal for the
+  target-wall path and `45` degrees for the relay-wall path. It does not
+  change the nominal scene, beam design, gate, or any Experiment B result.
+- **Why:** The wall thickness is a fixed controlled parameter in the baseline,
+  but a finite slab can show non-monotonic reflection behaviour from internal
+  interference. Recording the sensitivity separately prevents an unreported
+  material degree of freedom from being mistaken for the baseline.
+- **BRIEF section:** §5.1 nominal physical scene; §7.1 actual Sionna
+  components; §8.2 material-error stress separation.
+- **Phase 4 evidence:** The executed reference in
+  `results/phase4/geometry_reference.json` and `phase4_summary.json` gives:
+
+| thickness (m) | angle (deg) | \|r_TE\| | \|r_TM\| |
+| ---: | ---: | ---: | ---: |
+| 0.05 | 63.435 | 0.862327 | 0.075650 |
+| 0.05 | 45.000 | 0.758609 | 0.435581 |
+| 0.10 | 63.435 | 0.713500 | 0.047439 |
+| 0.10 | 45.000 | 0.231671 | 0.100727 |
+| 0.20 | 63.435 | 0.786926 | 0.063325 |
+| 0.20 | 45.000 | 0.361320 | 0.166744 |
+
+  The baseline row is `0.10 m`; it is not used to tune any decision threshold.
