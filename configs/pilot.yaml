@@ -120,6 +120,13 @@ scene:
   wall_dimension_tolerance_m: 1.0e-4
   phase4_max_depth: [1, 2, 3, 4]
   nominal_depth: 2
+  d9_path_power_relative_tolerance: 0.01
+  d9_require_relay_double_bounce: true
+  d9_depths:
+    target: 3
+    background: 2
+    downlink: 2
+    uplink: 2
   blocker:
     name: wall_path_absorber
     width_m: 4.0
@@ -429,3 +436,8 @@ decisions:
     brief_section: "7.4,11.1"
     choice: evaluator_side_actual_path_matched_relay_calibration
     config_key: experiment_a
+  D9:
+    type: interpretation
+    brief_section: "7.1,7.2,15"
+    choice: per_link_depth_at_one_percent_power_change_with_relay_double_bounce
+    config_key: scene.d9_depths

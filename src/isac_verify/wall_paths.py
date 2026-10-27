@@ -259,6 +259,8 @@ def _path_family(names: Sequence[str], objects: Sequence[str]) -> str:
         return f"reciprocal_wall_{objects[1]}"
     if len(compact) == 1 and compact[0] == "SPECULAR":
         return f"wall_clutter_{objects[0]}"
+    if compact and all(name == "SPECULAR" for name in compact):
+        return "multi_bounce_" + "_".join(objects)
     if not compact:
         return "los"
     return "other"
@@ -441,6 +443,238 @@ def depth_convergence(config: PilotConfig) -> dict[str, Any]:
             "total_path_power_w sums |a_tx0_rx0|^2 over every valid RCS path at "
             "the reported maximum depth; duplicated high-depth paths are "
             "retained because they are present in the solver output"
+        ),
+    }
+
+
+def _same_vertex_set(
+    first: Sequence[Sequence[float]],
+    second: Sequence[Sequence[float]],
+    *,
+    tolerance_m: float = 1.0e-3,
+) -> bool:
+    if len(first) != len(second):
+        return False
+    for point_a, point_b in zip(first, second):
+        if len(point_a) != len(point_b):
+            return False
+        if any(
+            abs(float(a) - float(b)) > tolerance_m
+            for a, b in zip(point_a, point_b)
+        ):
+            return False
+    return True
+
+
+def duplicate_path_groups(
+    records: Sequence[dict[str, Any]],
+    *,
+    tolerance_m: float = 1.0e-3,
+) -> list[list[int]]:
+    """Group records with identical interactions, objects, and 1 mm vertices."""
+    buckets: dict[tuple[Any, ...], list[int]] = {}
+    for index, record in enumerate(records):
+        key = (
+            tuple(record["interaction_types"]),
+            tuple(record["object_ids"]),
+        )
+        buckets.setdefault(key, []).append(index)
+    groups: list[list[int]] = []
+    for indices in buckets.values():
+        clusters: list[list[int]] = []
+        for index in indices:
+            for cluster in clusters:
+                if _same_vertex_set(
+                    records[index]["vertex_points_m"],
+                    records[cluster[0]]["vertex_points_m"],
+                    tolerance_m=tolerance_m,
+                ):
+                    cluster.append(index)
+                    break
+            else:
+                clusters.append([index])
+        groups.extend(cluster for cluster in clusters if len(cluster) > 1)
+    return groups
+
+
+def _duplicate_summary(
+    label: str,
+    path_set: PathSet,
+    records: Sequence[dict[str, Any]],
+) -> dict[str, Any]:
+    groups = duplicate_path_groups(records)
+    duplicate_indices = {index for group in groups for index in group}
+    duplicate_power = sum(
+        records[index]["path_power_w"] for index in duplicate_indices
+    )
+    total_power = sum(record["path_power_w"] for record in records)
+    return {
+        "label": label,
+        "max_depth": path_set.max_depth,
+        "path_count": len(records),
+        "unique_path_count": len(records) - sum(len(group) - 1 for group in groups),
+        "duplicate_group_count": len(groups),
+        "duplicate_path_count": len(duplicate_indices),
+        "extra_copy_count": sum(len(group) - 1 for group in groups),
+        "duplicate_power_w": float(duplicate_power),
+        "total_power_w": float(total_power),
+        "duplicate_power_fraction": (
+            float(duplicate_power / total_power) if total_power > 0.0 else 0.0
+        ),
+        "groups": [
+            [
+                {
+                    "path_index": records[index]["path_index"],
+                    "delay_ns": records[index]["delay_ns"],
+                    "amplitude": records[index]["amplitude"],
+                    "interaction_names": records[index]["interaction_names"],
+                    "object_names": records[index]["object_names"],
+                }
+                for index in group
+            ]
+            for group in groups
+        ],
+    }
+
+
+def duplicate_path_diagnostics(config: PilotConfig) -> dict[str, Any]:
+    """P1 duplicate-path audit for target, background, and relay links."""
+    specs = (
+        ("target", lambda depth: solve_target_paths(config, max_depth=depth)),
+        (
+            "background_monostatic",
+            lambda depth: solve_background_paths(
+                config, direction="monostatic", max_depth=depth
+            ),
+        ),
+        (
+            "downlink",
+            lambda depth: solve_background_paths(
+                config, direction="downlink", max_depth=depth
+            ),
+        ),
+        (
+            "uplink",
+            lambda depth: solve_background_paths(
+                config, direction="uplink", max_depth=depth
+            ),
+        ),
+    )
+    entries = []
+    for label, solve in specs:
+        for depth in (3, 4):
+            path_set = solve(depth)
+            records = path_records(
+                path_set, scene_label=f"{label}_duplicate_depth_{depth}"
+            )
+            entries.append(_duplicate_summary(label, path_set, records))
+    return {
+        "vertex_tolerance_m": 1.0e-3,
+        "depths": [3, 4],
+        "entries": entries,
+        "total_duplicate_groups": sum(
+            entry["duplicate_group_count"] for entry in entries
+        ),
+        "source_finding": (
+            "RCSSolver._pair_legs forms the Cartesian product of the "
+            "transmitter-side and receiver-side legs, keeps pairs that share "
+            "a scattering point and satisfy depth <= max_depth, and applies "
+            "no vertex-set duplicate removal. PathsBuffer.chain then combines "
+            "each selected TX-side/RX-side leg into one path and also performs "
+            "no deduplication. Any duplicate geometry enumerated by the "
+            "solver therefore remains a separate coefficient in Paths.a and "
+            "in the CIR sum. This is the installed-source behavior, not an "
+            "inferred intent."
+        ),
+    }
+
+
+def _depth_table(
+    config: PilotConfig,
+    *,
+    name: str,
+    solve: Any,
+) -> dict[str, Any]:
+    depths = [int(value) for value in config.get("scene", "phase4_max_depth")]
+    rows = []
+    for depth in depths:
+        path_set = solve(depth)
+        records = path_records(path_set, scene_label=f"{name}_depth_{depth}")
+        rows.append(
+            {
+                "max_depth": depth,
+                "path_count": len(records),
+                "total_path_power_w": float(
+                    sum(record["path_power_w"] for record in records)
+                ),
+                "families": sorted({record["family"] for record in records}),
+            }
+        )
+    for index in range(1, len(rows)):
+        previous = rows[index - 1]["total_path_power_w"]
+        current = rows[index]["total_path_power_w"]
+        rows[index]["power_change_w"] = current - previous
+        rows[index]["power_change_fraction"] = (
+            (current - previous) / previous if previous > 0.0 else None
+        )
+    return {"name": name, "depths": depths, "rows": rows}
+
+
+def depth_power_decision(config: PilotConfig) -> dict[str, Any]:
+    """P2/D9 per-link depth decision based on the next depth's power change."""
+    tolerance = float(config.get("scene", "d9_path_power_relative_tolerance"))
+    specs = {
+        "target": lambda depth: solve_target_paths(config, max_depth=depth),
+        "background": lambda depth: solve_background_paths(
+            config, direction="monostatic", max_depth=depth
+        ),
+        "downlink": lambda depth: solve_background_paths(
+            config, direction="downlink", max_depth=depth
+        ),
+        "uplink": lambda depth: solve_background_paths(
+            config, direction="uplink", max_depth=depth
+        ),
+    }
+    tables = {
+        name: _depth_table(config, name=name, solve=solve)
+        for name, solve in specs.items()
+    }
+    selected: dict[str, int | None] = {}
+    for name, table in tables.items():
+        chosen = None
+        for index in range(len(table["rows"]) - 1):
+            fraction = table["rows"][index + 1]["power_change_fraction"]
+            if fraction is not None and abs(fraction) < tolerance:
+                chosen = int(table["rows"][index]["max_depth"])
+                break
+        selected[name] = chosen
+    required_relay_double_bounce = bool(
+        config.get("scene", "d9_require_relay_double_bounce")
+    )
+    if required_relay_double_bounce:
+        for name in ("downlink", "uplink"):
+            if selected[name] is None or selected[name] < 2:
+                selected[name] = 2
+    configured = {
+        name: int(config.get("scene", "d9_depths", name))
+        for name in ("target", "background", "downlink", "uplink")
+    }
+    if selected != configured:
+        raise WallPathError(
+            "computed D9 depths "
+            f"{selected} do not match configured {configured}"
+        )
+    return {
+        "tolerance": tolerance,
+        "require_relay_double_bounce": required_relay_double_bounce,
+        "selected_depths": selected,
+        "tables": tables,
+        "note": (
+            "The relay D9 is raised to 2 when the strict first under-tolerance "
+            "depth is 1, so that first-order wall paths and the two "
+            "wall-wall double-bounce paths are all retained for Phase 5. "
+            "The depth-2 to depth-3 power change remains below the declared "
+            "tolerance."
         ),
     }
 
@@ -739,6 +973,8 @@ def write_phase4_outputs(config: PilotConfig, output: Path) -> dict[str, Any]:
     all_records.extend(background["downlink_all_paths"])
     all_records.extend(background["uplink_all_paths"])
     convergence = depth_convergence(config)
+    duplicates = duplicate_path_diagnostics(config)
+    depth_decision = depth_power_decision(config)
     blocked = blocked_scene_diagnostics(config)
     all_records.extend(blocked["unblocked_records"])
     all_records.extend(blocked["blocked_records"])
@@ -754,6 +990,15 @@ def write_phase4_outputs(config: PilotConfig, output: Path) -> dict[str, Any]:
         "target_nominal": nominal,
         "background": background,
         "depth_convergence": convergence,
+        "duplicate_path_audit": duplicates,
+        "d9_depth_decision": depth_decision,
+        "delay_coincidence_note": (
+            "At background depth 4, the four-bounce wall-wall monostatic "
+            "clutter path is at 120 m and 400.276917 ns, delay-coincident "
+            "with the direct target return (AoA +/-90 deg vs 0 deg). It is "
+            "not present at the selected background D9=2; it appears only at "
+            "depth 4."
+        ),
         "blocked_scene": {
             key: value
             for key, value in blocked.items()
@@ -778,6 +1023,8 @@ def write_phase4_outputs(config: PilotConfig, output: Path) -> dict[str, Any]:
         "twin": twin,
         "material": material,
         "d8": geometry["d8_wall_thickness"],
+        "duplicates": duplicates,
+        "depth_decision": depth_decision,
         "records": all_records,
     }
 

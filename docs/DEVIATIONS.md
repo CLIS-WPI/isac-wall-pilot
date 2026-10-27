@@ -177,3 +177,30 @@ Each entry: what changed, why, and which BRIEF section it affects.
 | 0.20 | 45.000 | 0.361320 | 0.166744 |
 
   The baseline row is `0.10 m`; it is not used to tune any decision threshold.
+
+## D9 — Per-link D9 depth uses 1% power convergence, with a relay double-bounce requirement
+
+- **Type:** interpretation.
+- **What:** Phase 5 uses `target=3`, `background=2`, `downlink=2`, `uplink=2`.
+  The declared rule is the first depth whose next-depth total path power
+  changes by less than `1%`. For the relay links, depth is raised to at least
+  `2` because the threat model must retain the first-order wall paths and the
+  two wall-wall double-bounce paths, not only the direct path.
+- **Why:** The strict per-link rule gives relay depth `1` (`downlink`
+  `d1->d2 = 0.0033771`, `uplink = 0.0033771`), but a depth-1 relay would
+  discard the wall-return paths needed for the two-action wall test. At depth
+  `2`, `d2->d3` is `0.0005584` for both relay links, still below `1%`.
+  Target depth `3` has `d3->d4 = 0.0014610`; background depth `2` has
+  `d2->d3 = 0.0037175`. Both are below `1%`.
+- **BRIEF section:** §7.1 actual Sionna components; §7.2 received-signal
+  model; §15 required validation tests.
+- **Phase 5 evidence:** `results/phase4/geometry_reference.json` and
+  `results/phase5/phase5_summary.json` contain the executed depth tables and
+  `selected_depths`; `depth_power_decision` raises if the configured depths
+  differ from the computed depths. The P1 duplicate audit found no duplicate
+  paths at depths 3 or 4, so no D10 deduplication entry is needed.
+
+The selected background depth `2` also excludes the depth-4 four-bounce
+wall-wall monostatic clutter at `400.2769173894194 ns`; that path appears only
+at depth 4 and is delay-coincident with the direct target return. It is
+recorded as a diagnostic, not used in the selected Phase 5 background.
