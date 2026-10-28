@@ -411,3 +411,65 @@ changes.** All stresses use `phase8.frozen` without retuning (A3.3).
     that level's rows, as in A3.1. A prediction is reported as *matched* when
     the point estimate moves in the stated direction (strictly), with the
     interval reported beside it. Stress results carry no GO/NO-GO label.
+
+## Amendment 6 — 2026-10-28
+
+Written after block 1 (bandwidth) was reported and versioned
+(`docs/results/phase8c/`), and before any block 2 (standoff sweep) code was
+written or any block 2 trial was generated, solved or run. **No threshold,
+gate, primary rule, decision criterion, frozen config value, earlier label or
+earlier prediction outcome changes.** Block 1 prediction A5.1(b) at `bw61`
+stays NOT matched.
+
+- **A6.1 Exploratory note on block 1 (exploratory, post hoc).** For all 24
+  held-out geometries, compute the angular ratio `Delta_phi_W / HPBW_TX`.
+  `Delta_phi_W = phi_W(R_A) - phi_W(R_T)` is the difference of the mixed-path
+  departure angles. `HPBW_TX` is the measured -3 dB width of the primary
+  method's wall beam at `phi_W(R_T)`. Report whether ho_10 and ho_19 are the
+  geometries with `Delta_phi_W / HPBW_TX < 1` (or the smallest ratios). This
+  is a hypothesis check, not a confirmatory result.
+- **A6.2 Pre-registered two-ratio prediction for block 2 (standoff sweep).**
+  - Mapped methods (`imperfect_robust`, `exact_oracle`): replay SUPPORTED is
+    non-negligible only where BOTH `Delta_tau_W / PSF(B) < 1` AND
+    `Delta_phi_W / HPBW_TX < 1`, and near zero where either ratio is `>= 1`.
+  - `mapfree_coarse_to_fine`: replay SUPPORTED_common follows
+    `Delta_tau_W / PSF(B) < 1` alone.
+  - The discriminating level is `Delta_R` about 20 m in the nominal-like
+    geometries, where the angle is resolved but the delay is not. The
+    prediction there is low false support for the mapped methods and high for
+    map-free.
+  - Report the 2x2 table (delay resolved / not x angle resolved / not) with
+    replay rates and geometry-level intervals per method, plus the
+    per-geometry analytical standoffs `Delta_R_tau(B)` and `Delta_R_phi`. The
+    predicted verification radius is `min(Delta_R_tau, Delta_R_phi)`.
+- **Operational notes** (reproducibility only; no additional rule):
+  - *Angles:* `phi_W(R) = atan(2 d / R)` (BRIEF §5.3 image method; it
+    reproduces the Phase 5 reference 26.565 deg at `R = 60`, `2d = 30`). The
+    true geometry is used, evaluator side only.
+  - *HPBW_TX:* the primary wall beam is rebuilt through the unchanged
+    planner (`phase7._plan_for`, `imperfect_robust`), target world,
+    `sigma_map = 0.5`, records 0-7, twin `r mod 2` (the stress grid).
+    `HPBW_TX` is the full -3 dB width of the lobe holding the pattern
+    maximum (0.01 deg grid over [-60, 60] deg), taken as the median over the
+    8 records (min and max reported). As a self-check, the rebuilt beam
+    direction must equal the main run's `beam_phi_deg` on records 0, 1, 4, 5.
+    The same per-geometry `HPBW_TX` is used for both mapped methods and for
+    every `Delta_R`, because the wall beam is planned for the claimed
+    candidate, not the relay (`scripts/phase8c_angular_ratio.py`).
+  - *Standoffs (closed form):*
+    - `Delta_R_tau(B)` solves `u(R_T - Delta_R) - u(R_T) = c * PSF(B)`.
+    - `Delta_R_phi` solves `phi_W(R_T - Delta_R) - phi_W(R_T) = HPBW_TX`.
+    - `PSF(B)` is each geometry's median measured point-spread delay at
+      profile B (block 2 runs the baseline profile).
+  - *Resolved:* a ratio `>= 1`. Block 2 ratios use `R_A = R_T - Delta_R` and
+    that level's measured PSF.
+  - *2x2 cells:* the units are (geometry, `Delta_R`) pairs. The interval is
+    the A4.1 geometry-level bootstrap (10,000 draws, seed 20261027),
+    resampling geometries with all of their rows in that cell.
+  - *Descriptive only:* "non-negligible", "near zero", "low" and "high" get
+    no numeric cut-off. The rates and intervals are reported, plus a
+    per-`Delta_R` table, with `Delta_R = 20 m` shown separately.
+  - *Relay feasibility:* if the re-matched relay at `R_T - Delta_R` is
+    infeasible for a geometry (latency floor, causality or the 10 dBm cap),
+    that (geometry, `Delta_R`) pair is reported as infeasible and not
+    redrawn.
