@@ -614,6 +614,10 @@ phase8:
       records_per_world: 8
       methods: [imperfect_narrow, imperfect_robust, mapfree_coarse_to_fine]
     bandwidth_profiles: [bw246, bw61]
+    # ANALYSIS_PLAN A5.2: relay at R_T - Delta_R (re-matched), baseline profile, own method set.
+    standoff:
+      delta_r_m: [3.0, 6.0, 10.0, 15.0, 20.0, 30.0]
+      methods: [exact_oracle, imperfect_robust, mapfree_coarse_to_fine]
   frozen:
     # Amendment 2 values (scripts/phase8a_amendment2.py on calibration v5). `noise_sigmas` is the
     # rule-3 floor k on rho_W = (E_W - N_W_hat) / N_W_hat, a ratio to the noise energy, not a count of

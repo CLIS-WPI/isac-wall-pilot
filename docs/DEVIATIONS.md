@@ -871,3 +871,23 @@ declared processing choices, not post-hoc tuning.
   2 records on the stress-harness code, baseline config. All 104 non-timing
   columns of the 120 rows are identical (`compare_shards.py`) to the
   calibration v5 shard.
+
+### P8-10 — Stress harness block 2: relay standoff sweep (ANALYSIS_PLAN A5.2)
+
+- **Type:** execution harness only; inactive by default.
+- **What:**
+  - Levels are `standoff_{03,06,10,15,20,30}m` (`phase8.stress.standoff`).
+  - `_run_slots` keeps the accepted held-out geometry, as drawn with its
+    original relay, so `R_T` and `d` are the main run's. It then sets
+    `R_A = R_T - Delta_R` and re-runs `prepare_geometry`, which re-solves the
+    scene and re-matches the relay by the same rule.
+  - An infeasible pair writes an empty shard with the rejection in its
+    metadata; it is not redrawn.
+  - Profile `baseline`; methods exact_oracle, imperfect_robust,
+    mapfree_coarse_to_fine; the A3.3 grid otherwise.
+- **Smoke test** (cal_00, 1 record, calibration split): at 3 m the relay sits
+  at 64.76 m with 20.014 ns added delay (floor 20 ns). At 20 m it sits at
+  47.76 m with 133.4 ns. The infeasible branch was not exercised.
+- **Equivalence evidence** (`results/phase8a_diag/eq_stress2`): cal_00 x 2
+  records on the baseline config. All 104 non-timing columns of the 120 rows
+  are identical to the calibration v5 shard. 71 tests passed.

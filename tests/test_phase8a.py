@@ -86,6 +86,11 @@ def test_stress_config_changes_only_grid_and_level(config: PilotConfig) -> None:
         assert stressed[key] == config.data[key], key
     assert config.get("phase6", "processing", "profile") == "baseline"
     assert "stress_runtime" not in config.section("phase8")
+    standoff = stress_config(config, "standoff_20m").data
+    assert standoff["phase8"]["stress_runtime"]["relay_standoff_m"] == 20.0
+    assert standoff["phase8"]["grid"]["methods"] == ["exact_oracle", "imperfect_robust", "mapfree_coarse_to_fine"]
+    assert standoff["phase6"] == config.data["phase6"] and standoff["rf"] == config.data["rf"]
+    assert stress_config(config, "standoff_03m").data["phase8"]["stress_runtime"]["relay_standoff_m"] == 3.0
 
 
 def test_frozen_decision_reads_only_phase8_frozen(config: PilotConfig) -> None:

@@ -608,6 +608,24 @@ def _run_slots(
             continue
         start = _now()
         geometry, config_g, prepared, rejected = accepted_geometry(config, slot, split)
+        standoff = config.section("phase8").get("stress_runtime", {}).get("relay_standoff_m")
+        if standoff is not None:
+            # A5.2: relay at R_T - Delta_R, re-matched by the same rule; an infeasible pair is logged, not redrawn.
+            geometry = {**geometry, "relay_distance_m": geometry["candidate_distance_m"] - float(standoff)}
+            config_g = geometry_config(config, geometry)
+            prepared = prepare_geometry(config_g)
+            if prepared["rejection"] is not None:
+                pd.DataFrame().to_parquet(shard, index=False)
+                meta_path.write_text(_json_dump({
+                    "geometry": {"geometry_id": geometry_id, "split": split, **geometry,
+                                 "relay_standoff_m": float(standoff),
+                                 "standoff_rejection": prepared["rejection"][0],
+                                 "standoff_rejection_detail": prepared["rejection"][1]},
+                    "rejected": rejected, "rows": 0, "elapsed_s": _now() - start,
+                    "geometry_solve_s": _now() - start, "stage_s": {},
+                }), encoding="utf-8")
+                print(f"{geometry_id}: standoff {standoff} m infeasible ({prepared['rejection'][0]})", flush=True)
+                continue
         solve_s = _now() - start
         geom_timing: dict[str, float] = {}
         frame = run_geometry(
