@@ -473,3 +473,64 @@ stays NOT matched.
     infeasible for a geometry (latency floor, causality or the 10 dBm cap),
     that (geometry, `Delta_R`) pair is reported as infeasible and not
     redrawn.
+
+## Amendment 7 — 2026-10-28
+
+Written after block 2 (standoff sweep) was reported and versioned
+(`docs/results/phase8c/standoff/`), and before any block 3 (array calibration
+error, D11) code was written or any block 3 trial was generated, solved or
+run. **No threshold, gate, primary rule, decision criterion, frozen config
+value, earlier label or earlier prediction outcome changes.** A6.1 stays not
+supported.
+
+- **A7.1 Predictions for D11** (0.5 dB and 5° rms per element on the physical
+  arrays, 4 realizations, planner unaware):
+  - realized null depth toward the relay, relative to the beam peak, has a
+    median near −32 dB (analytical σ²/N with σ² from the stated errors), far
+    shallower than the ideal-array baseline; report its distribution;
+  - replay SUPPORTED of the primary method at σ = 0.5 changes by at most 0.05
+    from baseline, and stays ≤ 5% in geometries with Δτ_W/PSF ≥ 1;
+  - target SUPPORTED stays ≥ 0.95.
+
+  Reasoning: the relay's extra LoS illumination replays at the direct-echo
+  delay, about one point-spread width below the wall gate.
+- **Operational notes** (reproducibility only; no additional rule):
+  - *Physical arrays:* the gNB TX and gNB RX arrays (16 elements each). The
+    relay is a single element and gets no error. Each element `n` gets a
+    complex factor `e_n = 10^(a_n / 20) * exp(j * p_n)` with
+    `a_n ~ N(0, 0.5)` dB and `p_n ~ N(0, 5)` deg, i.i.d.
+  - *Where it acts:* only on the true per-path link matrices used to generate
+    measurements: target and monostatic background `diag(e_RX) M diag(e_TX)`,
+    relay downlink `M diag(e_TX)`, relay uplink `diag(e_RX) M`. The planner,
+    twin maps, PSF measurement, receiver steering, noise calibration and the
+    matched-relay calibration all keep the ideal arrays.
+  - *Realizations:* 4 per geometry. Record `r` uses realization `r mod 4`, so
+    each realization covers records `{k, k+4}` (twins 0 and 1), both worlds
+    and every method of that record. Draws come from
+    `numpy.random.default_rng([20261028, slot, k])` in the order TX
+    amplitudes, TX phases, RX amplitudes, RX phases.
+  - *Grid:* the A3.3 stress grid (σ = 0.5, twins 0 and 1, 8 records per world,
+    methods `imperfect_narrow`, `imperfect_robust`,
+    `mapfree_coarse_to_fine`), baseline bandwidth profile, frozen thresholds.
+  - *Realized null depth:* for the primary method (`imperfect_robust`), both
+    worlds, records 0–7, the wall beam `w` is rebuilt evaluator side through
+    the unchanged pipeline on the perturbed links. As a self-check, the
+    rebuilt `beam_phi_deg` must equal the run's. With `G(phi)` the
+    `beam_gain` of `w ⊙ e_TX`, null depth is
+    `10 log10(G(phi_relay) / max G)` over the 481-point grid on
+    [−60, 60] deg used by `phase7._null_depth`, with `phi_relay` the true
+    relay azimuth. *Ideal-array baseline:* the main held-out run's
+    `null_depth_db` for the same method at σ = 0.5. Analytical reference:
+    `10 log10(σ² / N)` with `σ² = (0.5 ln10 / 20)² + (5 π / 180)²` and
+    `N = 16`.
+  - *Baseline and strata* follow the A5 notes. Baseline is the main held-out
+    run's σ = 0.5 cell, with matched records `{0, 1, 4, 5}` as the secondary
+    comparator. Pooled paired differences use the A4.1 geometry-level
+    bootstrap. The Δτ_W/PSF stratum uses each geometry's median at this level.
+  - *Matched:* the second prediction is matched when the absolute pooled
+    difference point estimate is ≤ 0.05 and the point estimate in the ≥ 1
+    stratum is ≤ 0.05. The third is matched when the target point estimate is
+    ≥ 0.95. The null-depth prediction is descriptive: median, interquartile
+    range and range are reported beside the analytical value and the baseline
+    median. "Near" and "far" get no numeric cut-off. Intervals are reported
+    beside every point estimate.
