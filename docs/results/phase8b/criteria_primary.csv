@@ -1,0 +1,11 @@
+criterion,role,point,ci95_lo,ci95_hi,threshold,pass_if,point_meets,interval_criterion_holds,whole_interval_failing
+"target SUPPORT, sigma<=0.5 (§16)",criterion,0.9982638888888888,0.9956597222222222,1.0,0.8,>= 0.8,True,,False
+"useful target SUPPORT, sigma<=0.5 (rule 8)",criterion,0.9982638888888888,0.9956597222222222,1.0,0.5,>= 0.5,True,,False
+"attack SUPPORT, pooled (§16)",criterion,0.053385416666666664,0.00390625,0.13098958333333333,0.1,<= 0.1,True,,False
+NOT_OBSERVABLE (§16),criterion,0.0,0.0,0.0,0.2,<= 0.2,True,,False
+"replay SUPPORTED, pooled (rule 8 / A2.3)",criterion,0.053385416666666664,0.00390625,0.13098958333333333,0.05,<= 0.05,False,False,False
+"replay SUPPORTED, 0.5 (rule 8 / A2.3)",criterion,0.061197916666666664,0.0,0.15755208333333334,0.05,<= 0.05,False,False,False
+"replay SUPPORTED, 1.0 (rule 8 / A2.3)",criterion,0.028645833333333332,0.0,0.07421875,0.05,<= 0.05,True,True,False
+"  component: advantage, sigma=0.5",component,0.13151041666666663,0.02864583333333326,0.26171875,0.0,> 0,True,True,False
+"  component: advantage, sigma=1.0",component,0.13151041666666663,0.02864583333333326,0.26171875,0.0,> 0,True,True,False
+advantage at sigma 0.5 or 1.0 (rule 8),criterion,,,,0.0,> 0 at either sigma (components above),True,True,False
