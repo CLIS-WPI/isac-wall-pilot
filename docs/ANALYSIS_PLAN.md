@@ -617,3 +617,50 @@ changes.**
       At −6 dB, robust target ≥ 0.95. "About 4×" is descriptive: the median
       ratio of target S to the baseline S on matched records, plus the
       fraction of target rows with S > s_hi.
+
+## Amendment 9 — 2026-10-28
+
+Written after the block 4 level −20 dBm failed with an uncaught `SceneError` in
+12 of 24 geometries (partial output kept only as evidence in
+`FAILED_probe_power_m20dbm`, never merged), and before the change below was
+written or −20 dBm was re-run. **No threshold, gate, primary rule, decision
+criterion, frozen config value, earlier label or earlier prediction outcome
+changes.** A8.1 predictions are unchanged.
+
+- **A9.1 Behaviour change:** when the measured candidate lies outside the
+  twin's free space (the scene validator would raise SceneError), the planner
+  returns decision UNRESOLVED with path status NOT_OBSERVABLE and reason
+  "candidate_outside_twin_free_space", instead of crashing. A candidate WAS
+  detected, so ACQUISITION_FAILED is not the right label. The change only
+  affects records that previously raised an uncaught exception; no previously
+  produced row can change.
+- **A9.2 Verification:**
+  - (a) the cal_00 × 2 equivalence check;
+  - (b) re-run one already completed level (−10 dBm) on 2 geometries with
+    the new code and show bit-identical non-timing columns.
+
+  No need to re-run the other completed levels.
+- **A9.3** Re-run only the −20 dBm level. Predictions A8.1 are unchanged.
+  Additionally report, evaluator side, per world:
+  - how many acquisitions are false (candidate farther than 2 m from the
+    true position);
+  - how many records take the new outside-free-space path.
+- **Operational notes** (reproducibility only; no additional rule):
+  - *Where it acts:* two places validate the twin scene against the measured
+    candidate.
+    - The direct-action PSF twin (nominal walls) in `phase7._acquire_record`.
+      There the record has no PSF and no direct gate, so every method of that
+      record gets the A9.1 row (status UNRESOLVED, `path_availability`
+      NOT_OBSERVABLE, the A9.1 reason, energies NaN). This includes the
+      map-free methods and direct_only, which need the direct gate.
+    - A mapped method's wall-plan twin (twin walls) in `phase7._plan_for`.
+      There only that method's row gets the A9.1 row.
+  - *Frozen classification:* a row with status UNRESOLVED and a NaN score is
+    never SUPPORTED or SUPPORTED_common under `phase8.frozen`.
+  - *False acquisition:* horizontal distance between the measured candidate
+    (`candidate_range_m`, `candidate_aoa_deg` from the gNB) and the true
+    claimed candidate position (`candidate_distance_m`,
+    `true_candidate_azimuth_deg`) > 2 m, counted per (geometry, world,
+    record) over detected records.
+  - *Counts per world* are (geometry, world, record) units. A record takes
+    the outside-free-space path if any of its rows has the A9.1 reason.
