@@ -612,9 +612,11 @@ def _run_slots(
         )
         for count in (8, 16, 32, choices.profile.num_symbols)
     }
+    runtime = config.section("phase8").get("stress_runtime", {})
+    probe_power = runtime.get("probe_power_dbm")
     direct_weights = direct_beam(
         float(config.get("experiment_a", "reference_beam_phi_deg")),
-        dbm_to_watt(config.get("waveform", "nominal_total_power_dbm")),
+        dbm_to_watt(config.get("waveform", "nominal_total_power_dbm") if probe_power is None else probe_power),
         ArrayGeometry.from_config(config),
     ).weights
     for slot in assigned:
@@ -643,6 +645,13 @@ def _run_slots(
                 }), encoding="utf-8")
                 print(f"{geometry_id}: standoff {standoff} m infeasible ({prepared['rejection'][0]})", flush=True)
                 continue
+        if probe_power is not None or runtime.get("rcs_reflected_illumination_db") is not None:
+            from .stress import scale_reflected_illumination, with_probe_power
+
+            if probe_power is not None:  # A8.1: after acceptance and relay calibration at the nominal power
+                config_g = with_probe_power(config_g, float(probe_power))
+            if runtime.get("rcs_reflected_illumination_db") is not None:  # A8.2: truth only
+                prepared = scale_reflected_illumination(prepared, float(runtime["rcs_reflected_illumination_db"]))
         solve_s = _now() - start
         geom_timing: dict[str, float] = {}
         frame = run_geometry(

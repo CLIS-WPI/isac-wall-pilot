@@ -620,6 +620,10 @@ phase8:
     standoff:
       delta_r_m: [3.0, 6.0, 10.0, 15.0, 20.0, 30.0]
       methods: [exact_oracle, imperfect_robust, mapfree_coarse_to_fine]
+    # ANALYSIS_PLAN A8.1: probe power levels (dBm) replacing the nominal for probe actions only.
+    probe_power_dbm: [-20.0, -10.0, 0.0, 20.0]
+    # ANALYSIS_PLAN A8.2: amplitude scaling (dB) of reflected-illumination true target paths; twin unaware.
+    rcs_reflected_illumination_db: [6.0, -6.0]
   frozen:
     # Amendment 2 values (scripts/phase8a_amendment2.py on calibration v5). `noise_sigmas` is the
     # rule-3 floor k on rho_W = (E_W - N_W_hat) / N_W_hat, a ratio to the noise energy, not a count of

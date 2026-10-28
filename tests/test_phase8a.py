@@ -292,3 +292,42 @@ def test_one_calibration_geometry_end_to_end(
         "imperfect_robust",
     }
     assert not (output / "heldout").exists()
+
+
+def test_block45_levels_power_thickness_rcs(config: PilotConfig, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A8 notes: probe power is a runtime override, thickness reaches truth and twin, RCS scales only
+    target paths with a reflection before the sensing interaction."""
+    import torch
+
+    from isac_verify import stress
+    from isac_verify.receiver import LinkPath
+
+    levels = stress.stress_levels(config)
+    for name in ("probe_power_m20dbm", "probe_power_m10dbm", "probe_power_0dbm", "probe_power_p20dbm",
+                 "wall_thickness_50mm", "wall_thickness_200mm", "rcs_p6db", "rcs_m6db"):
+        assert name in levels, name
+    power = stress.stress_config(config, "probe_power_m20dbm").data
+    assert power["phase8"]["stress_runtime"]["probe_power_dbm"] == -20.0
+    assert power["waveform"] == config.data["waveform"]  # acceptance and relay calibration stay nominal
+    assert stress.with_probe_power(config, -20.0).get("waveform", "nominal_total_power_dbm") == -20.0
+    assert config.get("waveform", "nominal_total_power_dbm") == 10.0
+    thick = stress.stress_config(config, "wall_thickness_50mm").data
+    assert thick["phase8"]["geometry"]["wall_thickness_m"] == 0.05 and thick["wall"]["thickness_m"] == 0.05
+    assert "probe_power_dbm" not in thick["phase8"]["stress_runtime"]
+    rcs = stress.stress_config(config, "rcs_m6db").data
+    assert rcs["phase8"]["stress_runtime"]["rcs_reflected_illumination_db"] == -6.0
+    assert rcs["wall"] == config.data["wall"] and rcs["phase6"] == config.data["phase6"]
+
+    names = {0: ["SENSING"], 1: ["SPECULAR", "SENSING"], 2: ["SENSING", "SPECULAR"],
+             3: ["SPECULAR", "SENSING", "SPECULAR"], 4: ["SENSING", "SPECULAR", "SPECULAR"]}
+    monkeypatch.setattr(stress, "path_records", lambda path_set, scene_label: [
+        {"path_index": i, "interaction_names": n} for i, n in names.items()])
+    assert stress.reflected_illumination_indices(None) == {1, 3}
+    ones = torch.ones(2, 2, dtype=torch.complex64)
+    links = {"target": tuple(LinkPath(f"true_target:f:{i}", "f", ones, 1e-7, 0.0, 0.0, ()) for i in names),
+             "downlink": (LinkPath("true_downlink:los:0", "los", ones, 1e-7, 0.0, 0.0, ()),)}
+    out = stress.scale_reflected_illumination({"paths": {"target": None}, "links": links}, 6.0)
+    gain = 10 ** (6 / 20)
+    for i, path in enumerate(out["links"]["target"]):
+        assert torch.allclose(path.matrix, ones * (gain if i in (1, 3) else 1.0)), i
+    assert out["links"]["downlink"] is links["downlink"]

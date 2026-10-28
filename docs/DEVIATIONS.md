@@ -912,3 +912,30 @@ declared processing choices, not post-hoc tuning.
 - **Equivalence evidence** (`results/phase8a_diag/eq_stress3`): cal_00 x 2
   records on the baseline config. All 104 non-timing columns of the 120 rows
   are identical to the calibration v5 shard. 72 tests passed.
+
+### P8-12 — Stress harness blocks 4 and 5: probe power, wall thickness D8, target RCS (ANALYSIS_PLAN A8)
+
+- **Type:** execution harness only; inactive by default.
+- **What:**
+  - Levels:
+    - `probe_power_{m20,m10,0,p20}dbm` (new key `phase8.stress.probe_power_dbm`);
+    - `wall_thickness_{50,200}mm` (existing key `phase8.stress.wall_thickness_m`);
+    - `rcs_{p6,m6}db` (new key `phase8.stress.rcs_reflected_illumination_db`).
+  - Probe power: `_run_slots` builds the direct beam at the level and
+    overrides `waveform.nominal_total_power_dbm` in each geometry config
+    after acceptance and relay calibration at 10 dBm (`stress.with_probe_power`).
+  - Thickness: the stress config sets `phase8.geometry.wall_thickness_m`
+    (read by `draw_geometry` -> `geometry_config`) and `wall.thickness_m`,
+    so truth and twin both use it.
+  - RCS: `stress.scale_reflected_illumination` scales the true target links
+    whose interaction list has SPECULAR before SENSING. On cal_00 that is 8 of
+    13 paths: `outgoing_wall_*` x2, plus 6 multi-bounce paths.
+  - The A3.3 relay gain, material and blocker levels are absent (NOT RUN,
+    Amendment 8).
+- **Smoke tests** (cal_00, 1 record, calibration split):
+  - −20 dBm: acquisition failed on record 0 in both worlds.
+  - 50 mm: robust target S 0.888 -> 0.936.
+  - RCS +6 dB: robust target S 0.888 -> 3.495 (3.9x); replay rows unchanged.
+- **Equivalence evidence** (`results/phase8a_diag/eq_stress4`): cal_00 x 2
+  records on the baseline config. All 104 non-timing columns of the 120 rows
+  are identical to the calibration v5 shard. 73 tests passed.
