@@ -1,0 +1,25 @@
+stratum,method,world,rate,point,ci95,n_rows,n_geometries
+ge1,imperfect_narrow,replay,supported,0.0,"[0.0, 0.0]",136,17
+ge1,imperfect_narrow,replay,supported_common,0.0,"[0.0, 0.0]",136,17
+ge1,imperfect_narrow,target,supported,0.9852941176470589,"[0.9558823529411765, 1.0]",136,17
+ge1,imperfect_narrow,target,supported_common,1.0,"[1.0, 1.0]",136,17
+ge1,imperfect_robust,replay,supported,0.0,"[0.0, 0.0]",136,17
+ge1,imperfect_robust,replay,supported_common,0.0,"[0.0, 0.0]",136,17
+ge1,imperfect_robust,target,supported,0.9926470588235294,"[0.9779411764705882, 1.0]",136,17
+ge1,imperfect_robust,target,supported_common,1.0,"[1.0, 1.0]",136,17
+ge1,mapfree_coarse_to_fine,replay,supported,0.0,"[0.0, 0.0]",136,17
+ge1,mapfree_coarse_to_fine,replay,supported_common,0.0,"[0.0, 0.0]",136,17
+ge1,mapfree_coarse_to_fine,target,supported,0.0,"[0.0, 0.0]",136,17
+ge1,mapfree_coarse_to_fine,target,supported_common,0.9044117647058824,"[0.7573529411764706, 1.0]",136,17
+lt1,imperfect_narrow,replay,supported,0.14285714285714285,"[0.0, 0.39285714285714285]",56,7
+lt1,imperfect_narrow,replay,supported_common,0.21428571428571427,"[0.0, 0.5]",56,7
+lt1,imperfect_narrow,target,supported,1.0,"[1.0, 1.0]",56,7
+lt1,imperfect_narrow,target,supported_common,1.0,"[1.0, 1.0]",56,7
+lt1,imperfect_robust,replay,supported,0.19642857142857142,"[0.0, 0.44642857142857145]",56,7
+lt1,imperfect_robust,replay,supported_common,0.26785714285714285,"[0.0, 0.625]",56,7
+lt1,imperfect_robust,target,supported,1.0,"[1.0, 1.0]",56,7
+lt1,imperfect_robust,target,supported_common,1.0,"[1.0, 1.0]",56,7
+lt1,mapfree_coarse_to_fine,replay,supported,0.0,"[0.0, 0.0]",56,7
+lt1,mapfree_coarse_to_fine,replay,supported_common,0.5357142857142857,"[0.14285714285714285, 0.8571428571428571]",56,7
+lt1,mapfree_coarse_to_fine,target,supported,0.0,"[0.0, 0.0]",56,7
+lt1,mapfree_coarse_to_fine,target,supported_common,0.7857142857142857,"[0.5, 1.0]",56,7

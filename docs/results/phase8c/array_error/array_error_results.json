@@ -1,0 +1,467 @@
+{
+  "validity": {
+    "rows_expected": true,
+    "split_is_heldout": true,
+    "level_label": true,
+    "methods": true,
+    "decision_source_frozen": true,
+    "reclassification_matches_run": true,
+    "preflight_pass": true,
+    "source_commit_clean": true,
+    "source_commit": "ea4f23e03390aaed856e9883f3d5547965f093a3",
+    "acquisition_failed_rows": 0,
+    "realization_is_record_mod_4": true,
+    "realizations_per_geometry": [
+      4
+    ]
+  },
+  "null_depth": {
+    "analytical_db": -31.655347161114786,
+    "realized_db": {
+      "n": 384,
+      "min": -54.77669908952166,
+      "q25": -38.15078097164009,
+      "median": -33.923991567476655,
+      "q75": -31.538359214700915,
+      "max": -24.943220192209274
+    },
+    "realized_db_by_world": {
+      "replay": {
+        "n": 192,
+        "min": -54.77669908952166,
+        "q25": -38.1497484448675,
+        "median": -33.92741357216031,
+        "q75": -31.538359214700915,
+        "max": -24.943220192209274
+      },
+      "target": {
+        "n": 192,
+        "min": -54.694556992849115,
+        "q25": -38.151550809690775,
+        "median": -33.923991567476655,
+        "q75": -31.538789663010128,
+        "max": -24.943952422769435
+      }
+    },
+    "realized_db_by_realization": {
+      "0": {
+        "n": 96,
+        "min": -54.77669908952166,
+        "q25": -37.844660696662395,
+        "median": -35.23904171758334,
+        "q75": -31.89909297543364,
+        "max": -24.943220192209274
+      },
+      "1": {
+        "n": 96,
+        "min": -42.43930612639026,
+        "q25": -33.95618583128575,
+        "median": -31.523990287487464,
+        "q75": -29.43986706709066,
+        "max": -26.94377776018306
+      },
+      "2": {
+        "n": 96,
+        "min": -51.452647212886696,
+        "q25": -39.39006693883162,
+        "median": -35.70780236632621,
+        "q75": -32.93413908392214,
+        "max": -28.857641001303783
+      },
+      "3": {
+        "n": 96,
+        "min": -47.36702588579459,
+        "q25": -38.752144867097826,
+        "median": -33.76361682592159,
+        "q75": -32.375669829443,
+        "max": -27.704161509151056
+      }
+    },
+    "ideal_array_same_beams_db": {
+      "n": 384,
+      "min": -107.61805434426697,
+      "q25": -61.949372417599164,
+      "median": -53.17934183283519,
+      "q75": -47.07794409459663,
+      "max": -35.22424549203855
+    },
+    "ideal_array_baseline_run_db": {
+      "n": 1536,
+      "min": -154.6790292662301,
+      "q25": -74.51161298614409,
+      "median": -66.7672083437009,
+      "q75": -60.30117941523942,
+      "max": -45.70802739375968
+    },
+    "rows_without_beam": 0
+  },
+  "replay_supported": {
+    "point": 0.057291666666666664,
+    "ci95": [
+      0.0,
+      0.14583333333333334
+    ],
+    "n_rows": 192,
+    "n_geometries": 24
+  },
+  "baseline_replay_supported": {
+    "point": 0.061197916666666664,
+    "ci95": [
+      0.0,
+      0.15755208333333334
+    ],
+    "n_rows": 768,
+    "n_geometries": 24
+  },
+  "replay_minus_baseline": {
+    "point": -0.00390625,
+    "ci95": [
+      -0.01171875,
+      0.0
+    ],
+    "ci_lower_gt_0": false
+  },
+  "secondary_matched_records_minus_baseline": {
+    "point": -0.020833333333333336,
+    "ci95": [
+      -0.06250000000000001,
+      0.0
+    ],
+    "ci_lower_gt_0": false
+  },
+  "n_geometries_ge1": 17,
+  "replay_supported_ge1": {
+    "point": 0.0,
+    "ci95": [
+      0.0,
+      0.0
+    ],
+    "n_rows": 136,
+    "n_geometries": 17
+  },
+  "a7_1_replay_matched": true,
+  "target_supported_primary": {
+    "point": 0.9947916666666666,
+    "ci95": [
+      0.984375,
+      1.0
+    ],
+    "n_rows": 192,
+    "n_geometries": 24
+  },
+  "a7_1_target_matched": true,
+  "stratified": [
+    {
+      "stratum": "ge1",
+      "method": "imperfect_narrow",
+      "world": "replay",
+      "rate": "supported",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "imperfect_narrow",
+      "world": "replay",
+      "rate": "supported_common",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "imperfect_narrow",
+      "world": "target",
+      "rate": "supported",
+      "point": 0.9852941176470589,
+      "ci95": [
+        0.9558823529411765,
+        1.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "imperfect_narrow",
+      "world": "target",
+      "rate": "supported_common",
+      "point": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "imperfect_robust",
+      "world": "replay",
+      "rate": "supported",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "imperfect_robust",
+      "world": "replay",
+      "rate": "supported_common",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "imperfect_robust",
+      "world": "target",
+      "rate": "supported",
+      "point": 0.9926470588235294,
+      "ci95": [
+        0.9779411764705882,
+        1.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "imperfect_robust",
+      "world": "target",
+      "rate": "supported_common",
+      "point": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "mapfree_coarse_to_fine",
+      "world": "replay",
+      "rate": "supported",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "mapfree_coarse_to_fine",
+      "world": "replay",
+      "rate": "supported_common",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "mapfree_coarse_to_fine",
+      "world": "target",
+      "rate": "supported",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "ge1",
+      "method": "mapfree_coarse_to_fine",
+      "world": "target",
+      "rate": "supported_common",
+      "point": 0.9044117647058824,
+      "ci95": [
+        0.7573529411764706,
+        1.0
+      ],
+      "n_rows": 136,
+      "n_geometries": 17
+    },
+    {
+      "stratum": "lt1",
+      "method": "imperfect_narrow",
+      "world": "replay",
+      "rate": "supported",
+      "point": 0.14285714285714285,
+      "ci95": [
+        0.0,
+        0.39285714285714285
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "imperfect_narrow",
+      "world": "replay",
+      "rate": "supported_common",
+      "point": 0.21428571428571427,
+      "ci95": [
+        0.0,
+        0.5
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "imperfect_narrow",
+      "world": "target",
+      "rate": "supported",
+      "point": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "imperfect_narrow",
+      "world": "target",
+      "rate": "supported_common",
+      "point": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "imperfect_robust",
+      "world": "replay",
+      "rate": "supported",
+      "point": 0.19642857142857142,
+      "ci95": [
+        0.0,
+        0.44642857142857145
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "imperfect_robust",
+      "world": "replay",
+      "rate": "supported_common",
+      "point": 0.26785714285714285,
+      "ci95": [
+        0.0,
+        0.625
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "imperfect_robust",
+      "world": "target",
+      "rate": "supported",
+      "point": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "imperfect_robust",
+      "world": "target",
+      "rate": "supported_common",
+      "point": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "mapfree_coarse_to_fine",
+      "world": "replay",
+      "rate": "supported",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "mapfree_coarse_to_fine",
+      "world": "replay",
+      "rate": "supported_common",
+      "point": 0.5357142857142857,
+      "ci95": [
+        0.14285714285714285,
+        0.8571428571428571
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "mapfree_coarse_to_fine",
+      "world": "target",
+      "rate": "supported",
+      "point": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    },
+    {
+      "stratum": "lt1",
+      "method": "mapfree_coarse_to_fine",
+      "world": "target",
+      "rate": "supported_common",
+      "point": 0.7857142857142857,
+      "ci95": [
+        0.5,
+        1.0
+      ],
+      "n_rows": 56,
+      "n_geometries": 7
+    }
+  ]
+}
