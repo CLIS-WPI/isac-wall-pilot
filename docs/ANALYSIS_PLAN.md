@@ -180,3 +180,67 @@ They do not add a decision criterion.
   on the same GPU (`docs/DEVIATIONS.md` P8-6). This is an execution change
   only; the computation and seeds are unchanged.
 - **Held-out:** no held-out geometry has been generated, solved or run.
+
+## Amendment 2 — 2026-10-27
+
+Written after calibration v5 (commit `8057404`, `results/phase8a`, 23040
+rows, `c = 1.0`) and before any held-out geometry was generated, solved or
+run. It uses calibration data only. The thresholds first frozen in `712b789`
+(tag `pilot-frozen` at that commit) applied rules 4-5 as written; this
+amendment supersedes their `s_lo` and `t_m` values. `k`, `s_hi` and `c` are
+unchanged. No trial was re-run. The values come from
+`scripts/phase8a_amendment2.py` applied to the existing
+`calibration_trials.parquet`. That script first re-classifies every row with
+the previous thresholds and checks that this reproduces the committed v5
+`rates.csv` exactly.
+
+- **A2.1 Like-for-like contrast (secondary).** In addition to the rule-8
+  advantage (primary SUPPORTED minus map-free coarse-to-fine
+  SUPPORTED_common), report the contrast in which `imperfect_robust` and
+  `mapfree_coarse_to_fine` both use SUPPORTED_common, at the same sigma cells
+  and with the same bootstrap. It is a secondary analysis; the primary
+  contrast and its decision rule are unchanged.
+  *Evidence:* the primary contrast compares a two-sided band rule
+  (`s_lo <= S <= s_hi` plus floor `k`) against a one-sided energy rule. On
+  calibration, the two rules gave different pooled replay rates
+  (imperfect_robust SUPPORTED 0.050 and SUPPORTED_common 0.050 against
+  coarse-to-fine SUPPORTED_common 0.052), and at sigma = 0 they gave
+  different per-cell rates for the same method (robust 0.049 SUPPORTED vs
+  0.081 SUPPORTED_common). So part of the primary contrast can come from the
+  choice of rule rather than from the twin.
+- **A2.2 Calibration granularity.** `s_lo` (each mapped method) and `t_m`
+  (every wall-probing method) are the smallest value whose replay-world rate
+  (SUPPORTED, or SUPPORTED_common) is `<= 5%` in EVERY sigma cell. Each cell
+  uses the operational definition of rule 4 (`n_allowed = floor(0.05 * 384)
+  = 19`, all replay rows of the cell as denominator); the frozen value is the
+  largest of the per-cell values. `t_m` changes from a pooled 95th percentile
+  to this per-cell rule.
+  *Evidence:* with pooled calibration, per-sigma replay rates reached 0.076
+  (imperfect_narrow SUPPORTED at sigma = 0; imperfect_robust SUPPORTED at
+  sigma = 2). imperfect_robust SUPPORTED_common reached 0.081 at sigma = 0.
+  Pooled `t_m` left the replay SUPPORTED_common rate at 0.052 for the oracle
+  and both map-free methods. Calibrating exactly at 5% pooled makes a held-out
+  point estimate `<= 5%` roughly a coin flip.
+- **A2.3 Held-out acceptance clarification.** The rule-8 replay criterion
+  (point estimate `<= 5%`, upper 95% bootstrap bound `<= 10%`) is applied to
+  each sigma cell used for the advantage (`0.5` and `1.0` m) and to the pooled
+  rate; all cells are reported.
+- **Unit label.** `k` is a threshold on `rho_W = (E_W - N_W_hat) / N_W_hat`, a
+  ratio to the wall-gate noise energy, not a number of noise standard
+  deviations. The config key `noise_sigmas` keeps its historical name
+  because `verification.classify_evidence` reads it.
+
+Frozen values (`configs/pilot.yaml`, `phase8.frozen`):
+
+| method | s_lo old -> new (binding sigma) | t_m old -> new (binding sigma) |
+|---|---|---|
+| exact_oracle | 0.016729 -> 0.016729 (0) | 25.537 -> 26.291 (0) |
+| imperfect_narrow | 0.014672 -> 0.017580 (0) | 22.949 -> 27.709 (0) |
+| imperfect_robust | 0.016168 -> 0.021784 (2.0) | 20.155 -> 25.572 (0.25) |
+| mapfree_two_beam | - | 3.0849 -> 5.6104 (0) |
+| mapfree_coarse_to_fine | - | 3.2792 -> 3.3299 (0) |
+
+`k`: exact_oracle 1.8738, imperfect_narrow 1.8474, imperfect_robust 1.7217.
+`s_hi`: 1.3178, 1.2873, 1.2868. `c = 1.0`.
+
+- **Held-out:** no held-out geometry has been generated, solved or run.

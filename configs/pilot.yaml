@@ -563,8 +563,13 @@ phase8:
     band:
       replay_supported_rate_max: 0.05
       s_hi_quantile: 0.995
+      # ANALYSIS_PLAN Amendment 2 (A2.2): frozen s_lo meets the max in every sigma cell, not only pooled.
+      replay_rate_scope: every_sigma_cell
     common:
       replay_quantile: 0.95
+      # Amendment 2 (A2.2): frozen t_m = smallest value with replay SUPPORTED_common rate <= 0.05 in every sigma cell.
+      replay_rate_max: 0.05
+      replay_rate_scope: every_sigma_cell
     coverage:
       required: 0.99
       inflation_candidates: [1.0, 1.25, 1.5, 2.0]
@@ -582,6 +587,14 @@ phase8:
     advantage_comparator: mapfree_coarse_to_fine
     advantage_rule: common_supported
     advantage_ci_lower_bound_min: 0.0
+    # Amendment 2 (A2.1): secondary like-for-like contrast, primary and comparator both on SUPPORTED_common.
+    like_for_like_contrast:
+      primary_rule: common_supported
+      comparator_rule: common_supported
+      role: secondary
+    # Amendment 2 (A2.3): replay criterion applied to each of these cells and to the pooled rate.
+    replay_criterion_sigma_m: [0.5, 1.0]
+    replay_criterion_pooled: true
     brief16_targets:
       target_support_min: 0.80
       attack_support_max: 0.10
@@ -595,6 +608,9 @@ phase8:
       applies_to: physical_tx_rx_arrays_only
     used_for_tuning: false
   frozen:
+    # Amendment 2 values (scripts/phase8a_amendment2.py on calibration v5). `noise_sigmas` is the
+    # rule-3 floor k on rho_W = (E_W - N_W_hat) / N_W_hat, a ratio to the noise energy, not a count of
+    # noise standard deviations; the key name is kept because classify_evidence reads it.
     gate_inflation_c: 1.0
     thresholds:
       exact_oracle:
@@ -603,15 +619,15 @@ phase8:
         supported_max: 1.3177824379243586
       imperfect_narrow:
         noise_sigmas: 1.8474066213620994
-        supported_min: 0.014672196624174676
+        supported_min: 0.017580349788033998
         supported_max: 1.2872929542923885
       imperfect_robust:
         noise_sigmas: 1.721736350287777
-        supported_min: 0.016167815432649144
+        supported_min: 0.021783770908692133
         supported_max: 1.286775241426862
     t_common:
-      exact_oracle: 25.537278873464246
-      imperfect_narrow: 22.94866130299852
-      imperfect_robust: 20.1552339818422
-      mapfree_two_beam: 3.0848590615005134
-      mapfree_coarse_to_fine: 3.279239106840957
+      exact_oracle: 26.29121700701684
+      imperfect_narrow: 27.70923606765283
+      imperfect_robust: 25.571842237988395
+      mapfree_two_beam: 5.610432702205838
+      mapfree_coarse_to_fine: 3.329868205928423
