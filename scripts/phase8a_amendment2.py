@@ -147,7 +147,7 @@ def main() -> None:
     out_dir = base / "amendment2"
     out_dir.mkdir(exist_ok=True)
     trials = pd.read_parquet(base / "calibration_trials.parquet")
-    thresholds = json.loads((base / "thresholds.json").read_text())
+    thresholds = json.loads((base / "thresholds_pooled_preA2.json").read_text())
     geometries = pd.read_csv(base / "geometries_calibration.csv")
     factor = float(thresholds["gate_inflation_c"]["value"])
     # The image-method delay must match the solver's true wall delay (self-check of geometry_diagnostics' model).

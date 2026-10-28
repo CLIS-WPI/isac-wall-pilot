@@ -244,3 +244,55 @@ Frozen values (`configs/pilot.yaml`, `phase8.frozen`):
 `s_hi`: 1.3178, 1.2873, 1.2868. `c = 1.0`.
 
 - **Held-out:** no held-out geometry has been generated, solved or run.
+
+## Amendment 3 — 2026-10-27
+
+Written after the Amendment 2 freeze (`0350377`, tag `pilot-frozen`) and
+before any held-out geometry was generated, solved or run. It adds secondary
+analyses and fixes the stress design. **No threshold, gate, inflation factor,
+primary rule, decision criterion or frozen config value changes.**
+
+- **A3.1 Stratified reporting (prediction stated before held-out).** Every
+  held-out rate, per method and sigma, is also reported separately for
+  geometries with `delta_tau_W / psf < 1` and `>= 1`. `delta_tau_W` is the
+  relay wall-path delay minus the target wall-path delay from the BRIEF §5.3
+  image method on the drawn geometry, and `psf` is the trial's measured
+  point-spread delay width. The stratification is evaluator-side only and
+  never enters a decision.
+  *Prediction from calibration:* false support concentrates in the `< 1`
+  stratum. On calibration, the only geometry below 1 (cal_05, 0.884) held
+  almost all replay support. The two geometries just above 1 (1.02, 1.07)
+  held a little, and every geometry above 1.3 held none
+  (`results/phase8a/amendment2/per_geometry_replay.csv`).
+- **A3.2 Band trade-off (secondary).** Also report SUPPORTED with the upper
+  bound `s_hi` removed. All other conditions stay as frozen (direct reliable,
+  reference detectable, floor `k`, `S >= s_lo`).
+- **A3.3 Stress design (BRIEF §16 robustness; frozen thresholds, no
+  retuning).** Stresses are reported separately and never used for tuning.
+  - *Grid per level:* the 24 held-out geometries; `sigma_map = 0.5 m` only;
+    twin realizations 0 and 1; 8 records per world; methods
+    `imperfect_robust`, `imperfect_narrow`, `mapfree_coarse_to_fine`, with the
+    direct action shared. The seeds are the declared held-out streams, as in
+    the main run. Baseline values for comparison come from the main held-out
+    run.
+  - *Levels:*
+    - probe power `{-20, -10, 0, 20} dBm`;
+    - bandwidth profiles `bw61` and `bw246`;
+    - relay gain `{-10, +10, +20} dB` relative to the matched gain (replay
+      world);
+    - true wall material with relative permittivity and conductivity both
+      scaled `x0.8` and `x1.2`; the twin keeps nominal material;
+    - target paths illuminated via a reflection scaled in amplitude by
+      `10^(+6/20)` and `10^(-6/20)`; the twin assumes constant RCS;
+    - the Phase 4 physical blocker in the target world;
+    - wall thickness `0.05` and `0.20 m` in BOTH truth and twin (labelled
+      follow-up D8);
+    - array calibration error `0.5 dB` and `5 deg` rms per element on the
+      physical TX/RX arrays only, 4 realizations (labelled follow-up D11),
+      with realized null depth toward the relay reported.
+  - *Cost estimate (user's planning figure, not measured):* about 2,304
+    trials per level, about 26 min per level, about 7.5 h in total.
+  - Stress code is inactive by default and must leave the baseline path
+    bit-identical. Before any stress run, this is shown on cal_00 x 2
+    records: all non-timing columns identical to the baseline.
+- **Held-out:** no held-out geometry has been generated, solved or run.

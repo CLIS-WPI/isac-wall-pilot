@@ -791,3 +791,23 @@ declared processing choices, not post-hoc tuning.
   `timing.json` records `workers`, `worker_slots`, per-worker wall time and
   PyTorch peaks, the agreed noise calibration, and the NVML process record for
   the whole device.
+
+### P8-7 — Tag `pilot-frozen` moved from `712b789` to `0350377`
+
+- **Type:** repository record only. No commit was rewritten.
+- **What:** `pilot-frozen` was first created on `712b789 phase8a: frozen
+  thresholds`, which froze the calibration v5 thresholds as written in rules 4-5
+  (pooled over sigma). ANALYSIS_PLAN Amendment 2 then re-derived `s_lo` and
+  `t_m` per sigma cell from the same calibration data. It was committed as
+  `0350377 phase8a: frozen thresholds (amendment 2)`, and the lightweight tag
+  was moved there with `git tag -f pilot-frozen 0350377`, with the user's
+  approval. `712b789` stays in the branch history. The repository has no
+  remote, so the old tag target was never published.
+- **Why:** the plan names `pilot-frozen` as the frozen operating point, and
+  the frozen thresholds are now the Amendment 2 values.
+- **Held-out:** no held-out geometry was generated, solved or run before or
+  during the move.
+- **Stale artifact:** `results/phase8a/thresholds.json`, written by
+  `calibrate` with the rule-4/5 values from before the amendment, was renamed
+  to `thresholds_pooled_preA2.json`. The frozen values are only in
+  `configs/pilot.yaml` `phase8.frozen`.
