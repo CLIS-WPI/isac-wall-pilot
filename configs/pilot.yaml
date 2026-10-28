@@ -607,6 +607,13 @@ phase8:
       realizations: 4
       applies_to: physical_tx_rx_arrays_only
     used_for_tuning: false
+    # ANALYSIS_PLAN A3.3 / A5: per-level grid on the held-out geometries (python -m isac_verify stress).
+    grid:
+      sigma_map_m: [0.5]
+      twin_realizations_per_sigma: 2
+      records_per_world: 8
+      methods: [imperfect_narrow, imperfect_robust, mapfree_coarse_to_fine]
+    bandwidth_profiles: [bw246, bw61]
   frozen:
     # Amendment 2 values (scripts/phase8a_amendment2.py on calibration v5). `noise_sigmas` is the
     # rule-3 floor k on rho_W = (E_W - N_W_hat) / N_W_hat, a ratio to the noise energy, not a count of

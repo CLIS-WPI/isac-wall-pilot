@@ -52,6 +52,22 @@ def _calibrate(args: argparse.Namespace) -> int:
     )
 
 
+def _stress(args: argparse.Namespace) -> int:
+    from .phase8a import approve_heldout
+    from .stress import run_stress
+
+    if not args.approved:
+        raise SystemExit("stress: refusing without --approved (stresses run on held-out geometries)")
+    approve_heldout()
+    return run_stress(
+        args.config,
+        args.output or f"results/phase8c_stress/{args.level}",
+        args.level,
+        require_h100=args.require_h100,
+        workers=args.workers,
+    )
+
+
 def _heldout(args: argparse.Namespace) -> int:
     from .config import PilotConfig
     from .phase8a import HELDOUT, analyze_heldout, approve_heldout, run_calibration
@@ -221,6 +237,18 @@ def build_parser() -> argparse.ArgumentParser:
     heldout.add_argument("--workers", type=int, default=1)
     heldout.add_argument("--worker-slots", default=None, help=argparse.SUPPRESS)
     heldout.set_defaults(handler=_heldout)
+
+    stress = subparsers.add_parser(
+        "stress",
+        help="Phase 8C: one A3.3/A5 stress level on the held-out geometries, frozen thresholds",
+    )
+    stress.add_argument("--level", required=True)
+    stress.add_argument("--config", default="configs/pilot.yaml")
+    stress.add_argument("--output", default=None)
+    stress.add_argument("--require-h100", action="store_true")
+    stress.add_argument("--approved", action="store_true", help="explicit human approval")
+    stress.add_argument("--workers", type=int, default=1)
+    stress.set_defaults(handler=_stress)
 
     report = subparsers.add_parser(
         "report",

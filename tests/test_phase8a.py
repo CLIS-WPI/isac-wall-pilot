@@ -63,6 +63,31 @@ def test_heldout_cli_refuses_without_approval() -> None:
     assert not Path("/tmp/never_written").exists()
 
 
+def test_stress_cli_refuses_without_approval() -> None:
+    from isac_verify.__main__ import main
+
+    with pytest.raises(SystemExit, match="--approved"):
+        main(["stress", "--level", "bw246", "--output", "/tmp/never_written_stress"])
+    assert not Path("/tmp/never_written_stress").exists()
+
+
+def test_stress_config_changes_only_grid_and_level(config: PilotConfig) -> None:
+    from isac_verify.stress import stress_config
+
+    with pytest.raises(Phase8Error, match="unknown stress level"):
+        stress_config(config, "baseline")
+    stressed = stress_config(config, "bw246").data
+    assert stressed["phase8"]["grid"]["sigma_map_m"] == [0.5]
+    assert stressed["phase8"]["grid"]["twin_realizations_per_sigma"] == 2
+    assert stressed["phase8"]["stress_runtime"]["declared_sigma_map_m"] == config.get("phase8", "grid", "sigma_map_m")
+    assert stressed["phase6"]["processing"]["profile"] == "bw246"
+    assert stressed["phase8"]["frozen"] == config.get("phase8", "frozen")
+    for key in set(config.data) - {"phase6", "phase8", "rf"}:
+        assert stressed[key] == config.data[key], key
+    assert config.get("phase6", "processing", "profile") == "baseline"
+    assert "stress_runtime" not in config.section("phase8")
+
+
 def test_frozen_decision_reads_only_phase8_frozen(config: PilotConfig) -> None:
     frozen = config.section("phase8", "frozen")
     factor, fitted = frozen_decision(config)

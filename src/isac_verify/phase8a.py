@@ -327,9 +327,18 @@ def run_geometry(
         float(value)
         for value in config.get("phase8", "rules", "coverage", "inflation_candidates")
     ]
+    methods = tuple(method for method in METHODS if method in grid["methods"])
     seeds = {"streams": geometry_seed_streams(config, split, slot, records)}
     twin_z = twin_draws(config, split, slot, realizations)
-    noise_seed = noise_only_seed_fn(config, split, slot, len(sigmas))
+    # A stress runs a sigma subset; each sigma keeps its declared noise-only seed block (A3.3).
+    declared = [
+        float(value)
+        for value in config.section("phase8").get("stress_runtime", {}).get("declared_sigma_map_m", sigmas)
+    ]
+    declared_seed = noise_only_seed_fn(config, split, slot, len(declared))
+
+    def noise_seed(world: str, sigma_index: int, record: int) -> int:
+        return declared_seed(world, declared.index(sigmas[sigma_index]), record)
     rows: list[dict[str, Any]] = []
     representative: dict[str, Any] = {}
     columns = {
@@ -370,7 +379,7 @@ def run_geometry(
                 representative=representative,
                 true_candidate_deg=prepared["true_candidate_deg"],
                 true_relay_deg=prepared["true_relay_deg"],
-                methods=METHODS,
+                methods=methods,
                 geometry_id=geometry_id,
                 split=split,
                 inflations=inflations,
@@ -958,7 +967,7 @@ def analyze_heldout(
             * len(config.get("phase8", "grid", "sigma_map_m"))
             * len(config.get("phase8", "grid", "worlds"))
             * records
-            * len(METHODS)
+            * len(config.get("phase8", "grid", "methods"))
         )
     summary = {
         "split": HELDOUT,

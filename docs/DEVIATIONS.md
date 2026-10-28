@@ -841,3 +841,33 @@ declared processing choices, not post-hoc tuning.
   geometry was drawn.
 - **Tags:** `pilot-frozen` stays on `0350377`. The held-out run executes from a
   worktree at tag `pilot-heldout` (this commit).
+
+### P8-9 — Stress harness (ANALYSIS_PLAN A3.3 / A5), inactive by default
+
+- **Type:** execution harness only. No receiver, planner, trial, gate or
+  threshold code changed. Stresses use `phase8.frozen` unchanged.
+- **What:**
+  - `isac_verify stress --level L --approved` writes `<output>/stress_config.yaml`
+    (`stress.stress_config`) and runs it through the unchanged held-out
+    harness (`run_calibration(split="heldout")`).
+  - The override replaces `phase8.grid` with `phase8.stress.grid` (A3.3:
+    sigma 0.5, 2 twin realizations, 8 records, methods narrow / robust /
+    coarse_to_fine). For a bandwidth level it also sets
+    `phase6.processing.profile` and the `bandwidth_profile` row label to the
+    level.
+  - The stress grid itself lives in new keys under `phase8.stress`; no
+    existing key changed.
+  - `run_geometry` now takes its method list from `phase8.grid.methods`
+    (ordered as `METHODS`), and maps each sigma to its declared noise-only
+    seed block via `phase8.stress_runtime.declared_sigma_map_m`. With the
+    baseline config both reduce to the previous values.
+  - `analyze_heldout` counts expected rows with `phase8.grid.methods`.
+- **Scope:** only the A5.3 block 1 levels (`bw246`, `bw61`) are implemented.
+  Later blocks add their levels before they run, and repeat the equivalence
+  check below.
+- **Twin index:** with 2 realizations a stress record `r` uses twin `r mod 2`;
+  the main run used `r mod 4` (A5 operational note).
+- **Equivalence evidence** (`results/phase8a_diag/eq_stress`, GPU 1): cal_00 x
+  2 records on the stress-harness code, baseline config. All 104 non-timing
+  columns of the 120 rows are identical (`compare_shards.py`) to the
+  calibration v5 shard.
