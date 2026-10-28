@@ -356,3 +356,58 @@ threshold, gate, primary rule, criterion value or frozen config value changes.
   SUPPORTED_common rates exactly (0 mismatches). Its label on calibration
   data is INCONCLUSIVE, with the advantage lower bound at or below 0 at both
   sigmas. That is calibration data, not a held-out result.
+
+## Amendment 5 — 2026-10-28
+
+Written after the held-out decision (INCONCLUSIVE, committed as
+`docs/results/phase8b/`) and before any stress code was written or any stress
+trial was generated, solved or run. It adds pre-registered stress predictions,
+a labelled follow-up and a run order. **No threshold, gate, inflation factor,
+primary rule, decision criterion, frozen config value or the held-out label
+changes.** All stresses use `phase8.frozen` without retuning (A3.3).
+
+- **A5.1 Pre-registered predictions for the bandwidth stress.** With `bw246`
+  the point-spread width halves, so (a) the number of held-out geometries
+  with `delta_tau_W / PSF(B) < 1` decreases, and (b) pooled replay SUPPORTED
+  of the primary method decreases relative to baseline. With `bw61` both move
+  the other way. Stratify by `delta_tau_W / PSF(B)` using each profile's own
+  measured PSF.
+- **A5.2 Labelled follow-up: relay standoff sweep.** On the 24 held-out
+  geometries, place the relay at `R_A = R_T - Delta_R` with
+  `Delta_R in {3, 6, 10, 15, 20, 30} m` (3 m is about the 20 ns latency
+  floor), with the relay re-matched per geometry by the same evaluator rule;
+  `sigma_map = 0.5`, the first 2 twin realizations, 8 records per world,
+  methods `imperfect_robust`, `exact_oracle`, `mapfree_coarse_to_fine`;
+  frozen thresholds. *Prediction:* replay SUPPORTED is high where the
+  analytical `delta_tau_W / PSF < 1` and near zero where it is `>= 1`. Report
+  replay SUPPORTED versus `delta_tau_W / PSF` with geometry-level intervals,
+  and the analytical minimum resolvable standoff `Delta_R_min(B)` per
+  geometry, solving `u(R_T - Delta_R) - u(R_T) = c * PSF(B)`.
+- **A5.3 Run order** (stop and report after each block):
+  1. bandwidth (`bw246`, `bw61`);
+  2. standoff sweep (A5.2);
+  3. array calibration error (D11);
+  4. probe power;
+  5. the remaining A3.3 levels (relay gain, material, RCS +/-6 dB, blocker,
+     wall thickness D8).
+- **Operational notes** (reproducibility only; no additional rule):
+  - A bandwidth level switches the waveform and receiver processing profile
+    (`phase6.processing.profile`, recorded in the `bandwidth_profile` column)
+    to `bw61` or `bw246`. Everything else follows the A3.3 grid. The recorded
+    noise calibration is re-measured with that profile, as in the main
+    pipeline.
+  - In `u(R) = sqrt(R^2 + 4 d^2) - R` (BRIEF §5.3 image method),
+    `delta_tau_W = (u(R_A) - u(R_T)) / c`.
+  - *Baseline* for A5.1(b) is the main held-out run's `sigma_map = 0.5` cell
+    for the primary method (A3.3). With 2 twin realizations a stress record
+    `r` uses twin `r mod 2`, while the main run used `r mod 4`. So a matched
+    comparator, the main-run rows with `record_index in {0, 1, 4, 5}` (same
+    seeds and same twin draw), is reported as secondary.
+  - *Pooled* in A5.1(b) means all rows of a level for the primary method at
+    `sigma_map = 0.5` (the only stress sigma), with the A4.1 geometry-level
+    bootstrap (10,000 draws, seed 20261027) and paired level-minus-baseline
+    differences on the same draws.
+  - The A5.1(a) count uses each geometry's median `delta_tau_W / PSF(B)` over
+    that level's rows, as in A3.1. A prediction is reported as *matched* when
+    the point estimate moves in the stated direction (strictly), with the
+    interval reported beside it. Stress results carry no GO/NO-GO label.
