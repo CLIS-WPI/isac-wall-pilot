@@ -595,6 +595,23 @@ phase8:
       applies_to: physical_tx_rx_arrays_only
     used_for_tuning: false
   frozen:
-    gate_inflation_c: null
-    thresholds: null
-    t_common: null
+    gate_inflation_c: 1.0
+    thresholds:
+      exact_oracle:
+        noise_sigmas: 1.8737742157431028
+        supported_min: 0.01672886868844307
+        supported_max: 1.3177824379243586
+      imperfect_narrow:
+        noise_sigmas: 1.8474066213620994
+        supported_min: 0.014672196624174676
+        supported_max: 1.2872929542923885
+      imperfect_robust:
+        noise_sigmas: 1.721736350287777
+        supported_min: 0.016167815432649144
+        supported_max: 1.286775241426862
+    t_common:
+      exact_oracle: 25.537278873464246
+      imperfect_narrow: 22.94866130299852
+      imperfect_robust: 20.1552339818422
+      mapfree_two_beam: 3.0848590615005134
+      mapfree_coarse_to_fine: 3.279239106840957
