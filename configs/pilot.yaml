@@ -606,6 +606,8 @@ phase8:
       phase_error_deg_rms: 5.0
       realizations: 4
       applies_to: physical_tx_rx_arrays_only
+    # ANALYSIS_PLAN A7.1 notes: realization k of slot s draws from default_rng([seed, s, k]).
+    array_calibration_seed: 20261028
     used_for_tuning: false
     # ANALYSIS_PLAN A3.3 / A5: per-level grid on the held-out geometries (python -m isac_verify stress).
     grid:

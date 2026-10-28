@@ -891,3 +891,24 @@ declared processing choices, not post-hoc tuning.
 - **Equivalence evidence** (`results/phase8a_diag/eq_stress2`): cal_00 x 2
   records on the baseline config. All 104 non-timing columns of the 120 rows
   are identical to the calibration v5 shard. 71 tests passed.
+
+### P8-11 — Stress harness block 3: array calibration error D11 (ANALYSIS_PLAN A7.1)
+
+- **Type:** execution harness only; inactive by default.
+- **What:**
+  - Level `array_error_d11` reads the existing `phase8.stress.array_calibration`
+    values (0.5 dB, 5 deg, 4 realizations) plus the new key
+    `phase8.stress.array_calibration_seed` (20261028).
+  - `run_geometry` builds 4 perturbed copies of the true link matrices
+    (`stress.perturb_links`: target and background `diag(e_RX) M diag(e_TX)`,
+    downlink `M diag(e_TX)`, uplink `diag(e_RX) M`). Record `r` uses copy
+    `r mod 4`, recorded in the extra column `array_error_realization`.
+  - The planner, twin maps, PSF, receiver steering, noise calibration and the
+    matched-relay calibration keep the ideal arrays.
+  - A3.3 grid, baseline profile.
+- **Smoke test** (cal_00, 1 record, calibration split): 6 rows, realization 0.
+  E_D changed from 1.2617e-11 to 1.2497e-11 W (target). The mapped beams
+  moved from +25.5 to -25.6 deg, so the planner chose the other wall side.
+- **Equivalence evidence** (`results/phase8a_diag/eq_stress3`): cal_00 x 2
+  records on the baseline config. All 104 non-timing columns of the 120 rows
+  are identical to the calibration v5 shard. 72 tests passed.

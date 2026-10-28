@@ -346,15 +346,30 @@ def run_geometry(
         "relay_distance_m": geometry["relay_distance_m"],
         "half_width_m": geometry["half_width_m"],
     }
+    array_error = config.section("phase8").get("stress_runtime", {}).get("array_error")
+    if array_error is not None:
+        # A7.1: record r sees realization r mod R of the gNB element errors; planner and twin stay ideal.
+        from .stress import array_error_factors, perturb_links
+
+        elements = int(config.get("arrays", "gnb_tx", "num_elements"))
+        perturbed = [
+            perturb_links(prepared["links"], *array_error_factors(array_error, slot, k, elements))
+            for k in range(int(array_error["realizations"]))
+        ]
     for world in worlds:
         for record_index in range(records):
+            links = (
+                prepared["links"]
+                if array_error is None
+                else perturbed[record_index % len(perturbed)]
+            )
             base = _acquire_record(
                 config=config_g,
                 choices=choices,
                 world=world,
                 record_index=record_index,
                 direct_weights=direct_weights,
-                links=prepared["links"],
+                links=links,
                 calibration=prepared["calibration"],
                 noise_full=noise_full,
                 timing=timing,
@@ -371,7 +386,7 @@ def run_geometry(
                 twin_z=twin_z,
                 seeds=seeds,
                 direct_weights=direct_weights,
-                links=prepared["links"],
+                links=links,
                 calibration=prepared["calibration"],
                 noise_full=noise_full,
                 noise_by_symbols=noise_by_symbols,
@@ -387,6 +402,8 @@ def run_geometry(
                 noise_only_seed=noise_seed,
             ):
                 row.update(columns)
+                if array_error is not None:
+                    row["array_error_realization"] = record_index % len(perturbed)
                 rows.append(row)
             del base
     representative.clear()

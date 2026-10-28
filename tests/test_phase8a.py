@@ -93,6 +93,42 @@ def test_stress_config_changes_only_grid_and_level(config: PilotConfig) -> None:
     assert stress_config(config, "standoff_03m").data["phase8"]["stress_runtime"]["relay_standoff_m"] == 3.0
 
 
+def test_array_error_level_and_link_perturbation(config: PilotConfig) -> None:
+    """A7.1 notes: D11 touches only gNB element sides of the true links; ones leave them unchanged."""
+    import torch
+
+    from isac_verify.receiver import LinkPath
+    from isac_verify.stress import ARRAY_ERROR_LEVEL, array_error_factors, perturb_links, stress_config
+
+    stressed = stress_config(config, ARRAY_ERROR_LEVEL).data
+    spec = stressed["phase8"]["stress_runtime"]["array_error"]
+    assert spec["amplitude_error_db_rms"] == 0.5 and spec["phase_error_deg_rms"] == 5.0
+    assert spec["realizations"] == 4 and spec["seed"] == 20261028
+    assert stressed["phase8"]["grid"]["methods"] == config.get("phase8", "stress", "grid", "methods")
+    assert stressed["phase6"] == config.data["phase6"] and stressed["rf"] == config.data["rf"]
+    e_tx, e_rx = array_error_factors(spec, 3, 1, 16)
+    assert np.array_equal(e_tx, array_error_factors(spec, 3, 1, 16)[0])
+    assert not np.allclose(e_tx, array_error_factors(spec, 3, 2, 16)[0]) and not np.allclose(e_tx, e_rx)
+    big_tx, _ = array_error_factors(spec, 0, 0, 200_000)
+    assert abs(np.std(20 * np.log10(np.abs(big_tx))) - 0.5) < 0.01
+    assert abs(np.std(np.rad2deg(np.angle(big_tx))) - 5.0) < 0.05
+
+    def link(rows: int, cols: int) -> LinkPath:
+        m = torch.arange(rows * cols, dtype=torch.float32).reshape(rows, cols).to(torch.complex64) + 1
+        return LinkPath("x", "f", m, 1e-7, 0.0, 0.0, ())
+
+    links = {"target": (link(16, 16),), "background": (link(16, 16),),
+             "downlink": (link(1, 16),), "uplink": (link(16, 1),)}
+    same = perturb_links(links, np.ones(16), np.ones(16))
+    assert all(torch.equal(same[k][0].matrix, links[k][0].matrix) for k in links)
+    out = perturb_links(links, e_tx, e_rx)
+    tx, rx = torch.as_tensor(e_tx, dtype=torch.complex64), torch.as_tensor(e_rx, dtype=torch.complex64)
+    assert torch.allclose(out["target"][0].matrix, rx[:, None] * links["target"][0].matrix * tx[None, :])
+    assert torch.allclose(out["background"][0].matrix, rx[:, None] * links["background"][0].matrix * tx[None, :])
+    assert torch.allclose(out["downlink"][0].matrix, links["downlink"][0].matrix * tx[None, :])
+    assert torch.allclose(out["uplink"][0].matrix, rx[:, None] * links["uplink"][0].matrix)
+
+
 def test_frozen_decision_reads_only_phase8_frozen(config: PilotConfig) -> None:
     frozen = config.section("phase8", "frozen")
     factor, fitted = frozen_decision(config)
