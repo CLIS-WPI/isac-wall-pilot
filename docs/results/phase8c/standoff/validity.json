@@ -1,0 +1,80 @@
+{
+  "standoff_03m": {
+    "rows_expected": true,
+    "split_is_heldout": true,
+    "methods": true,
+    "single_delta_r": true,
+    "decision_source_frozen": true,
+    "reclassification_matches_run": true,
+    "preflight_pass": true,
+    "source_commit_clean": true,
+    "source_commit": "986c3a45c88a6f2620110b448e13896bf6d12623",
+    "acquisition_failed_rows": 0,
+    "infeasible_pairs": {}
+  },
+  "standoff_06m": {
+    "rows_expected": true,
+    "split_is_heldout": true,
+    "methods": true,
+    "single_delta_r": true,
+    "decision_source_frozen": true,
+    "reclassification_matches_run": true,
+    "preflight_pass": true,
+    "source_commit_clean": true,
+    "source_commit": "986c3a45c88a6f2620110b448e13896bf6d12623",
+    "acquisition_failed_rows": 0,
+    "infeasible_pairs": {}
+  },
+  "standoff_10m": {
+    "rows_expected": true,
+    "split_is_heldout": true,
+    "methods": true,
+    "single_delta_r": true,
+    "decision_source_frozen": true,
+    "reclassification_matches_run": true,
+    "preflight_pass": true,
+    "source_commit_clean": true,
+    "source_commit": "986c3a45c88a6f2620110b448e13896bf6d12623",
+    "acquisition_failed_rows": 0,
+    "infeasible_pairs": {}
+  },
+  "standoff_15m": {
+    "rows_expected": true,
+    "split_is_heldout": true,
+    "methods": true,
+    "single_delta_r": true,
+    "decision_source_frozen": true,
+    "reclassification_matches_run": true,
+    "preflight_pass": true,
+    "source_commit_clean": true,
+    "source_commit": "986c3a45c88a6f2620110b448e13896bf6d12623",
+    "acquisition_failed_rows": 0,
+    "infeasible_pairs": {}
+  },
+  "standoff_20m": {
+    "rows_expected": true,
+    "split_is_heldout": true,
+    "methods": true,
+    "single_delta_r": true,
+    "decision_source_frozen": true,
+    "reclassification_matches_run": true,
+    "preflight_pass": true,
+    "source_commit_clean": true,
+    "source_commit": "986c3a45c88a6f2620110b448e13896bf6d12623",
+    "acquisition_failed_rows": 0,
+    "infeasible_pairs": {}
+  },
+  "standoff_30m": {
+    "rows_expected": true,
+    "split_is_heldout": true,
+    "methods": true,
+    "single_delta_r": true,
+    "decision_source_frozen": true,
+    "reclassification_matches_run": true,
+    "preflight_pass": true,
+    "source_commit_clean": true,
+    "source_commit": "986c3a45c88a6f2620110b448e13896bf6d12623",
+    "acquisition_failed_rows": 0,
+    "infeasible_pairs": {}
+  }
+}

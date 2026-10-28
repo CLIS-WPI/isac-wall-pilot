@@ -1,0 +1,22 @@
+method,rate,tau_bin,n_pairs,point,ci95,n_rows,n_geometries
+exact_oracle,supported,"[0.0, 0.5)",75,0.9666666666666667,"[0.9305511603375528, 1.0]",600,24
+exact_oracle,supported,"[0.5, 0.75)",20,0.44375,"[0.25, 0.64375]",160,20
+exact_oracle,supported,"[0.75, 1.0)",18,0.0,"[0.0, 0.0]",144,18
+exact_oracle,supported,"[1.0, 1.25)",11,0.0,"[0.0, 0.0]",88,11
+exact_oracle,supported,"[1.25, 1.5)",4,0.0,"[0.0, 0.0]",32,4
+exact_oracle,supported,"[1.5, 2.0)",10,0.0,"[0.0, 0.0]",80,10
+exact_oracle,supported,"[2.0, inf)",6,0.0,"[0.0, 0.0]",48,6
+imperfect_robust,supported,"[0.0, 0.5)",75,0.9566666666666667,"[0.9166666666666666, 0.995]",600,24
+imperfect_robust,supported,"[0.5, 0.75)",20,0.20625,"[0.075, 0.36875]",160,20
+imperfect_robust,supported,"[0.75, 1.0)",18,0.0,"[0.0, 0.0]",144,18
+imperfect_robust,supported,"[1.0, 1.25)",11,0.0,"[0.0, 0.0]",88,11
+imperfect_robust,supported,"[1.25, 1.5)",4,0.0,"[0.0, 0.0]",32,4
+imperfect_robust,supported,"[1.5, 2.0)",10,0.0,"[0.0, 0.0]",80,10
+imperfect_robust,supported,"[2.0, inf)",6,0.0,"[0.0, 0.0]",48,6
+mapfree_coarse_to_fine,supported_common,"[0.0, 0.5)",75,0.7683333333333333,"[0.6232876712328768, 0.8865131578947368]",600,24
+mapfree_coarse_to_fine,supported_common,"[0.5, 0.75)",20,0.5125,"[0.3, 0.7125]",160,20
+mapfree_coarse_to_fine,supported_common,"[0.75, 1.0)",18,0.24305555555555555,"[0.0763888888888889, 0.4375]",144,18
+mapfree_coarse_to_fine,supported_common,"[1.0, 1.25)",11,0.022727272727272728,"[0.0, 0.06818181818181818]",88,11
+mapfree_coarse_to_fine,supported_common,"[1.25, 1.5)",4,0.0,"[0.0, 0.0]",32,4
+mapfree_coarse_to_fine,supported_common,"[1.5, 2.0)",10,0.0,"[0.0, 0.0]",80,10
+mapfree_coarse_to_fine,supported_common,"[2.0, inf)",6,0.0,"[0.0, 0.0]",48,6

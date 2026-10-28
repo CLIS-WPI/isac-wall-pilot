@@ -1,0 +1,10 @@
+method,rate,delay_resolved,angle_resolved,n_pairs,point,ci95,n_rows,n_geometries
+exact_oracle,supported,False,False,83,0.9653614457831325,"[0.9320987654320988, 0.995253164556962]",664,24
+exact_oracle,supported,False,True,30,0.041666666666666664,"[0.0, 0.1111111111111111]",240,24
+exact_oracle,supported,True,True,31,0.0,"[0.0, 0.0]",248,23
+imperfect_robust,supported,False,False,83,0.8990963855421686,"[0.8520114942528736, 0.948170731707317]",664,24
+imperfect_robust,supported,False,True,30,0.041666666666666664,"[0.0, 0.1125]",240,24
+imperfect_robust,supported,True,True,31,0.0,"[0.0, 0.0]",248,23
+mapfree_coarse_to_fine,supported_common,False,False,83,0.7093373493975904,"[0.5617279067041726, 0.838608974830733]",664,24
+mapfree_coarse_to_fine,supported_common,False,True,30,0.44583333333333336,"[0.2399267241379311, 0.6363636363636364]",240,24
+mapfree_coarse_to_fine,supported_common,True,True,31,0.008064516129032258,"[0.0, 0.026785714285714284]",248,23

@@ -1,0 +1,19 @@
+method,rate,level,n_pairs,point,ci95,n_rows,n_geometries
+exact_oracle,supported,standoff_03m,24,1.0,"[1.0, 1.0]",192,24
+exact_oracle,supported,standoff_06m,24,1.0,"[1.0, 1.0]",192,24
+exact_oracle,supported,standoff_10m,24,1.0,"[1.0, 1.0]",192,24
+exact_oracle,supported,standoff_15m,24,1.0,"[1.0, 1.0]",192,24
+exact_oracle,supported,standoff_20m,24,1.0,"[1.0, 1.0]",192,24
+exact_oracle,supported,standoff_30m,24,1.0,"[1.0, 1.0]",192,24
+imperfect_robust,supported,standoff_03m,24,1.0,"[1.0, 1.0]",192,24
+imperfect_robust,supported,standoff_06m,24,1.0,"[1.0, 1.0]",192,24
+imperfect_robust,supported,standoff_10m,24,1.0,"[1.0, 1.0]",192,24
+imperfect_robust,supported,standoff_15m,24,1.0,"[1.0, 1.0]",192,24
+imperfect_robust,supported,standoff_20m,24,1.0,"[1.0, 1.0]",192,24
+imperfect_robust,supported,standoff_30m,24,1.0,"[1.0, 1.0]",192,24
+mapfree_coarse_to_fine,supported_common,standoff_03m,24,0.8697916666666666,"[0.7395833333333334, 0.9791666666666666]",192,24
+mapfree_coarse_to_fine,supported_common,standoff_06m,24,0.8697916666666666,"[0.7395833333333334, 0.9791666666666666]",192,24
+mapfree_coarse_to_fine,supported_common,standoff_10m,24,0.8697916666666666,"[0.7395833333333334, 0.9791666666666666]",192,24
+mapfree_coarse_to_fine,supported_common,standoff_15m,24,0.8697916666666666,"[0.7395833333333334, 0.9791666666666666]",192,24
+mapfree_coarse_to_fine,supported_common,standoff_20m,24,0.8697916666666666,"[0.7395833333333334, 0.9791666666666666]",192,24
+mapfree_coarse_to_fine,supported_common,standoff_30m,24,0.8697916666666666,"[0.7395833333333334, 0.9791666666666666]",192,24

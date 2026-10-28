@@ -1,0 +1,7 @@
+method,rate,delay_resolved,angle_resolved,n_pairs,point,ci95,n_rows,n_geometries
+exact_oracle,supported,False,True,16,0.078125,"[0.0, 0.1875]",128,16
+exact_oracle,supported,True,True,8,0.0,"[0.0, 0.0]",64,8
+imperfect_robust,supported,False,True,16,0.078125,"[0.0, 0.1953125]",128,16
+imperfect_robust,supported,True,True,8,0.0,"[0.0, 0.0]",64,8
+mapfree_coarse_to_fine,supported_common,False,True,16,0.5546875,"[0.3203125, 0.78125]",128,16
+mapfree_coarse_to_fine,supported_common,True,True,8,0.0,"[0.0, 0.0]",64,8
