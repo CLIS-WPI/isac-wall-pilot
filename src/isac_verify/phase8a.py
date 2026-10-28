@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import math
+import os
 import subprocess
 import sys
 import threading
@@ -45,6 +46,8 @@ from .receiver import ProcessingChoices, noise_calibration
 from .wall_paths import find_outgoing_wall_path, path_records
 
 SPLIT = "calibration"
+HELDOUT = "heldout"
+_heldout_approved = False
 RECORD_BLOCKS = {
     "direct": 0,
     "exact_oracle": 1,
@@ -60,7 +63,15 @@ class Phase8Error(RuntimeError):
     """Raised when a Phase 8A invariant is violated."""
 
 
+def approve_heldout() -> None:
+    """Unlock the held-out stream for this process (CLI ``heldout --approved``)."""
+    global _heldout_approved
+    _heldout_approved = True
+
+
 def _require_calibration(split: str) -> None:
+    if split == HELDOUT and _heldout_approved:
+        return
     if split != SPLIT:
         raise Phase8Error(
             f"split {split!r} is not available in Phase 8A: the held-out "
@@ -263,11 +274,12 @@ def _geometry_row(
     prepared: dict[str, Any],
     geometry_id: str,
     rejected: int,
+    split: str = SPLIT,
 ) -> dict[str, Any]:
     calibration = prepared["calibration"]
     return {
         "geometry_id": geometry_id,
-        "split": SPLIT,
+        "split": split,
         "slot": geometry["slot"],
         "attempt_accepted": geometry["attempt"],
         "rejected_draws_before": int(rejected),
@@ -303,8 +315,9 @@ def run_geometry(
     direct_weights: torch.Tensor,
     records: int,
     timing: dict[str, float],
+    split: str = SPLIT,
 ) -> pd.DataFrame:
-    """Run the full trial grid for one accepted calibration geometry."""
+    """Run the full trial grid for one accepted geometry of ``split``."""
     slot = int(geometry["slot"])
     grid = config.section("phase8", "grid")
     sigmas = [float(value) for value in grid["sigma_map_m"]]
@@ -314,9 +327,9 @@ def run_geometry(
         float(value)
         for value in config.get("phase8", "rules", "coverage", "inflation_candidates")
     ]
-    seeds = {"streams": geometry_seed_streams(config, SPLIT, slot, records)}
-    twin_z = twin_draws(config, SPLIT, slot, realizations)
-    noise_seed = noise_only_seed_fn(config, SPLIT, slot, len(sigmas))
+    seeds = {"streams": geometry_seed_streams(config, split, slot, records)}
+    twin_z = twin_draws(config, split, slot, realizations)
+    noise_seed = noise_only_seed_fn(config, split, slot, len(sigmas))
     rows: list[dict[str, Any]] = []
     representative: dict[str, Any] = {}
     columns = {
@@ -359,7 +372,7 @@ def run_geometry(
                 true_relay_deg=prepared["true_relay_deg"],
                 methods=METHODS,
                 geometry_id=geometry_id,
-                split=SPLIT,
+                split=split,
                 inflations=inflations,
                 true_wall=prepared["true_wall"],
                 noise_only_seed=noise_seed,
@@ -392,6 +405,7 @@ def run_calibration(
     record_limit: int | None = None,
     workers: int = 1,
     worker_slots: list[int] | None = None,
+    split: str = SPLIT,
 ) -> int:
     """Run the calibration geometries and compute the frozen thresholds.
 
@@ -403,7 +417,14 @@ def run_calibration(
     _require_gpu(config)
     output = Path(output_path)
     (output / "shards").mkdir(parents=True, exist_ok=True)
-    total_slots = int(config.get("phase8", "geometry", "calibration_geometries"))
+    _require_calibration(split)
+    total_slots = int(
+        config.get(
+            "phase8",
+            "geometry",
+            "heldout_geometries" if split == HELDOUT else "calibration_geometries",
+        )
+    )
     slots = total_slots if geometry_limit is None else min(total_slots, int(geometry_limit))
     records = (
         int(record_limit)
@@ -411,24 +432,26 @@ def run_calibration(
         else int(config.get("phase8", "grid", "records_per_world"))
     )
     if worker_slots is not None:
-        return _run_worker(config, output, worker_slots, records)
+        return _run_worker(config, output, worker_slots, records, split)
     from .environment import run_preflight
 
     if run_preflight(require_h100=require_h100, output_path=output) != 0:
         raise Phase8Error("preflight failed")
+    if split == HELDOUT:
+        _record_source_commit(output)
     resolved = dict(config.data)
     resolved["phase8_runtime"] = {
-        "split": SPLIT,
+        "split": split,
         "geometries": slots,
         "records_per_world": records,
-        "held_out_generated": False,
+        "held_out_generated": split == HELDOUT,
     }
     (output / "resolved_config.yaml").write_text(
         yaml.safe_dump(resolved, sort_keys=False), encoding="utf-8"
     )
     manifest = {
         "policy": "explicit_per_stream_never_none",
-        "split": SPLIT,
+        "split": split,
         "geometry_slots": slots,
         "records_per_world": records,
         "layout": "stream_seed*100000 + block*1000 + record*10 + look",
@@ -436,15 +459,15 @@ def run_calibration(
         "slots": [
             {
                 "slot": slot,
-                "physical_geometry": _stream(config, "physical_geometry", SPLIT)[slot],
-                "twin_error": _stream(config, "twin_error", SPLIT)[slot],
-                "noise_only_floor": _stream(config, "noise_only_floor", SPLIT)[slot],
-                "streams": geometry_seed_streams(config, SPLIT, slot, records),
+                "physical_geometry": _stream(config, "physical_geometry", split)[slot],
+                "twin_error": _stream(config, "twin_error", split)[slot],
+                "noise_only_floor": _stream(config, "noise_only_floor", split)[slot],
+                "streams": geometry_seed_streams(config, split, slot, records),
             }
             for slot in range(slots)
         ],
     }
-    (output / "seed_manifest_calibration.json").write_text(
+    (output / f"seed_manifest_{split}.json").write_text(
         _json_dump(manifest), encoding="utf-8"
     )
     timing: dict[str, Any] = {"per_geometry_s": {}}
@@ -454,12 +477,12 @@ def run_calibration(
     torch.cuda.reset_peak_memory_stats()
     if workers > 1:
         timing.update(
-            _run_parallel(config_path, output, slots, records, workers, record_limit)
+            _run_parallel(config_path, output, slots, records, workers, record_limit, split)
         )
     else:
-        timing["per_geometry_s"] = _run_slots(config, output, list(range(slots)), records)[
-            "per_geometry_s"
-        ]
+        timing["per_geometry_s"] = _run_slots(
+            config, output, list(range(slots)), records, split
+        )["per_geometry_s"]
     timing["workers"] = workers
     timing["end_to_end_s"] = _now() - run_start
     timing["nvml_end"] = _nvml_snapshot()
@@ -467,6 +490,10 @@ def run_calibration(
     timing["gpu_processes_observed"] = _summarize_gpu_processes(gpu_processes)
     timing["pytorch_peak_allocated_bytes"] = int(torch.cuda.max_memory_allocated())
     timing["pytorch_peak_reserved_bytes"] = int(torch.cuda.max_memory_reserved())
+    if split == HELDOUT:
+        return analyze_heldout(
+            output, config, timing=timing, expected_geometries=slots, records=records
+        )
     return analyze_calibration(
         output, config, timing=timing, expected_geometries=slots, records=records
     )
@@ -479,6 +506,7 @@ def _run_parallel(
     records: int,
     workers: int,
     record_limit: int | None,
+    split: str = SPLIT,
 ) -> dict[str, Any]:
     """Run slot subsets in ``workers`` processes and merge their worker records."""
     assignments = [list(range(slots))[k::workers] for k in range(min(workers, slots))]
@@ -486,7 +514,8 @@ def _run_parallel(
     processes = []
     for assigned in assignments:
         command = [
-            sys.executable, "-m", "isac_verify", "calibrate",
+            sys.executable, "-m", "isac_verify",
+            *(["heldout", "--approved"] if split == HELDOUT else ["calibrate"]),
             "--config", str(config_path), "--output", str(output),
             "--worker-slots", ",".join(str(slot) for slot in assigned),
         ]
@@ -520,10 +549,12 @@ def _run_parallel(
     return merged
 
 
-def _run_worker(config: PilotConfig, output: Path, assigned: list[int], records: int) -> int:
+def _run_worker(
+    config: PilotConfig, output: Path, assigned: list[int], records: int, split: str = SPLIT
+) -> int:
     start = _now()
     torch.cuda.reset_peak_memory_stats()
-    part = _run_slots(config, output, assigned, records)
+    part = _run_slots(config, output, assigned, records, split)
     part["wall_s"] = _now() - start
     part["pytorch_peak_allocated_bytes"] = int(torch.cuda.max_memory_allocated())
     part["pytorch_peak_reserved_bytes"] = int(torch.cuda.max_memory_reserved())
@@ -534,9 +565,9 @@ def _run_worker(config: PilotConfig, output: Path, assigned: list[int], records:
 
 
 def _run_slots(
-    config: PilotConfig, output: Path, assigned: list[int], records: int
+    config: PilotConfig, output: Path, assigned: list[int], records: int, split: str = SPLIT
 ) -> dict[str, Any]:
-    """Run the given calibration slots; shared by the sequential and worker paths."""
+    """Run the given slots of ``split``; shared by the sequential and worker paths."""
     per_geometry_s: dict[str, float] = {}
     choices = ProcessingChoices.from_config(config)
     noise_records = int(config.get("phase6", "processing", "noise_calibration_records"))
@@ -561,13 +592,13 @@ def _run_slots(
         ArrayGeometry.from_config(config),
     ).weights
     for slot in assigned:
-        geometry_id = f"cal_{slot:02d}"
+        geometry_id = f"{'ho' if split == HELDOUT else 'cal'}_{slot:02d}"
         shard, meta_path = _shard_paths(output, slot)
         if shard.exists() and meta_path.exists():
             print(f"{geometry_id}: shard exists, skipping", flush=True)
             continue
         start = _now()
-        geometry, config_g, prepared, rejected = accepted_geometry(config, slot)
+        geometry, config_g, prepared, rejected = accepted_geometry(config, slot, split)
         solve_s = _now() - start
         geom_timing: dict[str, float] = {}
         frame = run_geometry(
@@ -582,6 +613,7 @@ def _run_slots(
             direct_weights=direct_weights,
             records=records,
             timing=geom_timing,
+            split=split,
         )
         elapsed = _now() - start
         frame.to_parquet(shard, index=False)
@@ -589,7 +621,7 @@ def _run_slots(
             _json_dump(
                 {
                     "geometry": _geometry_row(
-                        geometry, prepared, geometry_id, len(rejected)
+                        geometry, prepared, geometry_id, len(rejected), split
                     ),
                     "rejected": rejected,
                     "rows": int(len(frame)),
@@ -850,6 +882,106 @@ def analyze_calibration(
         f"phase 8a calibration complete: rows={len(trials)} "
         f"geometries={len(geometries)} c={factor:g} "
         f"coverage_met={choice['met']} rejected={len(rejected_frame)}",
+        flush=True,
+    )
+    return 0
+
+
+def _record_source_commit(output: Path) -> None:
+    """Add the host-recorded source commit (scripts/drun.sh) to environment.json; refuse if unknown or dirty."""
+    commit = os.environ.get("ISAC_GIT_COMMIT", "")
+    dirty = os.environ.get("ISAC_GIT_DIRTY", "")
+    if not commit or dirty != "0":
+        raise Phase8Error(
+            f"held-out run needs a clean, known source commit (commit={commit!r}, dirty={dirty!r})"
+        )
+    path = output / "environment.json"
+    environment = json.loads(path.read_text(encoding="utf-8"))
+    environment["source_commit"] = {"commit": commit, "dirty_paths": int(dirty)}
+    path.write_text(json.dumps(environment, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def frozen_decision(config: PilotConfig) -> tuple[float, dict[str, Any]]:
+    """Gate inflation and thresholds from ``phase8.frozen`` only, in ``classify_trials`` form."""
+    frozen = config.section("phase8", "frozen")
+    if frozen.get("gate_inflation_c") is None or not frozen.get("thresholds") or not frozen.get("t_common"):
+        raise Phase8Error("phase8.frozen is incomplete; the held-out run needs frozen thresholds")
+    fitted = {
+        "mapped": {
+            method: {
+                "floor_k": {"value": float(values["noise_sigmas"])},
+                "s_lo": {"value": float(values["supported_min"])},
+                "s_hi": {"value": float(values["supported_max"])},
+            }
+            for method, values in frozen["thresholds"].items()
+        },
+        "common": {method: {"value": float(value)} for method, value in frozen["t_common"].items()},
+    }
+    if set(fitted["mapped"]) != set(cal.MAPPED_METHODS) or set(fitted["common"]) != set(
+        cal.WALL_PROBING_METHODS
+    ):
+        raise Phase8Error("phase8.frozen does not cover every method")
+    return float(frozen["gate_inflation_c"]), fitted
+
+
+def analyze_heldout(
+    output: str | Path,
+    config: PilotConfig,
+    *,
+    timing: dict[str, Any] | None = None,
+    expected_geometries: int | None = None,
+    records: int | None = None,
+) -> int:
+    """Apply the frozen decision (``phase8.frozen`` only) to the held-out shards. Nothing is fitted."""
+    output = Path(output)
+    shard_files = sorted((output / "shards").glob("geometry_*.parquet"))
+    if not shard_files:
+        raise Phase8Error("no held-out shards found")
+    trials = pd.concat([pd.read_parquet(path) for path in shard_files], ignore_index=True)
+    metas = [json.loads(path.with_suffix(".json").read_text(encoding="utf-8")) for path in shard_files]
+    if set(trials["split"]) != {HELDOUT}:
+        raise Phase8Error("held-out artifacts contain a non-held-out split")
+    factor, fitted = frozen_decision(config)
+    classified = cal.classify_trials(trials, fitted, factor)
+    classified.to_parquet(output / "heldout_trials.parquet", index=False)
+    cal.rate_table(classified).to_csv(output / "rates.csv", index=False)
+    inflations = [float(v) for v in config.get("phase8", "rules", "coverage", "inflation_candidates")]
+    cal.coverage_table(trials, inflations).to_csv(output / "coverage.csv", index=False)
+    geometries = pd.DataFrame([meta["geometry"] for meta in metas])
+    geometries.to_csv(output / "geometries_heldout.csv", index=False)
+    rejected = pd.DataFrame([row for meta in metas for row in meta["rejected"]])
+    rejected.to_csv(output / "rejected_draws.csv", index=False)
+    expected = None
+    if expected_geometries is not None and records is not None:
+        expected = (
+            expected_geometries
+            * len(config.get("phase8", "grid", "sigma_map_m"))
+            * len(config.get("phase8", "grid", "worlds"))
+            * records
+            * len(METHODS)
+        )
+    summary = {
+        "split": HELDOUT,
+        "geometries": int(len(geometries)),
+        "rows": int(len(trials)),
+        "expected_rows": expected,
+        "rows_match": (expected is None) or int(len(trials)) == expected,
+        "decision_source": "configs phase8.frozen",
+        "gate_inflation_c": factor,
+        "rejected_draws": int(len(rejected)),
+        "acquisition_failed_rows": int((trials["status"] == "ACQUISITION_FAILED").sum()),
+        "decision_counts": classified["decision"].value_counts().to_dict(),
+        "status": "HELDOUT_COMPLETE",
+    }
+    (output / "heldout_summary.json").write_text(_json_dump(summary), encoding="utf-8")
+    timing = dict(timing or {})
+    timing["per_geometry_s_from_shards"] = {m["geometry"]["geometry_id"]: m["elapsed_s"] for m in metas}
+    timing["stage_s_from_shards"] = {m["geometry"]["geometry_id"]: m["stage_s"] for m in metas}
+    timing["rows"] = int(len(trials))
+    (output / "timing.json").write_text(_json_dump(timing), encoding="utf-8")
+    print(
+        f"phase 8 held-out complete: rows={len(trials)} geometries={len(geometries)} "
+        f"c={factor:g} rejected={len(rejected)}",
         flush=True,
     )
     return 0

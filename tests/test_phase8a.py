@@ -11,6 +11,7 @@ from isac_verify.config import PilotConfig
 from isac_verify.phase8a import (
     Phase8Error,
     draw_geometry,
+    frozen_decision,
     geometry_config,
     geometry_seed_streams,
     noise_only_seed_fn,
@@ -52,6 +53,29 @@ def test_heldout_stream_is_refused(config: PilotConfig) -> None:
         geometry_seed_streams(config, "heldout", 0, 32)
     with pytest.raises(Phase8Error, match="explicit human approval"):
         twin_draws(config, "heldout", 0, 4)
+
+
+def test_heldout_cli_refuses_without_approval() -> None:
+    from isac_verify.__main__ import main
+
+    with pytest.raises(SystemExit, match="--approved"):
+        main(["heldout", "--output", "/tmp/never_written"])
+    assert not Path("/tmp/never_written").exists()
+
+
+def test_frozen_decision_reads_only_phase8_frozen(config: PilotConfig) -> None:
+    frozen = config.section("phase8", "frozen")
+    factor, fitted = frozen_decision(config)
+    assert factor == frozen["gate_inflation_c"]
+    for method, values in frozen["thresholds"].items():
+        assert fitted["mapped"][method]["floor_k"]["value"] == values["noise_sigmas"]
+        assert fitted["mapped"][method]["s_lo"]["value"] == values["supported_min"]
+        assert fitted["mapped"][method]["s_hi"]["value"] == values["supported_max"]
+    assert {m: v["value"] for m, v in fitted["common"].items()} == frozen["t_common"]
+    data = json.loads(json.dumps(config.data))
+    data["phase8"]["frozen"]["thresholds"] = None
+    with pytest.raises(Phase8Error, match="incomplete"):
+        frozen_decision(PilotConfig(path=config.path, data=data))
 
 
 def test_geometry_config_is_collinear_and_symmetric(config: PilotConfig) -> None:

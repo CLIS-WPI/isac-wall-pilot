@@ -811,3 +811,33 @@ declared processing choices, not post-hoc tuning.
   `calibrate` with the rule-4/5 values from before the amendment, was renamed
   to `thresholds_pooled_preA2.json`. The frozen values are only in
   `configs/pilot.yaml` `phase8.frozen`.
+
+### P8-8 — Held-out harness added after the freeze (no computation change)
+
+- **Type:** execution harness only. No receiver, planner, trial, seed, gate or
+  threshold code changed.
+- **What:** the frozen code (`0350377`) could not run the held-out split.
+  `phase8a.py` hard-coded `SPLIT = "calibration"`, and no held-out command
+  existed (the plan scoped held-out to Part B). Nothing read `phase8.frozen`:
+  in-pipeline decisions read `phase6.evidence.thresholds` (null, so every trial
+  row is UNRESOLVED / `thresholds_null`), and calibration decisions were applied
+  afterwards by `calibration.classify_trials` with freshly fitted values. The
+  harness now:
+  - threads a `split` argument through the existing per-slot path
+    (`run_geometry`, `_run_slots`, workers, seed manifest, geometry ids `ho_XX`);
+  - unlocks the held-out stream only via `isac_verify heldout --approved`
+    (the stream stays refused by default);
+  - applies decisions in `analyze_heldout` from `phase8.frozen` only
+    (`frozen_decision`; nothing is fitted on held-out data);
+  - records the host git commit in `environment.json` (`source_commit`) and
+    refuses to run held-out from an unknown or dirty tree (`scripts/drun.sh`
+    passes `ISAC_GIT_COMMIT` / `ISAC_GIT_DIRTY`).
+- **Equivalence evidence** (`results/phase8a_diag/eq_harness`, GPU 1):
+  cal_00 x 2 records run on the harness code. All 104 non-timing columns of
+  the 120 rows are identical, compared as text, to the same records of the
+  calibration v5 shard produced by the frozen code. `analyze_heldout` was dry-run on
+  a relabelled copy of those calibration rows
+  (`results/phase8a_diag/analyzer_dryrun_calibration_relabelled`); no held-out
+  geometry was drawn.
+- **Tags:** `pilot-frozen` stays on `0350377`. The held-out run executes from a
+  worktree at tag `pilot-heldout` (this commit).

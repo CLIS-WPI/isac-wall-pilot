@@ -52,6 +52,29 @@ def _calibrate(args: argparse.Namespace) -> int:
     )
 
 
+def _heldout(args: argparse.Namespace) -> int:
+    from .config import PilotConfig
+    from .phase8a import HELDOUT, analyze_heldout, approve_heldout, run_calibration
+
+    if not args.approved:
+        raise SystemExit("heldout: refusing without --approved (explicit human approval)")
+    approve_heldout()
+    if args.analyze_only:
+        return analyze_heldout(args.output, PilotConfig.load(args.config))
+    return run_calibration(
+        args.config,
+        args.output,
+        require_h100=args.require_h100,
+        workers=args.workers,
+        worker_slots=(
+            None
+            if args.worker_slots is None
+            else [int(slot) for slot in args.worker_slots.split(",")]
+        ),
+        split=HELDOUT,
+    )
+
+
 def _report(args: argparse.Namespace) -> int:
     from .report import build_report
 
@@ -185,6 +208,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     calibrate.add_argument("--worker-slots", default=None, help=argparse.SUPPRESS)
     calibrate.set_defaults(handler=_calibrate)
+
+    heldout = subparsers.add_parser(
+        "heldout",
+        help="Phase 8: run the held-out geometries with the frozen thresholds",
+    )
+    heldout.add_argument("--config", default="configs/pilot.yaml")
+    heldout.add_argument("--output", default="results/phase8b_heldout")
+    heldout.add_argument("--require-h100", action="store_true")
+    heldout.add_argument("--approved", action="store_true", help="explicit human approval")
+    heldout.add_argument("--analyze-only", action="store_true")
+    heldout.add_argument("--workers", type=int, default=1)
+    heldout.add_argument("--worker-slots", default=None, help=argparse.SUPPRESS)
+    heldout.set_defaults(handler=_heldout)
 
     report = subparsers.add_parser(
         "report",

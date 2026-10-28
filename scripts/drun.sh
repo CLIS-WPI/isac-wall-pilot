@@ -16,4 +16,6 @@ exec docker run --rm --gpus "$GPU" --shm-size=8g \
   --user "$(id -u):$(id -g)" -e HOME=/tmp \
   -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics \
   -e MPLBACKEND=Agg -e ISAC_GPU="$GPU" \
+  -e ISAC_GIT_COMMIT="$(git rev-parse HEAD 2>/dev/null || true)" \
+  -e ISAC_GIT_DIRTY="$(git status --porcelain 2>/dev/null | wc -l)" \
   "${EXTRA[@]}" isac-wall-pilot:2.2.0 "$@"
