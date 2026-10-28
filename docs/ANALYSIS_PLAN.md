@@ -534,3 +534,86 @@ supported.
     range and range are reported beside the analytical value and the baseline
     median. "Near" and "far" get no numeric cut-off. Intervals are reported
     beside every point estimate.
+
+## Amendment 8 — 2026-10-28
+
+Written after block 3 (D11) was reported and versioned
+(`docs/results/phase8c/array_error/`), and before any block 4 or block 5 code
+was written or any block 4 or block 5 trial was generated, solved or run. The
+exploratory s_lo sensitivity (`docs/results/phase8c/threshold_sensitivity/`)
+uses only the main held-out run. **No threshold, gate, primary rule, decision
+criterion, frozen config value, earlier label or earlier prediction outcome
+changes.**
+
+- **A8.1 Block 4, probe power {−20, −10, 0, 20} dBm, same design as A3.3.**
+  Predictions:
+  - (a) robust target SUPPORTED stays ≥ 0.95 at −10 dBm and drops at
+    −20 dBm, where acquisition failures also appear (direct peak-to-noise
+    ≈ 12 dB vs the 10 dB floor);
+  - (b) coarse-to-fine target SUPPORTED_common falls below 0.5 at a power at
+    least 10 dB higher than the power where robust target SUPPORTED falls
+    below 0.5;
+  - (c) replay SUPPORTED in the Δτ_W/PSF ≥ 1 stratum stays ≤ 5% at every
+    power.
+- **A8.2 Reduced block 5:** wall thickness 0.05 and 0.20 m (truth and twin,
+  D8) and target RCS scaling ±6 dB on reflected-illumination paths (twin
+  unaware). Predictions:
+  - (a) thickness: replay in the Δτ_W/PSF ≥ 1 stratum stays ≤ 5% at both
+    thicknesses; replay in the < 1 stratum is higher at 0.05 m than at
+    baseline;
+  - (b) RCS +6 dB: S rises about 4×, above s_hi, so robust target SUPPORTED
+    falls below 0.2, while the A3.2 variant without s_hi stays ≥ 0.95;
+    RCS −6 dB: target SUPPORTED stays ≥ 0.95; replay is unaffected by RCS.
+- **A8.3 Not run, with reasons recorded.**
+  - Relay gain levels: S is normalized by E_D, so a fixed relay gain change
+    scales numerator and denominator together. This is an argument, not a
+    result.
+  - Material ±20%: bracketed by the thickness levels' reflection change.
+  - Blocker: covered by test 15 and Phase 4.
+
+  These A3.3 levels are marked **NOT RUN**.
+- **Operational notes** (reproducibility only; no additional rule):
+  - *Grid:* the A3.3 stress grid (σ = 0.5, twins 0 and 1, 8 records per
+    world, methods `imperfect_narrow`, `imperfect_robust`,
+    `mapfree_coarse_to_fine`), baseline bandwidth profile, frozen thresholds.
+    Baseline is the main held-out run's σ = 0.5 cell (10 dBm, 0.10 m, constant
+    RCS), with matched records `{0, 1, 4, 5}` as the secondary comparator.
+    Intervals are the A4.1 geometry-level bootstrap. A stratum uses each
+    geometry's median Δτ_W/PSF at that level (A5 notes).
+  - *Probe power:* the level replaces the nominal 10 dBm for every probe
+    action of every record (direct, mapped wall beam, map-free looks).
+    Geometry acceptance and the matched-relay calibration stay at the nominal
+    10 dBm. The relay keeps its matched gain and is linear (the 10 dBm cap
+    applies only at calibration), so the forwarded signal scales with probe
+    power. Receiver and relay noise are unchanged. Direct peak-to-noise is
+    not a recorded column; the recorded direct-gate ratio
+    `(E_D − N_D) / N_D` is reported descriptively instead.
+  - *Thickness:* `wall.thickness_m` is set to the level in the configuration
+    used for the true scene and for the twin (Sionna slab material).
+    Geometry acceptance runs with that configuration. As a validity check,
+    the accepted geometries must equal the main run's.
+  - *RCS:* the true target link paths whose interaction sequence has a
+    specular reflection before the sensing interaction are scaled in
+    amplitude by `10^(±6/20)`. These are `outgoing_wall_*` and the
+    multi-bounce paths with a reflection before the target. The direct and
+    reciprocal-wall paths (LoS illumination) are unchanged, and the twin
+    keeps constant RCS. The replay world contains no target paths. So, as a
+    harness validity check (not evidence for the prediction), the replay rows
+    on matched records must equal the main run's in every non-timing column.
+  - *Matched rules (point estimates; intervals reported beside them):*
+    - A8.1(a): robust target ≥ 0.95 at −10 dBm, strictly lower at −20 dBm
+      than at −10 dBm, and at least one ACQUISITION_FAILED row at −20 dBm.
+    - A8.1(b): `P_m` is the highest tested power, including the 10 dBm
+      baseline, at which method `m`'s target rate is < 0.5. The prediction is
+      matched when `P_c2f ≥ P_robust + 10`. If robust is never below 0.5,
+      `P_robust < −20` and it is matched when `P_c2f ≥ −10`. It is not
+      matched when c2f is never below 0.5, and indeterminate (reported as not
+      matched) when only `P_c2f = −20` exists.
+    - A8.1(c) and A8.2(a) first part: robust replay ≤ 0.05 in the ≥ 1 stratum
+      at each level.
+    - A8.2(a) second part: robust replay in the < 1 stratum at 0.05 m is
+      strictly greater than the baseline rate over the same geometries.
+    - A8.2(b): at +6 dB, robust target < 0.2 and the no-s_hi variant ≥ 0.95.
+      At −6 dB, robust target ≥ 0.95. "About 4×" is descriptive: the median
+      ratio of target S to the baseline S on matched records, plus the
+      fraction of target rows with S > s_hi.
