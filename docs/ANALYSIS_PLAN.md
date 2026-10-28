@@ -296,3 +296,63 @@ primary rule, decision criterion or frozen config value changes.**
     bit-identical. Before any stress run, this is shown on cal_00 x 2
     records: all non-timing columns identical to the baseline.
 - **Held-out:** no held-out geometry has been generated, solved or run.
+
+## Amendment 4 — 2026-10-28
+
+Written while the held-out run was in progress (worktree at tag
+`pilot-heldout`, started 2026-10-27 about 22:56 on GPU 1) and before any
+held-out result file was opened, listed or summarized. It operationalizes the
+BRIEF §16 label and fixes it in `scripts/phase8b_heldout_analysis.py`. No
+threshold, gate, primary rule, criterion value or frozen config value changes.
+
+- **A4.1 Decision labels.** The criteria are:
+  - the §16 targets: target SUPPORT `>= 0.80` (primary, sigma `<= 0.5`),
+    attack SUPPORT `<= 0.10` (primary, replay, pooled), NOT_OBSERVABLE
+    `<= 0.20` (primary);
+  - the rule-8 useful bar: target SUPPORT `>= 0.5` at sigma `<= 0.5`;
+  - the rule-8 / A2.3 replay criterion: primary replay SUPPORTED `<= 5%`
+    pooled and at sigma `0.5` and `1.0`, each with upper bound `<= 10%`;
+  - the rule-8 advantage at sigma `0.5` or `1.0`.
+
+  Each criterion gets a geometry-level 95% bootstrap interval (10,000 draws,
+  seed 20261027, percentile interval; advantages are paired on the same
+  draws). The labels are applied in this order:
+  - **INVALID:** any validity check fails. The script checks complete
+    decision columns, a full grid per geometry, the geometry count, the
+    expected row count, the held-out split, decisions sourced from
+    `phase8.frozen`, preflight PASS, H100, and a clean source commit. It also
+    asserts that its own re-classification from `phase8.frozen` equals the
+    run's stored decisions.
+  - **NO-GO:** for at least one criterion, the whole 95% interval lies on the
+    failing side. For example: replay lower bound `> 5%`, attack lower bound
+    `> 0.10`, target upper bound `< 0.80`, NOT_OBSERVABLE lower bound `> 0.20`,
+    or advantage upper bound `<= 0` at both sigma `0.5` and `1.0`.
+  - **CONDITIONAL GO:** every point estimate meets its criterion (for the
+    advantage, point `> 0` at sigma `0.5` or `1.0`) AND every interval
+    criterion holds: replay upper bound `<= 10%` in every gating cell, and
+    advantage lower bound `> 0` at sigma `0.5` or `1.0`. The non-statistical
+    §16 conditions (Experiment A matched-information control, propagated
+    evidence, no hidden-truth / budget / normalization / relay / leakage
+    explanation) are reported separately from this label.
+  - **INCONCLUSIVE:** otherwise.
+
+  The label is reported for the primary contrast (the decision). The label
+  that the A2.1 like-for-like contrast would give, with all other criteria
+  identical, is reported separately as secondary; it is not the decision.
+- **A4.2 Criteria table.** Every criterion's point estimate, interval,
+  threshold and A4.1 tests go in one table (`criteria_primary.csv`,
+  `criteria_like_for_like.csv`), so the label can be checked by hand. The
+  advantage appears as its two sigma components plus the combined
+  either-sigma criterion.
+- **A4.3 Truth isolation test.** `tests/test_phase8a.py::
+  test_frozen_decision_ignores_truth_and_labels` perturbs every
+  truth/evaluator column (world labels swapped; true positions, wall offsets,
+  path delays and AoAs, coverage flags, twin map errors, sigma, geometry and
+  seed columns permuted and rescaled). It checks that decisions from
+  `frozen_decision` + `classify_trials` are unchanged. Truth may enter only
+  metrics and the A3.1 stratification.
+- **Dry run:** on the calibration v5 trials, the script reproduces all 60
+  method x sigma x world cells of the Amendment 2 SUPPORTED and
+  SUPPORTED_common rates exactly (0 mismatches). Its label on calibration
+  data is INCONCLUSIVE, with the advantage lower bound at or below 0 at both
+  sigmas. That is calibration data, not a held-out result.

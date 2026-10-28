@@ -78,6 +78,48 @@ def test_frozen_decision_reads_only_phase8_frozen(config: PilotConfig) -> None:
         frozen_decision(PilotConfig(path=config.path, data=data))
 
 
+TRUTH_AND_EVALUATOR_COLUMNS = (
+    "world", "sigma_map_m", "geometry_id", "twin_index", "true_wall_delay_ns", "true_wall_aoa_deg",
+    "true_positive_wall_m", "true_negative_wall_m", "true_candidate_azimuth_deg", "true_relay_azimuth_deg",
+    "candidate_distance_m", "relay_distance_m", "half_width_m", "candidate_aoa_error_deg",
+    "twin_map_error_positive_m", "twin_map_error_negative_m", "cover_delay_c1", "cover_aoa_c1",
+    "receiver_noise_seed", "relay_noise_seed", "probe_seed",
+)
+
+
+def test_frozen_decision_ignores_truth_and_labels(config: PilotConfig) -> None:
+    """A4.3: decisions depend only on measured columns and phase8.frozen, never on truth or labels."""
+    from isac_verify.calibration import classify_trials
+
+    rng = np.random.default_rng(0)
+    n = 600
+    methods = ["direct_only", "exact_oracle", "imperfect_narrow", "imperfect_robust",
+               "mapfree_two_beam", "mapfree_coarse_to_fine"]
+    frame = pd.DataFrame({
+        "method": rng.choice(methods, n),
+        "status": rng.choice(["UNRESOLVED", "ACQUISITION_FAILED"], n, p=[0.95, 0.05]),
+        "direct_reliable": rng.choice([0.0, 1.0], n, p=[0.1, 0.9]),
+        "ref_det_c1": rng.choice([0.0, 1.0], n, p=[0.1, 0.9]),
+        "S_c1": rng.uniform(-0.05, 1.5, n),
+        "N_W_c1": rng.uniform(0.5, 1.5, n),
+        "wall_excess_snr": rng.uniform(0.0, 10.0, n),
+        "wall_excess_snr_c1": rng.uniform(0.0, 40.0, n),
+    })
+    frame["E_W_c1"] = frame["N_W_c1"] * (1.0 + frame["wall_excess_snr_c1"] * rng.uniform(0.0, 0.2, n))
+    for column in TRUTH_AND_EVALUATOR_COLUMNS:
+        frame[column] = rng.normal(size=n)
+    frame["world"] = rng.choice(["target", "replay"], n)
+    factor, fitted = frozen_decision(config)
+    decided = ["decision", "decision_reason", "supported", "supported_common"]
+    reference = classify_trials(frame, fitted, factor)[decided]
+    assert reference["supported"].any() and reference["supported_common"].any()
+    perturbed = frame.copy()
+    for column in TRUTH_AND_EVALUATOR_COLUMNS:
+        perturbed[column] = rng.permutation(perturbed[column].to_numpy()) * 3.0 if column != "world" else \
+            perturbed[column].map({"target": "replay", "replay": "target"})
+    pd.testing.assert_frame_equal(classify_trials(perturbed, fitted, factor)[decided], reference)
+
+
 def test_geometry_config_is_collinear_and_symmetric(config: PilotConfig) -> None:
     draw = draw_geometry(config, "calibration", 3, 0)
     local = geometry_config(config, draw)

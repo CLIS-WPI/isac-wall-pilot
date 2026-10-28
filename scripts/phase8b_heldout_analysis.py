@@ -4,7 +4,8 @@ Evaluator side. Decisions come only from configs `phase8.frozen` (via
 `phase8a.frozen_decision`); nothing is fitted. Geometry-level bootstrap per
 BRIEF §13.3.
 
-Usage: python scripts/phase8b_heldout_analysis.py TRIALS.parquet GEOMETRIES.csv OUT_DIR
+Usage: python scripts/phase8b_heldout_analysis.py TRIALS.parquet GEOMETRIES.csv OUT_DIR [RUN_DIR]
+(RUN_DIR holds heldout_summary.json and environment.json for the run-level validity checks.)
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from isac_verify.calibration import MAPPED_METHODS, classify_trials
+from isac_verify.calibration import MAPPED_METHODS, WALL_PROBING_METHODS, classify_trials
 from isac_verify.config import PilotConfig
 from isac_verify.phase8a import frozen_decision
 
@@ -149,24 +150,88 @@ def analyze(frame: pd.DataFrame, geometry_ids: list[str], config: PilotConfig) -
     return out
 
 
-def decide(result: dict) -> dict:
-    """§16 label. Operationalization (stated for review): points must meet the §16 targets and rule 8;
-    INCONCLUSIVE when the points meet them but a pre-registered interval criterion does not."""
-    p = result["primary"]
-    b16 = p["brief16"]
-    points = all(b16[k]["point_meets"] for k in b16) and p[f"target_supported_sigma_le_0p5_{PRIMARY}"]["useful"]
+def criteria_table(result: dict, contrast: str = "advantage") -> list[dict]:
+    """A4.2: every §16 / rule-8 criterion with point, interval and the A4.1 tests, checkable by hand.
+
+    ``contrast`` is "advantage" (primary, rule 8) or "a2_1_like_for_like" (secondary, A2.1).
+    """
+    p, b16 = result["primary"], result["primary"]["brief16"]
     replay = p[f"replay_supported_{PRIMARY}"]
-    replay_points = all(replay["cells"][c]["point"] <= 0.05 for c in replay["gating_cells"])
-    adv_points = any(p["advantage"]["by_sigma"][s]["point"] > 0 for s in p["advantage"]["decision_sigmas"])
-    intervals = replay["meets_all_gating"] and p["advantage"]["holds"]
-    if not (points and replay_points and adv_points):
+    useful = p[f"target_supported_sigma_le_0p5_{PRIMARY}"]
+    rows = []
+
+    def add(name, entry, threshold, side, interval_holds=None):
+        lo, hi = entry["ci95"]
+        point = entry["point"]
+        ok = point >= threshold if side == ">=" else point <= threshold
+        # whole interval on the failing side
+        fails = hi < threshold if side == ">=" else lo > threshold
+        rows.append({"criterion": name, "role": "criterion", "point": point, "ci95_lo": lo, "ci95_hi": hi, "threshold": threshold,
+                     "pass_if": f"{side} {threshold:g}", "point_meets": bool(ok),
+                     "interval_criterion_holds": interval_holds, "whole_interval_failing": bool(fails)})
+
+    add("target SUPPORT, sigma<=0.5 (§16)", b16["target_support"], float(b16["target_support"]["target_min"]), ">=")
+    add("useful target SUPPORT, sigma<=0.5 (rule 8)", useful, 0.5, ">=")
+    add("attack SUPPORT, pooled (§16)", b16["attack_support"], float(b16["attack_support"]["target_max"]), "<=")
+    add("NOT_OBSERVABLE (§16)", b16["not_observable"], float(b16["not_observable"]["target_max"]), "<=")
+    for cell_name in replay["gating_cells"]:
+        e = replay["cells"][cell_name]
+        add(f"replay SUPPORTED, {cell_name} (rule 8 / A2.3)", e, 0.05, "<=", bool(e["ci95"][1] <= 0.10))
+    by_sigma = (p["advantage"] if contrast == "advantage" else result["secondary"]["a2_1_like_for_like"])["by_sigma"]
+    sigmas = p["advantage"]["decision_sigmas"]
+    entries = [by_sigma[s] for s in sigmas]
+    for s, e in zip(sigmas, entries):
+        rows.append({"criterion": f"  component: {contrast}, sigma={s}", "role": "component", "point": e["point"],
+                     "ci95_lo": e["ci95"][0], "ci95_hi": e["ci95"][1], "threshold": 0.0, "pass_if": "> 0",
+                     "point_meets": bool(e["point"] > 0), "interval_criterion_holds": bool(e["ci95"][0] > 0),
+                     "whole_interval_failing": bool(e["ci95"][1] <= 0)})
+    rows.append({
+        "criterion": f"{contrast} at sigma 0.5 or 1.0 (rule 8{'' if contrast == 'advantage' else ', A2.1'})",
+        "role": "criterion", "point": None, "ci95_lo": None, "ci95_hi": None, "threshold": 0.0,
+        "pass_if": "> 0 at either sigma (components above)",
+        "point_meets": any(e["point"] > 0 for e in entries),
+        "interval_criterion_holds": any(e["ci95"][0] > 0 for e in entries),
+        "whole_interval_failing": all(e["ci95"][1] <= 0 for e in entries),
+    })
+    return rows
+
+
+def decide(result: dict, validity: dict, contrast: str = "advantage") -> dict:
+    """A4.1 label: INVALID > NO-GO (some whole interval failing) > CONDITIONAL GO (all points and
+    interval criteria) > INCONCLUSIVE."""
+    table = [r for r in criteria_table(result, contrast) if r.get("role", "criterion") == "criterion"]
+    if not validity["all_pass"]:
+        label = "INVALID"
+    elif any(r["whole_interval_failing"] for r in table):
         label = "NO-GO"
-    elif not intervals:
-        label = "INCONCLUSIVE"
+    elif all(r["point_meets"] for r in table) and all(
+        r["interval_criterion_holds"] for r in table if r["interval_criterion_holds"] is not None
+    ):
+        label = "CONDITIONAL GO"
     else:
-        label = "CONDITIONAL GO (subject to the non-statistical §16 conditions)"
-    return {"label": label, "point_criteria_met": bool(points and replay_points and adv_points),
-            "interval_criteria_met": bool(intervals)}
+        label = "INCONCLUSIVE"
+    return {"label": label, "contrast": contrast, "criteria": criteria_table(result, contrast)}
+
+
+def validity_checks(frame: pd.DataFrame, run_dir: Path | None, geometry_count: int) -> dict:
+    """A4.1 INVALID conditions that this script can check; run-level files only when a run dir is given."""
+    checks = {
+        "decision_columns_complete": bool(frame[["supported", "supported_common"]].notna().all().all()),
+        "every_geometry_has_full_grid": bool(frame.groupby("geometry_id").size().nunique() == 1),
+        "geometry_count": int(frame["geometry_id"].nunique()) == geometry_count,
+    }
+    if run_dir is not None:
+        summary = json.loads((run_dir / "heldout_summary.json").read_text())
+        environment = json.loads((run_dir / "environment.json").read_text())
+        checks.update({
+            "rows_match_expected": bool(summary["rows_match"]),
+            "split_is_heldout": bool(set(frame["split"]) == {"heldout"}),
+            "decision_source_frozen": summary["decision_source"] == "configs phase8.frozen",
+            "preflight_pass": environment["status"] == "PASS",
+            "gpu_is_h100": "H100" in environment["gpu"]["device"]["name"],
+            "source_commit_clean": environment.get("source_commit", {}).get("dirty_paths") == 0,
+        })
+    return {"checks": checks, "all_pass": all(checks.values()), "run_level_checked": run_dir is not None}
 
 
 def rate_tables(frame: pd.DataFrame, draws: int, by: list[str]) -> pd.DataFrame:
@@ -180,6 +245,10 @@ def rate_tables(frame: pd.DataFrame, draws: int, by: list[str]) -> pd.DataFrame:
         sub = cache[ids]
         row = {**keys, "n": int(len(group))}
         for column in ("supported", "supported_no_s_hi", "supported_common"):
+            applies = keys["method"] in (WALL_PROBING_METHODS if column == "supported_common" else MAPPED_METHODS)
+            if not applies:  # no such rule for this method (as in calibration.rate_table)
+                row[column] = row[f"{column}_lo"] = row[f"{column}_hi"] = float("nan")
+                continue
             point, samples = sub.rate(group, column)
             row[column], (row[f"{column}_lo"], row[f"{column}_hi"]) = point, ci(samples)
         rows.append(row)
@@ -188,6 +257,7 @@ def rate_tables(frame: pd.DataFrame, draws: int, by: list[str]) -> pd.DataFrame:
 
 def main() -> None:
     trials_path, geometries_path, out_dir = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+    run_dir = Path(sys.argv[4]) if len(sys.argv) > 4 else None
     out_dir.mkdir(parents=True, exist_ok=True)
     config = PilotConfig.load("configs/pilot.yaml")
     trials = pd.read_parquet(trials_path)
@@ -206,7 +276,12 @@ def main() -> None:
         part = frame[frame["stratum"] == name]
         if part["geometry_id"].nunique():
             result["strata"][name] = analyze(part, sorted(part["geometry_id"].unique()), config)
-    result["decision"] = decide(result["population"])
+    result["validity"] = validity_checks(frame, run_dir, len(geometries))
+    result["decision"] = decide(result["population"], result["validity"])
+    result["decision_like_for_like_secondary"] = decide(result["population"], result["validity"], "a2_1_like_for_like")
+    pd.DataFrame(result["decision"]["criteria"]).to_csv(out_dir / "criteria_primary.csv", index=False)
+    pd.DataFrame(result["decision_like_for_like_secondary"]["criteria"]).to_csv(
+        out_dir / "criteria_like_for_like.csv", index=False)
     result["geometry_strata"] = s.reset_index().to_dict(orient="records")
     result["bootstrap"] = {"seed": BOOTSTRAP_SEED, "draws": draws, "unit": "geometry", "interval": "percentile 95%"}
     (out_dir / "heldout_results.json").write_text(json.dumps(result, indent=2, default=float))
@@ -216,7 +291,11 @@ def main() -> None:
         ["supported", "supported_no_s_hi", "supported_common"]].mean().reset_index()
     per_geometry.to_csv(out_dir / "rates_per_geometry.csv", index=False)
     s.to_csv(out_dir / "geometry_strata.csv")
-    print(json.dumps(result["decision"]), f"\nwrote {out_dir}")
+    print("validity", json.dumps(result["validity"]))
+    for key in ("decision", "decision_like_for_like_secondary"):
+        print(key, result[key]["label"])
+        print(pd.DataFrame(result[key]["criteria"]).to_string())
+    print(f"wrote {out_dir}")
 
 
 if __name__ == "__main__":
