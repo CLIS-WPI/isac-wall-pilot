@@ -1,0 +1,14 @@
+{
+  "label": "EXPLORATORY, post hoc threshold sensitivity; changes no decision or label",
+  "source": ".worktrees/heldout/results/phase8b_heldout/heldout_trials.parquet",
+  "frozen_s_lo": {
+    "imperfect_robust": 0.021783770908692133,
+    "imperfect_narrow": 0.017580349788033998
+  },
+  "s_hi": {
+    "imperfect_robust": 1.286775241426862,
+    "imperfect_narrow": 1.2872929542923885
+  },
+  "bootstrap_draws": 10000,
+  "score_column": "S_c1"
+}
