@@ -67,13 +67,13 @@ def fig_a(out: Path) -> pd.DataFrame:
     c1["delta_r_m"] = c1["run"].str.extract(r"standoff_(\d+)m")[0].astype(float)
     c1 = c1.sort_values("delta_r_m").assign(method="c1_passive", rate="supported_pass")
     series(ax, c1["delta_r_m"], c1, OKABE["purple"], "Receive-side", "D", dashed=True)
-    # Fraction of geometries NOT certified against any single-antenna emitter (B3), docs/results/wpe:
-    # plotted as a grey dotted line with small markers at the six standoff levels (not steps).
+    # Fraction of geometries NOT certified against any single-antenna emitter, conservative multi-route
+    # certificate (B3), docs/results/wpe: grey dotted line with small markers at the six standoff levels.
     cert = pd.read_csv(R / "wpe/b3_certified_region.csv")
     cert = cert[cert["run"].str.startswith("standoff_")].copy()
     cert["delta_r_m"] = cert["run"].str.extract(r"standoff_(\d+)m")[0].astype(float)
     cert = cert.sort_values("delta_r_m")
-    cert["point"] = 1.0 - cert["certified_fraction_m0"]
+    cert["point"] = 1.0 - cert["certified_fraction_cons_m0"]
     ax.plot(cert["delta_r_m"], cert["point"], color="0.5", linestyle=":", linewidth=1.0,
             marker="o", markersize=2.5, label="Not certified")
     for x, text, style in ((phi, r"median $\Delta R_\phi$", ":"), (tau, r"median $\Delta R_\tau$", "-.")):

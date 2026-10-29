@@ -114,11 +114,37 @@ def couple(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
                 "los_uplink_delay_ns": los.delay_s * 1e9, "wall_uplink_delay_ns": wall.delay_s * 1e9,
                 "delay_offset_los_minus_wall_ns": offset_ns, "los_copy_at_refl_center_ns": los_at_refl_center_ns,
                 "overlap": bool(dgate.delay_min_s * 1e9 <= los_at_refl_center_ns <= dgate.delay_max_s * 1e9)}
+        # Conservative Cauchy-Schwarz bound over ALL uplink routes that reach the reflector gate (delay in its
+        # window): kappa_cons = e_cand / (sum_i sqrt(e_i^refl))^2 <= kappa (single route), since |a_i| sqrt(G_i) =
+        # sqrt(combiner_power(h_i, phi_w)). Any signal segment reaching the gate through route i also reaches the
+        # bearing through LoS, landing at refl_center - (tau_i - tau_LoS); every such ghost must be caught.
+        survey_lo, survey_hi = (float(v) for v in config.get("phase6", "processing", "delay_search_ns"))
+        # Routes that can carry signal energy to the reflector gate: every non-LoS uplink multipath (reciprocal
+        # wall, opposite wall, double bounces). Uplink one-way delays are a different frame than the round-trip gate,
+        # so inclusion is by route family, not absolute delay; each route's ghost (item 2) handles its delay.
+        routes = [p for p in prepared["links"]["uplink"] if p.family != "los"]
+        sqrt_sum, ghosts, in_survey_all, out_direct_all = 0.0, [], True, True
+        for p in routes:
+            e_i = combiner_power(p.matrix[:, 0].to(torch.complex64), phi_w, rx_array, w)
+            sqrt_sum += math.sqrt(max(e_i, 0.0))
+            ghost_ns = refl.center_delay_s * 1e9 + (los.delay_s - p.delay_s) * 1e9
+            in_survey = survey_lo <= ghost_ns <= survey_hi
+            in_direct = dgate.delay_min_s * 1e9 <= ghost_ns <= dgate.delay_max_s * 1e9
+            in_survey_all &= in_survey
+            out_direct_all &= not in_direct
+            ghosts.append(f"{p.family}:{ghost_ns:.1f}:{'S' if in_survey else 's'}{'D' if in_direct else 'd'}")
+        kappa_cons = e_cand / sqrt_sum ** 2 if sqrt_sum > 0 else float("nan")
+        row |= {"kappa_cons": kappa_cons, "kappa_cons_db": 10 * math.log10(max(kappa_cons, 1e-30)),
+                "n_gate_routes": len(routes), "cons_ghost_in_survey_all": bool(in_survey_all),
+                "cons_ghost_out_direct_all": bool(out_direct_all), "gate_route_ghosts": ";".join(ghosts)}
     else:
         row |= {"G_db": float("nan"), "kappa_db": float("nan"), "kappa": float("nan"),
+                "kappa_cons": float("nan"), "kappa_cons_db": float("nan"), "n_gate_routes": 0,
+                "cons_ghost_in_survey_all": False, "cons_ghost_out_direct_all": False, "gate_route_ghosts": "",
                 "missing_uplink": f"los={los is not None} wall_{side}={wall is not None}"}
     pd.DataFrame([row]).to_parquet(out_dir / f"{run}_{slot:02d}.parquet", index=False)
     print(f"{run} {gid}: G={row.get('G_db', float('nan')):.2f} dB kappa={row.get('kappa_db', float('nan')):.2f} dB "
+          f"kappa_cons={row.get('kappa_cons_db', float('nan')):.2f} dB routes={row.get('n_gate_routes')} "
           f"overlap={row.get('overlap')}", flush=True)
 
 
@@ -290,15 +316,39 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
     certifiable = (~cp["overlap"]) & cp["los_in_survey"] & cp["kappa"].notna()
     cp["certified_m0"] = certifiable & (cp["kappa_E_req"] > c_hi)
     cp["certified_m3db"] = certifiable & (cp["kappa_E_req"] > c_hi * cp["margin3db_factor"])
+    # Conservative certificate (multi-route): every gate route's LoS ghost caught AND kappa_cons * E_req > c_hi.
+    cp["kappa_cons_E_req"] = cp["kappa_cons"] * cp["E_req"]
+    cons_ghosts_ok = cp["cons_ghost_in_survey_all"] & cp["cons_ghost_out_direct_all"]
+    cons_ok = cons_ghosts_ok & cp["kappa_cons"].notna()
+    cp["certified_cons_m0"] = cons_ok & (cp["kappa_cons_E_req"] > c_hi)
+    cp["certified_cons_m3db"] = cons_ok & (cp["kappa_cons_E_req"] > c_hi * cp["margin3db_factor"])
+
+    def _loss_reason(r) -> str:  # why an old-certified geometry loses the conservative certificate
+        if not r["certified_m0"] or r["certified_cons_m0"]:
+            return ""
+        if not r["cons_ghost_in_survey_all"]:
+            return "ghost_outside_window"
+        if not r["cons_ghost_out_direct_all"]:
+            return "ghost_in_direct_gate"
+        return "bound_too_weak"
+
+    cp["cons_loss_reason"] = cp.apply(_loss_reason, axis=1)
     cp.to_csv(out / "b1_b3_per_geometry.csv", index=False)
+    cp[cp["cons_loss_reason"] != ""][["run", "geometry_id", "cons_loss_reason", "n_gate_routes", "kappa_db",
+                                      "kappa_cons_db", "gate_route_ghosts"]].to_csv(
+        out / "b3_conservative_losses.csv", index=False)
     cert = []
     for run, part in cp.groupby("run"):
         n = len(part)
         cert.append({"run": run, "n_geometries": n, "overlap_fraction": float(part["overlap"].mean()),
                      "median_G_db": float(part["G_db"].median()), "median_kappa_db": float(part["kappa_db"].median()),
+                     "median_kappa_cons_db": float(part["kappa_cons_db"].median()),
                      "certified_fraction_m0": float(part["certified_m0"].mean()),
                      "certified_fraction_m3db": float(part["certified_m3db"].mean()),
                      "n_certified_m0": int(part["certified_m0"].sum()),
+                     "certified_fraction_cons_m0": float(part["certified_cons_m0"].mean()),
+                     "certified_fraction_cons_m3db": float(part["certified_cons_m3db"].mean()),
+                     "n_certified_cons_m0": int(part["certified_cons_m0"].sum()),
                      "n_window_failed": int(((~part["overlap"]) & (~part["los_in_survey"])).sum())})
     cert_df = pd.DataFrame(cert).set_index("run").reindex(["heldout", *STANDOFFS]).reset_index()
     cert_df.to_csv(out / "b3_certified_region.csv", index=False)

@@ -123,21 +123,26 @@ def e_b3(out: Path) -> None:  # Amendment 13 (defensive): B3 certified region, w
     for run, label in RUN.items():
         c = cert.loc[run]
         rows.append(f"{label} & {c.certified_fraction_m0:.3f} ({int(c.n_certified_m0)}/{int(c.n_geometries)}) & "
-                    f"{c.overlap_fraction:.3f} & {c.median_G_db:+.1f} & {c.median_kappa_db:+.1f} \\\\")
+                    f"{c.certified_fraction_cons_m0:.3f} ({int(c.n_certified_cons_m0)}/{int(c.n_geometries)}) & "
+                    f"{c.median_kappa_db:+.1f} & {c.median_kappa_cons_db:+.1f} \\\\")
     fr_note = "; ".join(
         f"{RUN[run].replace('$', '')}: {fr.loc[run].false_rejection:.4f} "
         f"[{fr.loc[run].ci95_lo:.4f}, {fr.loc[run].ci95_hi:.4f}] ({int(fr.loc[run].n_rejected)}/{int(fr.loc[run].n_records)})"
         for run in RUN)
     write(out, "table_wpe_certified.tex", [
         "% Amendment 13 (defensive), B3: certified region against the single-antenna-emitter relay class, per level",
-        "% (n=24 held-out geometries, 24 per standoff). CERTIFIED = relay delay-resolved (LoS copy outside the direct",
-        "% gate) AND its forced LoS copy falls inside the surveillance window AND kappa*E_req > c_hi; the 3 dB-margin",
-        "% variant is identical. G = reflector-gate angle response at the relay wall arrival vs the steered peak;",
-        "% kappa = LoS-into-candidate-gate over wall-into-reflector-gate. Source: docs/results/wpe/b3_certified_region.csv.",
+        "% (n=24 held-out geometries, 24 per standoff). Single-route CERTIFIED = reciprocal wall route delay-resolved",
+        "% (its LoS ghost outside the direct gate) AND inside the surveillance window AND kappa*E_req > c_hi.",
+        "% Conservative CERTIFIED (multi-route, Cauchy-Schwarz over every non-LoS gate route): EVERY route's LoS ghost",
+        "% inside the window and outside the direct gate AND kappa_cons*E_req > c_hi, kappa_cons = e_cand/(sum_i sqrt",
+        "% e_i^refl)^2 <= kappa. The 3 dB-margin variant is identical. Every conservative loss here is a double-bounce",
+        "% route whose ghost falls just below the 300 ns window (not a weak bound: kappa_cons ~ kappa).",
+        "% Source: docs/results/wpe/b3_certified_region.csv, b3_conservative_losses.csv.",
         f"% c_hi = {c_hi:.3e} (0.99 quantile of C over 1920 calibration genuine targets; realized calibration FR 1.04%).",
         f"% B2 genuine-target false rejection (point [95% CI] (rejected/records)): {fr_note}.",
         "% columns: l r r r r", r"\toprule",
-        r"Level & Certified & Overlap & Median $G$ (dB) & Median $\kappa$ (dB) \\", r"\midrule"], rows)
+        r"Level & Certified (1-route) & Certified (cons.) & Median $\kappa$ (dB) & Median $\kappa_{\rm cons}$ (dB) \\",
+        r"\midrule"], rows)
 
 
 def main() -> None:

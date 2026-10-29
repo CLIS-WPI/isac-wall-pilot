@@ -1,19 +1,22 @@
 % Amendment 13 (defensive), B3: certified region against the single-antenna-emitter relay class, per level
-% (n=24 held-out geometries, 24 per standoff). CERTIFIED = relay delay-resolved (LoS copy outside the direct
-% gate) AND its forced LoS copy falls inside the surveillance window AND kappa*E_req > c_hi; the 3 dB-margin
-% variant is identical. G = reflector-gate angle response at the relay wall arrival vs the steered peak;
-% kappa = LoS-into-candidate-gate over wall-into-reflector-gate. Source: docs/results/wpe/b3_certified_region.csv.
+% (n=24 held-out geometries, 24 per standoff). Single-route CERTIFIED = reciprocal wall route delay-resolved
+% (its LoS ghost outside the direct gate) AND inside the surveillance window AND kappa*E_req > c_hi.
+% Conservative CERTIFIED (multi-route, Cauchy-Schwarz over every non-LoS gate route): EVERY route's LoS ghost
+% inside the window and outside the direct gate AND kappa_cons*E_req > c_hi, kappa_cons = e_cand/(sum_i sqrt
+% e_i^refl)^2 <= kappa. The 3 dB-margin variant is identical. Every conservative loss here is a double-bounce
+% route whose ghost falls just below the 300 ns window (not a weak bound: kappa_cons ~ kappa).
+% Source: docs/results/wpe/b3_certified_region.csv, b3_conservative_losses.csv.
 % c_hi = 6.526e-14 (0.99 quantile of C over 1920 calibration genuine targets; realized calibration FR 1.04%).
 % B2 genuine-target false rejection (point [95% CI] (rejected/records)): Held-out, \sigma=0.5: 0.0247 [0.0052, 0.0482] (19/768); \Delta R=3 m: 0.0260 [0.0000, 0.0573] (5/192); \Delta R=6 m: 0.0260 [0.0000, 0.0573] (5/192); \Delta R=10 m: 0.0260 [0.0000, 0.0573] (5/192); \Delta R=15 m: 0.0260 [0.0000, 0.0573] (5/192); \Delta R=20 m: 0.0260 [0.0000, 0.0573] (5/192); \Delta R=30 m: 0.0260 [0.0000, 0.0573] (5/192).
 % columns: l r r r r
 \toprule
-Level & Certified & Overlap & Median $G$ (dB) & Median $\kappa$ (dB) \\
+Level & Certified (1-route) & Certified (cons.) & Median $\kappa$ (dB) & Median $\kappa_{\rm cons}$ (dB) \\
 \midrule
-Held-out, $\sigma=0.5$ & 0.750 (18/24) & 0.250 & -24.0 & +39.4 \\
-$\Delta R=3$ m & 0.000 (0/24) & 1.000 & -0.2 & +4.7 \\
-$\Delta R=6$ m & 0.000 (0/24) & 1.000 & -0.8 & +5.8 \\
-$\Delta R=10$ m & 0.000 (0/24) & 1.000 & -2.0 & +7.9 \\
-$\Delta R=15$ m & 0.042 (1/24) & 0.958 & -5.0 & +12.6 \\
-$\Delta R=20$ m & 0.417 (10/24) & 0.583 & -10.0 & +20.5 \\
-$\Delta R=30$ m & 0.958 (23/24) & 0.042 & -33.0 & +52.1 \\
+Held-out, $\sigma=0.5$ & 0.750 (18/24) & 0.208 (5/24) & +39.4 & +39.1 \\
+$\Delta R=3$ m & 0.000 (0/24) & 0.000 (0/24) & +4.7 & +4.7 \\
+$\Delta R=6$ m & 0.000 (0/24) & 0.000 (0/24) & +5.8 & +5.8 \\
+$\Delta R=10$ m & 0.000 (0/24) & 0.000 (0/24) & +7.9 & +7.9 \\
+$\Delta R=15$ m & 0.042 (1/24) & 0.000 (0/24) & +12.6 & +12.5 \\
+$\Delta R=20$ m & 0.417 (10/24) & 0.042 (1/24) & +20.5 & +20.5 \\
+$\Delta R=30$ m & 0.958 (23/24) & 0.375 (9/24) & +52.1 & +50.6 \\
 \bottomrule
