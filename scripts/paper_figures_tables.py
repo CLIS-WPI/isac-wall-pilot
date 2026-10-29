@@ -59,6 +59,14 @@ def fig_a(out: Path) -> pd.DataFrame:
                                           ("mapfree_coarse_to_fine", OKABE["green"], "Coarse-to-fine (common)", "^")):
         m = d[d["method"] == method].sort_values("delta_r_m")
         series(ax, m["delta_r_m"], m, colour, label, marker)
+    # C1 passive check (A11.1, frozen passive thresholds), replay rows of docs/results/wpc
+    c1 = pd.read_csv(R / "wpc/c1_passive_vs_active.csv")
+    c1 = c1[(c1["world"] == "replay") & c1["run"].str.startswith("standoff_")].rename(
+        columns={"passive_point": "point", "passive_ci95_lo": "lo", "passive_ci95_hi": "hi",
+                 "passive_n_geometries": "n_geometries"})
+    c1["delta_r_m"] = c1["run"].str.extract(r"standoff_(\d+)m")[0].astype(float)
+    c1 = c1.sort_values("delta_r_m").assign(method="c1_passive", rate="supported_pass")
+    series(ax, c1["delta_r_m"], c1, OKABE["purple"], "C1 passive check", "D", dashed=True)
     for x, text, style in ((phi, r"median $\Delta R_\phi$", ":"), (tau, r"median $\Delta R_\tau$", "-.")):
         ax.axvline(x, color=OKABE["black"], linestyle=style, linewidth=0.8)
         ax.text(x + 0.4, 0.8, text, rotation=90, fontsize=7, va="center")
@@ -68,8 +76,10 @@ def fig_a(out: Path) -> pd.DataFrame:
     ax.set_ylim(-0.02, 1.02)
     ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2)
     save(fig, out, "fig_a_standoff_sweep")
-    d = d[["method", "rate", "delta_r_m", "point", "lo", "hi", "n_geometries"]].assign(
-        median_delta_r_phi_m=phi, median_delta_r_tau_m=tau, source="docs/results/phase8c/standoff")
+    d = pd.concat([d.assign(source="docs/results/phase8c/standoff"),
+                   c1.assign(source="docs/results/wpc/c1_passive_vs_active.csv")], ignore_index=True)
+    d = d[["method", "rate", "delta_r_m", "point", "lo", "hi", "n_geometries", "source"]].assign(
+        median_delta_r_phi_m=phi, median_delta_r_tau_m=tau)
     d.to_csv(out / "fig_a_standoff_sweep.csv", index=False)
     return d
 

@@ -1002,3 +1002,19 @@ the zero-delay padded-FFT roundtrip error was
 - **Scaling:** the transform uses Sionna's `1/(N*S)` normalization. No
   additional scaling is applied after the transform; PSF widths and gate
   energies are therefore measured under the declared windows.
+
+## Phase 8C — receiver angle map is mirrored relative to link angles (D3, 2026-10-29)
+
+- **Fact:** `receiver.angular_delay_map` forms `sum_n steering_vector(theta).conj()_n w_n h_n =
+  sum_n a_n(theta) w_n h_n`. A path arriving with link angle `phi` has `h ~ a_RX(phi)`, so its map peak
+  is at `theta = -phi`. TX steering is not mirrored (beam gain peaks at the link departure angle).
+- **Executed:** `scripts/wpd_mechanism.py` (noiseless, ho_10 main and ho_02 standoff_10m, LoS downlink x
+  each wall uplink) asserts `|map_peak + aoa| < 2 deg`. Printed:
+  `('true_uplink:wall_clutter_positive_wall:1', 33.9708366394043, -34.0)`,
+  `('true_uplink:wall_clutter_negative_wall:2', -33.9708366394043, 34.0)`,
+  `('true_uplink:multi_bounce_positive_wall_negative_wall:3', -53.421173095703125, 53.5)`,
+  `('true_uplink:wall_clutter_positive_wall:1', 36.17108917236328, -36.25)` (ho_02); 8 of 8 mirrored.
+- **Consequence:** an AoA gate placed from a twin/link angle must use `-phi` in map coordinates. The frozen
+  pipeline is unaffected: its AoA gates are centred on the measured candidate AoA, and every candidate lies
+  within ±0.11° of 0° (true azimuth 0), where the mirror is the identity. The C1 passive gate was not
+  (see `docs/DEVIATIONS.md` P8-14).

@@ -972,6 +972,7 @@ declared processing choices, not post-hoc tuning.
   use the same mirrored gate, and the corridor walls are symmetric in delay), but it is not the "same wall
   side as the active plan" that A11 describes. The C1 numbers stand as the result of the gate as built; their
   sensitivity to the mirror was NOT measured (it needs new GPU runs).
-- **Frozen pipeline:** unaffected in practice: its AoA gates are centred on the measured candidate AoA, which
-  lies within ±0.11° of 0 in every held-out and calibration row (true azimuth 0), where the mirror is the
-  identity.
+- **Frozen pipeline:** unaffected, because every candidate lies within ±0.11° of 0° (measured candidate AoA in
+  every held-out and calibration row; true azimuth 0) and its AoA gates are centred on that measured AoA,
+  where the mirror is the identity. Fact recorded in `docs/API_NOTES.md` (Phase 8C, mirrored angle map).
+- **Decision (user, 2026-10-29):** no C1 re-run; C1 is internally consistent.
