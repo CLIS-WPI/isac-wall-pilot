@@ -688,3 +688,93 @@ unchanged.
   runtimes, the NVML check for foreign GPU processes, and the number of
   records that take the A9.1 outside-free-space path (expected 0 except at
   −10 dBm and −20 dBm).
+
+## Amendment 11 — 2026-10-28
+
+Written after an external review and after the WP-B re-analyses of existing
+rows (`docs/results/wpb/`, commit 6c51991), and before any WP-C code was
+written or any WP-C trial or direct action was generated, solved or run.
+**No threshold, gate, primary rule, decision criterion, frozen config value,
+earlier label or earlier prediction outcome changes.** The frozen active-probe
+decisions stay as they are; C1 adds a separate passive score with its own
+thresholds, and C2 is a controller evaluated offline plus fresh trials.
+
+- **A11.1 C1 passive twin baseline (no extra probe).** From the SAME direct
+  action of each record (recomputed with the identical seeds, because the
+  observable is not stored), the twin predicts the candidate's reciprocal
+  mixed path (direct out, wall return): arrival angle φ_k(p̂) and delay
+  τ_k(p̂). It is gated with the same construction as the active wall gate and
+  scored as
+  `S_pass = (E_Wrx − N̂_Wrx) / max(E_D − N̂_D, ε) / r̂_pass`, with
+  `r̂_pass = twin gate energy (passive gate) / twin gate energy (direct gate)`,
+  both from the twin map under the direct beam. Floor k, s_lo and s_hi for
+  S_pass are calibrated by the SAME rules on the 12 calibration geometries.
+  Evaluation: held-out σ = 0.5 and all 6 standoff levels.
+  *Pre-registered prediction:* target support similar to the active probe;
+  passive replay support HIGHER than the active probe's at ΔR = 15 and 20 m,
+  because the relay is fully illuminated in the direct action and its
+  wall-uplink replay leaks through receive sidelobes; both near zero at
+  ΔR = 30 m. The result is reported whichever way it goes.
+- **A11.2 C2 closed-loop controller (no LLM).** For every held-out candidate
+  at σ = 0.5, both hypotheses, all 32 records: the first probe is the stored
+  main-run `imperfect_robust` row (frozen decision). If it is SUPPORTED with
+  `S ≥ s_esc = 0.1784` (calibration value, `docs/results/paper/
+  e2_escalation_README.json`), authorize. If it is SUPPORTED with
+  `S < s_esc`, send a FRESH 245.76 MHz probe with an independent new seed
+  stream (a new GPU trial) and authorize only if that probe is SUPPORTED.
+  Otherwise hold. Report authorized actions on replays, held actions on
+  genuine targets, mean probe cost (unit: one 122.88 MHz wall probe) and the
+  number of new trials. Repeat on the ΔR = 15 m standoff level.
+- **Operational notes** (reproducibility only; no additional rule):
+  - *C1 records:* calibration geometries cal_00–cal_11, 32 records per world,
+    all 5 σ, twin = record mod 4; held-out ho_00–ho_23, 32 records per world,
+    σ = 0.5, twin = record mod 4; each standoff level ho_00–ho_23, 8 records
+    per world, σ = 0.5, twin = record mod 2, relay placed and re-matched as in
+    A5.2. Direct actions use the stored seed streams. A self-check requires
+    the recomputed direct-gate energy `E_D` and, where the robust beam
+    exists, `beam_phi_deg` to equal the stored `imperfect_robust` row exactly.
+  - *C1 passive gate:* delay window = the `imperfect_robust` wall gate's delay
+    window for that record and σ (the reciprocal path has the same delay:
+    twin-ensemble quantiles [0.005, 0.995] of the wall delay over twin-map
+    error σ and candidate-range uncertainty, plus PSF delay width + 3σ_τ).
+    Arrival-angle window: centre = the twin's selected wall path departure
+    angle (the reciprocal path's arrival angle); twin-ensemble interval = the
+    same quantiles of the 257 ensemble wall angles
+    (`beams.uncertainty_wall_angles_deg`, same σ and range uncertainty),
+    widened to include the centre, plus PSF angular width + 3σ_φ of the
+    candidate. Same wall side as the active plan. Receiver map, noise
+    estimate N̂ and ε are the existing ones.
+  - *C1 conditions:* the existing SUPPORTED conditions with the passive
+    quantities: direct reliable (`E_D − N̂_D > N̂_D · 10^(10/10)`); reference
+    detectable (twin passive-gate energy `> N̂_Wrx · 10` and twin direct-gate
+    energy `> N̂_D · 10`); floor `ρ_pass = (E_Wrx − N̂_Wrx)/N̂_Wrx > k_pass`;
+    `s_lo,pass ≤ S_pass ≤ s_hi,pass`. ACQUISITION_FAILED, A9.1
+    outside-free-space and no-twin-wall-path records are never SUPPORTED.
+  - *C1 calibration (same rules as rules 3–4 and A2.2):* `k_pass` = rule 3 on
+    the noise-only passive-gate excess (noise-only map with the declared
+    noise-only seed of that world, σ and record), pooled over σ;
+    `s_hi,pass` = 0.995 quantile of target-world S_pass among floor-passing
+    rows, pooled over σ; `s_lo,pass` = the A2.2 per-σ-cell rule (replay rate
+    ≤ 5% in every σ cell, `n_allowed = floor(0.05 · 384) = 19`), frozen value
+    the largest cell value. Thresholds are fixed before any held-out or
+    standoff passive score is computed.
+  - *C1 matched rules (point estimates, intervals beside them):* target
+    "similar": |passive − active| robust target SUPPORTED at held-out σ = 0.5
+    ≤ 0.05. Replay "higher": passive replay SUPPORTED > active at ΔR = 15 m
+    and at ΔR = 20 m (each). "Near zero at 30 m": both ≤ 0.05. Paired
+    differences use the A4.1 geometry bootstrap.
+  - *C2 fresh probe:* a complete `imperfect_robust` trial at the bw246 profile
+    for the same geometry, hypothesis, record index and twin realization (same
+    twin-map draw), σ = 0.5, frozen thresholds. It needs its own 245.76 MHz
+    direct action (candidate, PSF and direct gate at that profile). Its
+    probe-symbol, receiver-noise and relay-noise seed bases are replaced by
+    new disjoint per-slot bases (33201–33224, 34201–34224, 35201–35224);
+    geometry and twin-error streams are unchanged. Cost is reported two
+    ways: wall probes only (1 + 2 per escalation, as in E2) and including the
+    fresh trial's 245.76 MHz direct action (1 + 4 per escalation). On
+    ΔR = 15 m the first probe is the stored standoff_15m row (8 records per
+    world, twin = record mod 2) and the fresh probe uses the same relay
+    placement.
+  - *Labels:* WP-B stress-level re-analyses are secondary. C1 and C2 are
+    pre-registered here; anything else computed from them is exploratory,
+    post hoc.
