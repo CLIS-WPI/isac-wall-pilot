@@ -1,0 +1,44 @@
+{
+  "label": "A-2 exploratory, post hoc (paired S_c1 difference, fixed receiver minus frozen; ho_02, ho_10, records 0-3)",
+  "rows_finite": 240,
+  "rows_side_flipped": 112,
+  "overall_dS": {
+    "n": 240,
+    "mean": 0.0002075120938777049,
+    "median": -2.0571303867289448e-07,
+    "std": 0.033312430086707194,
+    "min": -0.16001131018530934,
+    "max": 0.1484406939688978
+  },
+  "side_unchanged_target": {
+    "interpretation": "S_c1 = net_wall / net_direct / r_dt. Where the wall side is unchanged, no factor has a systematic median shift: net_direct is 1.000 (the direct beam, direct gate and twin map are angle-symmetric about 0 deg, so the candidate-AoA sign flip leaves them untouched), and net_wall and r_dt each move by sub-percent in the median. The 3-6% figure reported in A12.3 is the median of the ABSOLUTE relative difference |dS|/|S|, i.e. a per-row spread, not a bias: the signed dS is symmetric about 0 (mean ~2e-4, median ~0, signs ~50/50), and a one-sample t-test does not reject zero mean (p~0.95 for both mapped methods). The per-row few-percent moves come from the receive AoA gate now sitting at +phi instead of -phi: its edges fall on slightly different cells of the (symmetric) measured wall-return point spread. CONCLUSION: consistent with gate-discretization noise, not a systematic shift; target S stays at ~1 so no genuine-target decision flips."
+  },
+  "decomposition": [
+    {
+      "method": "imperfect_narrow",
+      "n": 32,
+      "rel_S_median": 1.00215069081685,
+      "rel_net_wall_median": 1.000232653712081,
+      "rel_net_direct_median": 0.999999960762594,
+      "rel_r_dt_median": 0.9962932260787527,
+      "dS_mean": 0.0005210165909580716,
+      "dS_sign_all_same": false,
+      "frac_dS_positive": 0.53125,
+      "ttest_t": 0.05148612519670852,
+      "ttest_p": 0.9592684928068566
+    },
+    {
+      "method": "imperfect_robust",
+      "n": 32,
+      "rel_S_median": 0.9957131122924685,
+      "rel_net_wall_median": 0.9999219971940458,
+      "rel_net_direct_median": 0.999999960762594,
+      "rel_r_dt_median": 1.0042625159711802,
+      "dS_mean": 0.0009332100781248159,
+      "dS_sign_all_same": false,
+      "frac_dS_positive": 0.4375,
+      "ttest_t": 0.07295863033288465,
+      "ttest_p": 0.9423077583106702
+    }
+  ]
+}

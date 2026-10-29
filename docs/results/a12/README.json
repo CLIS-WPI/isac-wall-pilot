@@ -3,5 +3,12 @@
   "a12_3_impact.json": "fixed receiver (5cb272b) vs frozen held-out run: ho_02 and ho_10, records 0-3, 5 sigma, 2 worlds, 6 methods (480 rows); decision and S_c1 differences, every differing non-timing column",
   "a12_3_flagged_rows.csv": "rows with a decision difference or |dS_c1|/|S_c1| >= 1e-3",
   "a12_3_by_wall_side.json": "the same differences split by whether the planned wall side flipped; the 3 decision flips",
-  "scripts": ["scripts/a12_impact.py", "scripts/a12_impact_split.py"]
+  "scripts": [
+    "scripts/a12_impact.py",
+    "scripts/a12_impact_split.py",
+    "scripts/a12_paired_analysis.py"
+  ],
+  "a2_s_difference.csv": "A-2: paired S_c1 difference (fixed - frozen) per method and hypothesis, split by wall side unchanged/flipped",
+  "a2_decomposition.csv": "A-2: target S ratio decomposed into net_wall / net_direct / r_dt (side unchanged), with one-sample t-test",
+  "a2_summary.json": "A-2: interpretation; the shift is consistent with gate-discretization noise, not systematic"
 }
