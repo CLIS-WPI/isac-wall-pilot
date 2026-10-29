@@ -976,3 +976,31 @@ declared processing choices, not post-hoc tuning.
   every held-out and calibration row; true azimuth 0) and its AoA gates are centred on that measured AoA,
   where the mirror is the identity. Fact recorded in `docs/API_NOTES.md` (Phase 8C, mirrored angle map).
 - **Decision (user, 2026-10-29):** no C1 re-run; C1 is internally consistent.
+
+### P8-15 — Receiver angle-map sign fixed (ANALYSIS_PLAN A12.1; post-freeze code change)
+
+- **Type:** post-freeze correction of package code (`src/isac_verify/receiver.py`), committed after
+  Amendment 12 (da29b88) and before any A12 run. Frozen thresholds, config and earlier results unchanged.
+- **What:** `angular_delay_map` and `_zero_padded_delay_profile` combined `sum_n a_n(theta) w_n h_n`
+  (`steering_vector(theta).conj()`); they now combine `sum_n conj(a_n(theta)) w_n h_n`, matched to the RT
+  arrival convention `h ~ a_RX(phi)` (API_NOTES). A path at link angle phi now peaks at map angle +phi.
+- **Evidence (D3, P8-14):** on the pre-fix code, 8 of 8 ray-traced uplink paths peaked at −phi (e.g.
+  ho_10 `wall_clutter_positive_wall` link +33.97° → map −34.0°).
+- **Tests (A12.2, `tests/test_angle_convention.py`):** pre-fix: 3 failed — single paths +30° → −30.0° and
+  −20° → +20.0°; asymmetric corridor (walls +12/−18 m, candidate 50 m at +10°): acquired azimuth −12.21°;
+  with that sign check disabled, the planned (negative) side held 0.312 of its outgoing path in the wall
+  gate and 8.6e-7 of its reciprocal path in the reciprocal gate, while the opposite side's held 0.588 and
+  0.374. Post-fix: 3 passed — planned (negative) side 0.982 (wall gate) and 0.967 (reciprocal gate); opposite
+  side 5.8e-5 and 5.8e-11. The test points the direct beam at the candidate bearing (+10°) and uses 50 m so
+  the direct return lies inside `delay_search_ns` (a 40 m first draft acquired an in-window wall return).
+- **Test fixture corrected:** `tests/test_receiver_refinement.py::_plane_wave` synthesized `conj(a(phi))`
+  (the mirrored convention), so after the fix its "30°" path appeared at −30° and
+  `test_dense_profile_matches_coarse_map_on_grid` compared a sidelobe column (1.71e-5 > 1e-5). The fixture
+  now uses `a(phi)`, as its docstring states; tolerances unchanged; the test passes.
+- **Still failing:** `tests/test_phase6.py::test_blocked_genuine_wall_path_matches_noise`. Phase 6 places
+  the absorber on the POSITIVE wall path (`wall_paths.blocker_spec`). The corridor is symmetric (±15 m);
+  the measured candidate azimuth bias flips sign with the fix (+0.008657° → −0.008657°, candidate y
+  +0.0091 m → −0.0091 m), which flips the twin's strongest outgoing-wall path from positive (aod +26.557°)
+  to negative (−26.557°). The probe now illuminates the unblocked wall: blocked E_W = 8.50e-12 W vs
+  N_W = 5.03e-15 W (pre-fix 1.30e-14 W), score 1.068 (pre-fix 0.0010). Kept failing; not changed.
+  The planner's wall side in symmetric corridors is decided by this sub-0.01° tie-break (see A12.3).

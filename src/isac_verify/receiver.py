@@ -645,7 +645,8 @@ def angular_delay_map(
             choices.receiver_array,
             dtype=torch.complex64,
         )
-        combined = (vector.conj()[:, None] * windowed).sum(dim=0)
+        # A12.1: steering_vector = conj(a); matched to h ~ a(phi), so link angle phi maps to +phi.
+        combined = (vector[:, None] * windowed).sum(dim=0)
         powers.append(combined.abs().square())
     power_w = torch.stack(powers, dim=1)
     _require_shape(
@@ -1081,7 +1082,7 @@ def _zero_padded_delay_profile(
     )
     zero_doppler = (h_eff * delay_window[None, None, :]).sum(dim=0)
     _require_shape("zero_doppler", zero_doppler, rx=num_rx, freq=profile.fft_size)
-    combined = ((vector.conj() * aoa_window)[:, None] * zero_doppler).sum(dim=0)
+    combined = ((vector * aoa_window)[:, None] * zero_doppler).sum(dim=0)  # A12.1 sign, as angular_delay_map
     _require_shape("combined", combined, freq=profile.fft_size)
     taps = torch.fft.ifft(combined, n=pad, dim=-1) * (
         pad / (profile.fft_size * profile.num_symbols)

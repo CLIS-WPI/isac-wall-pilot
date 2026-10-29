@@ -9,8 +9,10 @@ world label and the stored rows are used only for the self-check and the output 
 
 Self-check: recomputed E_D and (where the robust beam exists) beam_phi_deg equal the stored robust row.
 
-Usage (GPU): python scripts/wpc_passive.py RUN SLOT REFERENCE_TRIALS.parquet OUT_DIR
+Usage (GPU): python scripts/wpc_passive.py RUN SLOT REFERENCE_TRIALS.parquet OUT_DIR [a12]
   RUN = calibration | heldout | standoff_03m ... standoff_30m
+  a12: ANALYSIS_PLAN A12.4 re-run with the fixed receiver; the stored rows predate A12.1, so their E_D and
+       beam_phi_deg are recorded next to the recomputed values (E_D_stored, beam_phi_stored) instead of asserted.
 """
 
 from __future__ import annotations
@@ -58,6 +60,7 @@ def passive_gate(config: PilotConfig, plan, candidate, offsets: dict, sigma_m: f
 
 def main() -> None:
     run, slot, ref_path, out_dir = sys.argv[1], int(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4])
+    a12 = sys.argv[5:] == ["a12"]
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{run}_{slot:02d}.parquet"
     assert not out_path.exists(), out_path
@@ -114,7 +117,10 @@ def main() -> None:
                     rows.append({**row, "passive_status": "acquisition_failed"})
                     continue
                 direct = base["direct_energy"]
-                assert float(direct.energy_w) == float(stored["E_D"]), (gid, world, record, sigma)
+                if a12:
+                    row |= {"E_D_stored": float(stored["E_D"]), "beam_phi_stored": float(stored["beam_phi_deg"])}
+                else:
+                    assert float(direct.energy_w) == float(stored["E_D"]), (gid, world, record, sigma)
                 offsets = _twin_offsets(config_g, sigma, twin_z[twin_idx]["positive"], twin_z[twin_idx]["negative"])
                 try:
                     plan, direct_twin, _ = _plan_for(config=config_g, choices=choices, base=base, world=world,
@@ -127,7 +133,10 @@ def main() -> None:
                     rows.append({**row, "passive_status": "no_twin_wall_path"})
                     continue
                 if plan.beam is not None and plan.beam.weights is not None:
-                    assert float(plan.beam.phi_deg) == float(stored["beam_phi_deg"]), (gid, world, record, sigma)
+                    if a12:
+                        row["beam_phi_deg"] = float(plan.beam.phi_deg)
+                    else:
+                        assert float(plan.beam.phi_deg) == float(stored["beam_phi_deg"]), (gid, world, record, sigma)
                     checks += 1
                 else:  # robust beam unusable: the passive score still needs the twin map under the direct beam
                     direct_twin = _twin_map(config=config_g, choices=choices, weights=direct_weights,

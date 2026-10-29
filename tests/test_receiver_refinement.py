@@ -41,7 +41,7 @@ def _plane_wave(
     amplitude: float,
 ) -> LinkPath:
     """Path whose beamed response is ``amplitude`` times the RX response at ``aoa_deg``."""
-    rx = array_response(aoa_deg, choices.receiver_array, dtype=torch.complex64).conj()
+    rx = array_response(aoa_deg, choices.receiver_array, dtype=torch.complex64)  # RT arrival convention (A12.1)
     tx = weights.conj() / weights.abs().square().sum()
     return LinkPath(
         label=f"synthetic:{aoa_deg}",

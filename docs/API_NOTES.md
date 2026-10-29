@@ -1018,3 +1018,6 @@ the zero-delay padded-FFT roundtrip error was
   pipeline is unaffected: its AoA gates are centred on the measured candidate AoA, and every candidate lies
   within ±0.11° of 0° (true azimuth 0), where the mirror is the identity. The C1 passive gate was not
   (see `docs/DEVIATIONS.md` P8-14).
+- **Fixed 2026-10-29 (ANALYSIS_PLAN A12.1, DEVIATIONS P8-15):** the combiner is now
+  `sum_n conj(a_n(theta)) w_n h_n`; `tests/test_angle_convention.py` checks +30° → +30° and −20° → −20°.
+  Everything above describes the code before that fix (all runs up to and including A11/D3).
