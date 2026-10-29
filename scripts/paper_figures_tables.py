@@ -206,10 +206,13 @@ def table_stress(out: Path) -> None:
 def table_e2(out: Path) -> None:
     d = pd.read_csv(out / "e2_escalation.csv")
     d = d[d["pairing"] == "matched_records_0_1_4_5"]
-    text = {"P0": "P0: 122.88 MHz only", "P1": "P1: 245.76 MHz only", "P2": "P2: escalate on SUPPORTED"}
+    text = {"P0": "P0: 122.88 MHz only", "P1": "P1: 245.76 MHz only", "P2": "P2: escalate on SUPPORTED",
+            "P3": f"P3: escalate if $S<s_{{\\mathrm{{esc}}}}={d['s_esc'].dropna().iloc[0]:.3f}$"}
     lines = ["% E2 escalation policy: exploratory, post hoc. imperfect_robust, sigma 0.5, records 0,1,4,5 paired",
              "% across the main run and bw246 (shared seeds: second probe not an independent realization).",
              "% Cost: mean wall-probe spectrum-time per candidate, unit = one 122.88 MHz probe.",
+             "% s_esc: 1st percentile of calibration imperfect_robust target S among SUPPORTED rows, pooled over",
+             "% sigma (results/phase8a/calibration_trials.parquet); see e2_escalation_README.json.",
              "% columns: l r c r c r r", r"\toprule",
              r"Policy & \multicolumn{2}{c}{Target SUPPORTED} & \multicolumn{2}{c}{Replay SUPPORTED} & "
              r"Cost (target) & Cost (replay) \\", r"\midrule"]

@@ -8,11 +8,14 @@ stress: twin = r mod 2). Secondary: all 8 stress records (twins differ for recor
 Policies (decisions are the frozen ones each run already recorded):
   P0 one wall probe at 122.88 MHz;  P1 one wall probe at 245.76 MHz;
   P2 probe at 122.88 MHz, and if SUPPORTED a second probe at 245.76 MHz; SUPPORTED only if both are.
+  P3 probe at 122.88 MHz; if SUPPORTED with S >= s_esc accept; if SUPPORTED with S < s_esc, SUPPORTED only if
+     the 245.76 MHz probe is also SUPPORTED. s_esc is the 1st percentile (numpy linear) of imperfect_robust
+     target-world S_c1 among frozen-SUPPORTED rows of the CALIBRATION trials, pooled over sigma.
 Cost per candidate in baseline-probe units (same probe duration; a 245.76 MHz probe costs 2):
-  P0 = 1, P1 = 2, P2 = 1 + 2 * [first probe SUPPORTED].
+  P0 = 1, P1 = 2, P2 = 1 + 2 * [first probe SUPPORTED], P3 = 1 + 2 * [first SUPPORTED and S < s_esc].
 Intervals: A4.1 geometry-level bootstrap (`phase8b_heldout_analysis.Bootstrap`).
 
-Usage: python scripts/paper_e2_escalation.py MAIN_RUN_DIR BW246_RUN_DIR OUT_DIR
+Usage: python scripts/paper_e2_escalation.py MAIN_RUN_DIR BW246_RUN_DIR CALIBRATION_TRIALS.parquet OUT_DIR
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from isac_verify.config import PilotConfig
@@ -45,16 +49,20 @@ def streams_shared(main_dir: Path, stress_dir: Path) -> bool:
 
 
 def main() -> None:
-    main_dir, stress_dir, out_dir = (Path(a) for a in sys.argv[1:4])
+    main_dir, stress_dir, calibration_path, out_dir = (Path(a) for a in sys.argv[1:5])
     out_dir.mkdir(parents=True, exist_ok=True)
     config = PilotConfig.load("configs/pilot.yaml")
     draws = int(config.get("phase8", "heldout", "bootstrap_draws"))
+    cal = classify(pd.read_parquet(calibration_path), config)
+    assert cal["geometry_id"].str.startswith("cal_").all(), "s_esc must come from calibration geometries only"
+    cal_s = cal[(cal["method"] == PRIMARY) & (cal["world"] == "target") & cal["supported"]]["S_c1"].astype(float)
+    s_esc = float(np.percentile(cal_s, 1.0))
     base = pd.read_parquet(main_dir / "heldout_trials.parquet")
     base = base[(base["method"] == PRIMARY) & (base["sigma_map_m"] == SIGMA)]
     wide = classify(pd.read_parquet(stress_dir / "heldout_trials.parquet"), config)
     wide = wide[(wide["method"] == PRIMARY) & (wide["sigma_map_m"] == SIGMA)]
     assert set(base["bandwidth_profile"]) == {"baseline"} and set(wide["bandwidth_profile"]) == {"bw246"}
-    pairs = base[KEY + ["twin_index", "supported"]].merge(
+    pairs = base[KEY + ["twin_index", "supported", "S_c1"]].merge(
         wide[KEY + ["twin_index", "supported"]], on=KEY, suffixes=("_122", "_246"), validate="one_to_one")
     assert len(pairs) == len(wide)
     same_twin = pairs["twin_index_122"] == pairs["twin_index_246"]
@@ -62,14 +70,19 @@ def main() -> None:
     pairs["P0"] = pairs["supported_122"].astype(bool)
     pairs["P1"] = pairs["supported_246"].astype(bool)
     pairs["P2"] = pairs["P0"] & pairs["P1"]
+    pairs = pairs.rename(columns={"S_c1": "S_122"})
+    escalate = pairs["P0"] & (pairs["S_122"] < s_esc)
+    pairs["P3"] = pairs["P0"] & (~escalate | pairs["P1"])
     pairs["cost_P0"], pairs["cost_P1"] = 1.0, 2.0
     pairs["cost_P2"] = 1.0 + 2.0 * pairs["P0"]
+    pairs["cost_P3"] = 1.0 + 2.0 * escalate
     boot = Bootstrap(sorted(pairs["geometry_id"].unique()), draws)
 
     rows = []
     for pairing, part in (("matched_records_0_1_4_5", pairs[same_twin]), ("all_8_records", pairs)):
-        for policy in ("P0", "P1", "P2"):
-            entry = {"label": LABEL, "pairing": pairing, "policy": policy}
+        for policy in ("P0", "P1", "P2", "P3"):
+            entry = {"label": LABEL, "pairing": pairing, "policy": policy,
+                     "s_esc": s_esc if policy == "P3" else float("nan")}
             for world in ("target", "replay"):
                 w = part[part["world"] == world]
                 r, c = rate_entry(boot, w, policy), rate_entry(boot, w, f"cost_{policy}")
@@ -90,6 +103,10 @@ def main() -> None:
                 "dependence was not characterized). P2's rates are not those of an independently re-drawn "
                 "second probe.",
         "cost_unit": "one 122.88 MHz wall probe; a 245.76 MHz probe of the same duration costs 2",
+        "s_esc": {"value": s_esc, "source": str(calibration_path),
+                  "definition": "1st percentile (numpy linear) of imperfect_robust target-world S_c1 among rows "
+                                "SUPPORTED under phase8.frozen, calibration trials, pooled over sigma",
+                  "n_rows": int(len(cal_s)), "sigmas": sorted(float(x) for x in cal["sigma_map_m"].unique())},
     }, indent=2))
     print(table.round(4).to_string())
 
