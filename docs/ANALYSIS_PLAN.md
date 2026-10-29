@@ -664,3 +664,27 @@ changes.** A8.1 predictions are unchanged.
     record) over detected records.
   - *Counts per world* are (geometry, world, record) units. A record takes
     the outside-free-space path if any of its rows has the A9.1 reason.
+
+## Amendment 10 — 2026-10-28
+
+Written after the block 4 level −10 dBm, run with the pre-A9 code (5c8b0a5),
+failed with the same uncaught `SceneError` in 1 of 24 geometries (slot 20;
+partial output kept only as evidence in `FAILED_probe_power_m10dbm`), and
+before any re-run with the A9 code (bbea099). Amendment 9 text is unchanged.
+**No threshold, gate, primary rule, decision criterion, frozen config value,
+earlier label or earlier prediction outcome changes.** A8.1 predictions are
+unchanged.
+
+- **A10.1** A9.2(b) names −10 dBm as an already completed level; it is not.
+  The A9.2(b) check (2 geometries, bit-identical non-timing columns) is done
+  instead against `probe_power_0dbm`, which completed with the pre-A9 code.
+- **A10.2** A9.3 says to re-run only −20 dBm. Both −10 dBm and −20 dBm are
+  re-run in full with bbea099. The A9.3 counts are reported for both levels.
+- **A10.3** After the full −10 dBm re-run, the 23 geometries that completed in
+  `FAILED_probe_power_m10dbm` are compared with the same geometries of the new
+  run on all non-timing columns. They must be identical. The failed shards are
+  used only for this comparison and are never merged.
+- **A10.4** The combined report also gives, for every level: per-worker
+  runtimes, the NVML check for foreign GPU processes, and the number of
+  records that take the A9.1 outside-free-space path (expected 0 except at
+  −10 dBm and −20 dBm).
