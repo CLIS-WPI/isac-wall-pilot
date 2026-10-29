@@ -1,0 +1,65 @@
+{
+  "rows": 46080,
+  "factors": {
+    "geometries": 24,
+    "sigma_map_m": 5,
+    "records_per_world": 32,
+    "hypotheses": 2,
+    "methods": 6
+  },
+  "methods": [
+    "direct_only",
+    "exact_oracle",
+    "imperfect_narrow",
+    "imperfect_robust",
+    "mapfree_coarse_to_fine",
+    "mapfree_two_beam"
+  ],
+  "sigmas": [
+    0.0,
+    0.25,
+    0.5,
+    1.0,
+    2.0
+  ],
+  "twin_realizations": 4,
+  "twin_rule": "twin_index = record_index mod 4",
+  "profiles": [
+    {
+      "profile": "bw61",
+      "bandwidth_mhz": 61.44,
+      "fft_size_N": 1024,
+      "subcarrier_spacing_khz": 60.0,
+      "cp_length": 128,
+      "sample_rate_mhz": 61.44,
+      "symbol_duration_us_incl_cp": 18.75,
+      "symbols_per_action": 64,
+      "action_duration_ms": 1.2,
+      "delay_bin_ns": 16.276041666666668
+    },
+    {
+      "profile": "baseline",
+      "bandwidth_mhz": 122.88,
+      "fft_size_N": 2048,
+      "subcarrier_spacing_khz": 60.0,
+      "cp_length": 256,
+      "sample_rate_mhz": 122.88,
+      "symbol_duration_us_incl_cp": 18.75,
+      "symbols_per_action": 64,
+      "action_duration_ms": 1.2,
+      "delay_bin_ns": 8.138020833333334
+    },
+    {
+      "profile": "bw246",
+      "bandwidth_mhz": 245.76,
+      "fft_size_N": 4096,
+      "subcarrier_spacing_khz": 60.0,
+      "cp_length": 512,
+      "sample_rate_mhz": 245.76,
+      "symbol_duration_us_incl_cp": 18.75,
+      "symbols_per_action": 64,
+      "action_duration_ms": 1.2,
+      "delay_bin_ns": 4.069010416666667
+    }
+  ]
+}

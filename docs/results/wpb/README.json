@@ -1,0 +1,5 @@
+{
+  "label": "WP-B: re-analysis of existing rows; main held-out run = primary; stress/standoff levels = secondary",
+  "b4_note": "The geometry bootstrap interval [0, 0] for a zero rate is not a bound: every resample of a zero cell is zero. cp95_upper is the one-sided 95% Clopper-Pearson bound for 0 of n geometries with any supported row; it also bounds the row rate when rows per geometry are equal.",
+  "b3_note": "approximate: linear interpolation in dBm on a 10 dB grid; 10 dBm point is the main run"
+}

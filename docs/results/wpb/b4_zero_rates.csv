@@ -1,0 +1,101 @@
+table,cell,n_geometries,geometries_with_any_supported,cp95_upper
+B1,bw246 sigma=0.5 imperfect_robust replay with_s_hi,24,0,0.11734615615494881
+B1,bw246 sigma=0.5 imperfect_robust replay no_s_hi,24,0,0.11734615615494881
+B1,standoff_30m sigma=0.5 imperfect_robust replay with_s_hi,24,0,0.11734615615494881
+B1,standoff_30m sigma=0.5 imperfect_robust replay no_s_hi,24,0,0.11734615615494881
+B1,probe_power_m20dbm sigma=0.5 imperfect_robust target with_s_hi,24,0,0.11734615615494881
+B1,probe_power_m20dbm sigma=0.5 imperfect_robust target no_s_hi,24,0,0.11734615615494881
+B1,probe_power_m20dbm sigma=0.5 imperfect_robust replay with_s_hi,24,0,0.11734615615494881
+B1,probe_power_m20dbm sigma=0.5 imperfect_robust replay no_s_hi,24,0,0.11734615615494881
+B1,rcs_p6db sigma=0.5 imperfect_robust target with_s_hi,24,0,0.11734615615494881
+B2,probe_power_m20dbm sigma=0.5 imperfect_robust replay supported,24,0,0.11734615615494881
+B2,probe_power_m20dbm sigma=0.5 mapfree_coarse_to_fine replay supported_common,24,0,0.11734615615494881
+B2,probe_power_m10dbm sigma=0.5 mapfree_coarse_to_fine replay supported_common,24,0,0.11734615615494881
+B2,probe_power_0dbm sigma=0.5 mapfree_coarse_to_fine replay supported_common,24,0,0.11734615615494881
+B3_grid,probe_power_m20dbm sigma=0.5 imperfect_narrow replay supported,24,0,0.11734615615494881
+B3_grid,probe_power_m10dbm sigma=0.5 imperfect_narrow replay supported,24,0,0.11734615615494881
+B3_grid,probe_power_m20dbm sigma=0.5 imperfect_narrow target supported,24,0,0.11734615615494881
+B3_grid,probe_power_m20dbm sigma=0.5 imperfect_robust replay supported,24,0,0.11734615615494881
+B3_grid,probe_power_m20dbm sigma=0.5 imperfect_robust target supported,24,0,0.11734615615494881
+B3_grid,probe_power_m20dbm sigma=0.5 mapfree_coarse_to_fine replay supported_common,24,0,0.11734615615494881
+B3_grid,probe_power_m10dbm sigma=0.5 mapfree_coarse_to_fine replay supported_common,24,0,0.11734615615494881
+B3_grid,probe_power_0dbm sigma=0.5 mapfree_coarse_to_fine replay supported_common,24,0,0.11734615615494881
+B3_grid,probe_power_m20dbm sigma=0.5 mapfree_coarse_to_fine target supported_common,24,0,0.11734615615494881
+B3_grid,probe_power_m10dbm sigma=0.5 mapfree_coarse_to_fine target supported_common,24,0,0.11734615615494881
+E2,matched_records_0_1_4_5 P1 replay,24,0,0.11734615615494881
+E2,matched_records_0_1_4_5 P2 replay,24,0,0.11734615615494881
+E2,matched_records_0_1_4_5 P3 replay,24,0,0.11734615615494881
+E2,all_8_records P1 replay,24,0,0.11734615615494881
+E2,all_8_records P2 replay,24,0,0.11734615615494881
+E2,all_8_records P3 replay,24,0,0.11734615615494881
+rates_by_level_stratum.csv,level=bw246 stratum=ge1 method=imperfect_narrow world=replay rate=supported,24,0,0.11734615615494881
+rates_by_level_stratum.csv,level=bw246 stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,24,0,0.11734615615494881
+rates_by_level_stratum.csv,level=bw246 stratum=ge1 method=imperfect_robust world=replay rate=supported,24,0,0.11734615615494881
+rates_by_level_stratum.csv,level=bw246 stratum=ge1 method=imperfect_robust world=replay rate=supported_common,24,0,0.11734615615494881
+rates_by_level_stratum.csv,level=bw61 stratum=ge1 method=imperfect_narrow world=replay rate=supported,4,0,0.5271291954984121
+rates_by_level_stratum.csv,level=bw61 stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,4,0,0.5271291954984121
+rates_by_level_stratum.csv,level=bw61 stratum=ge1 method=imperfect_robust world=replay rate=supported,4,0,0.5271291954984121
+rates_by_level_stratum.csv,level=bw61 stratum=ge1 method=imperfect_robust world=replay rate=supported_common,4,0,0.5271291954984121
+rates_by_level_stratum.csv,level=bw61 stratum=ge1 method=mapfree_coarse_to_fine world=replay rate=supported_common,4,0,0.5271291954984121
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=imperfect_narrow world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=imperfect_narrow world=target rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=imperfect_narrow world=target rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=imperfect_robust world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=imperfect_robust world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=imperfect_robust world=target rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=imperfect_robust world=target rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=mapfree_coarse_to_fine world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=ge1 method=mapfree_coarse_to_fine world=target rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=imperfect_narrow world=replay rate=supported,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=imperfect_narrow world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=imperfect_narrow world=target rate=supported,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=imperfect_narrow world=target rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=imperfect_robust world=replay rate=supported,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=imperfect_robust world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=imperfect_robust world=target rate=supported,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=imperfect_robust world=target rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=mapfree_coarse_to_fine world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m20dbm stratum=lt1 method=mapfree_coarse_to_fine world=target rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=ge1 method=imperfect_narrow world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=ge1 method=imperfect_robust world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=ge1 method=mapfree_coarse_to_fine world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=ge1 method=mapfree_coarse_to_fine world=target rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=lt1 method=imperfect_narrow world=replay rate=supported,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=lt1 method=imperfect_narrow world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=lt1 method=imperfect_robust world=replay rate=supported,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=lt1 method=imperfect_robust world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=lt1 method=mapfree_coarse_to_fine world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_m10dbm stratum=lt1 method=mapfree_coarse_to_fine world=target rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_0dbm stratum=ge1 method=imperfect_narrow world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_0dbm stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_0dbm stratum=ge1 method=imperfect_robust world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_0dbm stratum=ge1 method=mapfree_coarse_to_fine world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_0dbm stratum=lt1 method=imperfect_narrow world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_0dbm stratum=lt1 method=imperfect_robust world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_0dbm stratum=lt1 method=mapfree_coarse_to_fine world=replay rate=supported_common,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=probe_power_p20dbm stratum=ge1 method=imperfect_narrow world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=probe_power_p20dbm stratum=ge1 method=imperfect_robust world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=wall_thickness_200mm stratum=ge1 method=imperfect_narrow world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=wall_thickness_200mm stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=wall_thickness_200mm stratum=ge1 method=imperfect_robust world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_p6db stratum=ge1 method=imperfect_narrow world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_p6db stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_p6db stratum=ge1 method=imperfect_narrow world=target rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_p6db stratum=ge1 method=imperfect_robust world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_p6db stratum=ge1 method=imperfect_robust world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_p6db stratum=ge1 method=imperfect_robust world=target rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_p6db stratum=ge1 method=mapfree_coarse_to_fine world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_p6db stratum=lt1 method=imperfect_narrow world=target rate=supported,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=rcs_p6db stratum=lt1 method=imperfect_robust world=target rate=supported,7,0,0.3481636551311609
+rates_by_level_stratum.csv,level=rcs_m6db stratum=ge1 method=imperfect_narrow world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_m6db stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_m6db stratum=ge1 method=imperfect_robust world=replay rate=supported,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_m6db stratum=ge1 method=imperfect_robust world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_level_stratum.csv,level=rcs_m6db stratum=ge1 method=mapfree_coarse_to_fine world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_stratum.csv,stratum=ge1 method=imperfect_narrow world=replay rate=supported,17,0,0.16156611126074016
+rates_by_stratum.csv,stratum=ge1 method=imperfect_narrow world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_stratum.csv,stratum=ge1 method=imperfect_robust world=replay rate=supported,17,0,0.16156611126074016
+rates_by_stratum.csv,stratum=ge1 method=imperfect_robust world=replay rate=supported_common,17,0,0.16156611126074016
+rates_by_stratum.csv,stratum=ge1 method=mapfree_coarse_to_fine world=replay rate=supported_common,17,0,0.16156611126074016
