@@ -1,0 +1,11 @@
+{
+  "label": "WP-C, pre-registered in ANALYSIS_PLAN Amendment 11 (commit 598dd99). Anything else derived from these files is exploratory, post hoc.",
+  "c1_passive_thresholds.json": "A11.1 thresholds fitted on the 12 calibration geometries (committed a702d35 before any held-out passive score)",
+  "c1_passive_vs_active.csv": "A11.1 passive vs frozen active imperfect_robust SUPPORTED, held-out sigma 0.5 and 6 standoff levels; geometry bootstrap; cp95_upper_if_zero = one-sided 95% Clopper-Pearson bound, 0 of n geometries",
+  "c1_verdicts.json": "A11.1 matched rules",
+  "c1_passive_rows.parquet": "per-record passive and active rows (held-out and standoff)",
+  "c2_controller.csv": "A11.2 controller outcome per run and world; cost unit = one 122.88 MHz wall probe",
+  "c2_heldout_decisions.parquet / c2_standoff_15m_decisions.parquet": "per-candidate controller decisions",
+  "c2_fresh_trials/": "the fresh 245.76 MHz trials (new seed bases 33201/34201/35201); 47 held-out + 27 standoff_15m",
+  "scripts": ["scripts/wpc_passive.py", "scripts/wpc_passive_analysis.py", "scripts/wpc_controller.py"]
+}
