@@ -30,7 +30,8 @@ from isac_verify.config import PilotConfig
 from isac_verify.phase7 import _acquire_record, _plan_for, _twin_map, _twin_offsets, _twin_paths
 from isac_verify.phase8a import (HELDOUT, accepted_geometry, approve_heldout, geometry_config,
                                  geometry_seed_streams, prepare_geometry, twin_draws)
-from isac_verify.receiver import ProcessingChoices, _aoa_window, gate_energy, noise_calibration
+from isac_verify.receiver import (ProcessingChoices, _aoa_window, angular_delay_map, cfr_from_paths,
+                                  delay_doppler_map, gate_energy, noise_calibration)
 from isac_verify.stress import stress_config
 from isac_verify.verification import GateWindow
 
@@ -119,6 +120,50 @@ def couple(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
     pd.DataFrame([row]).to_parquet(out_dir / f"{run}_{slot:02d}.parquet", index=False)
     print(f"{run} {gid}: G={row.get('G_db', float('nan')):.2f} dB kappa={row.get('kappa_db', float('nan')):.2f} dB "
           f"overlap={row.get('overlap')}", flush=True)
+
+
+def leakage(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
+    """Prop. 3 assumption check: share of a single emitter's reflector-gate energy arriving through paths OTHER
+    than the reciprocal wall path, from the existing noiseless uplink channels (relay -> gNB, single element)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    gid = f"ho_{slot:02d}"
+    _, config, config_g, choices, noise_full, direct_weights, geometry, prepared, split = _setup(run, slot)
+    profile = choices.profile
+    seeds = {"streams": geometry_seed_streams(config, HELDOUT, slot, 1)}
+    twins = int(config.section("phase8", "grid")["twin_realizations_per_sigma"])
+    z = twin_draws(config, HELDOUT, slot, twins)[0]
+    base = _acquire_record(config=config_g, choices=choices, world="target", record_index=0,
+                           direct_weights=direct_weights, links=prepared["links"], calibration=prepared["calibration"],
+                           noise_full=noise_full, timing={}, seeds=seeds)
+    offsets = _twin_offsets(config_g, SIGMA, z["positive"], z["negative"])
+    plan, _, _ = _plan_for(config=config_g, choices=choices, base=base, world="target", method=METHOD,
+                           sigma_m=SIGMA, twin_offsets=offsets, direct_weights=direct_weights, timing={})
+    refl = passive_gate(config_g, plan, base["candidate"], offsets, SIGMA)
+    side = plan.wall_side
+    wall_family = f"wall_clutter_{side}_wall"
+    uplink = list(prepared["links"]["uplink"])
+    ones1 = torch.ones(1, device="cuda", dtype=torch.complex64)
+    pilots = torch.ones((profile.num_symbols, profile.fft_size), device="cuda", dtype=torch.complex64)
+
+    def gate_energy_of(paths) -> float:  # noiseless reflector-gate energy of the uplink channel built from `paths`
+        if not paths:
+            return 0.0
+        cfr = cfr_from_paths(paths, ones1, profile)  # [rx, freq]
+        h_eff = cfr[None, :, :] * pilots[:, None, :]  # constant across symbols -> all energy at zero Doppler
+        adm = angular_delay_map(delay_doppler_map(h_eff, choices), choices, noise_per_cell_w=0.0)
+        return float(gate_e(adm, refl).energy_w)
+
+    wall = [p for p in uplink if p.family == wall_family]
+    others = [p for p in uplink if p.family != wall_family]
+    e_all, e_wall, e_others = gate_energy_of(uplink), gate_energy_of(wall), gate_energy_of(others)
+    row = {"label": "Prop3 assumption check (defensive)", "run": run, "geometry_id": gid, "wall_side": side,
+           "n_uplink_paths": len(uplink), "n_wall_paths": len(wall), "n_other_paths": len(others),
+           "e_gate_all_w": e_all, "e_gate_wall_only_w": e_wall, "e_gate_others_only_w": e_others,
+           "share_others": (e_others / e_all) if e_all > 0 else float("nan"),
+           "other_families": ",".join(sorted({p.family for p in others}))}
+    pd.DataFrame([row]).to_parquet(out_dir / f"{run}_{slot:02d}.parquet", index=False)
+    print(f"{run} {gid}: share_others={row['share_others']:.4g} "
+          f"(others={len(others)} paths: {row['other_families']})", flush=True)
 
 
 def _cand_residual_gate(cand_deg: float, dgate: GateWindow, refl: GateWindow, survey: tuple[float, float],
@@ -257,16 +302,38 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
                      "n_window_failed": int(((~part["overlap"]) & (~part["los_in_survey"])).sum())})
     cert_df = pd.DataFrame(cert).set_index("run").reindex(["heldout", *STANDOFFS]).reset_index()
     cert_df.to_csv(out / "b3_certified_region.csv", index=False)
+
+    # Prop. 3 assumption check: non-reciprocal-wall share of reflector-gate energy, median/max per level.
+    # Primary metric is the per-path (incoherent) share e_others / (e_wall + e_others), which is bounded in [0,1]
+    # and attributable to paths; the coherent share e_others / e_all is kept for reference but can exceed 1 where
+    # the wall path and the others interfere destructively (the coherent total falls below a subset's energy).
+    leak = _load(couple_dir.parent / "leak", "*.parquet")
+    leak_rows = []
+    if not leak.empty:
+        denom = leak["e_gate_wall_only_w"] + leak["e_gate_others_only_w"]
+        leak["share_others_incoherent"] = np.where(denom > 0, leak["e_gate_others_only_w"] / denom, np.nan)
+        leak.to_csv(out / "prop3_leakage_per_geometry.csv", index=False)
+        for run in ["heldout", *STANDOFFS]:
+            part = leak[leak["run"] == run]
+            s, sc = part["share_others_incoherent"].dropna(), part["share_others"].dropna()
+            if len(s):
+                leak_rows.append({"run": run, "n_geometries": int(len(s)),
+                                  "median_share_others": float(s.median()), "max_share_others": float(s.max()),
+                                  "median_share_coherent": float(sc.median()), "max_share_coherent": float(sc.max())})
+        pd.DataFrame(leak_rows).to_csv(out / "prop3_leakage.csv", index=False)
     (out / "README.json").write_text(json.dumps({
         "label": "Amendment 13 (defensive) pre-registered: B1 coupling, B2 consistency statistic, B3 certified region. No attacker code.",
         "b1_b3_per_geometry.csv": "per geometry/level: G (dB), kappa (dB), delay offset, overlap, E_req, kappa*E_req, certified flags",
         "b2_threshold.json": "B2 c_hi (0.99 quantile of C over calibration genuine targets); committed before eval",
         "b2_false_rejection.csv": "B2 genuine-target false rejection on held-out (sigma 0.5) and each standoff level",
         "b3_certified_region.csv": "certified fraction per level (margin 0 and 3 dB) vs overlap and median G",
+        "prop3_leakage.csv": "Prop.3 check: non-reciprocal-wall share of reflector-gate energy, median/max per level",
         "c_hi": c_hi, "scripts": ["scripts/wpe_defensive.py"]}, indent=2))
     pd.set_option("display.width", 220)
     print(pd.DataFrame(b2).round(4).to_string())
     print(cert_df.round(4).to_string())
+    if leak_rows:
+        print(pd.DataFrame(leak_rows).round(6).to_string())
 
 
 def main() -> None:
@@ -274,6 +341,8 @@ def main() -> None:
     mode = sys.argv[1]
     if mode == "couple":
         couple(sys.argv[2], int(sys.argv[3]), Path(sys.argv[4]), Path(sys.argv[5]))
+    elif mode == "leakage":
+        leakage(sys.argv[2], int(sys.argv[3]), Path(sys.argv[4]), Path(sys.argv[5]))
     elif mode == "consistency":
         consistency(sys.argv[2], int(sys.argv[3]), Path(sys.argv[4]), Path(sys.argv[5]))
     elif mode == "calibrate":

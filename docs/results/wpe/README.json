@@ -4,6 +4,7 @@
   "b2_threshold.json": "B2 c_hi (0.99 quantile of C over calibration genuine targets); committed before eval",
   "b2_false_rejection.csv": "B2 genuine-target false rejection on held-out (sigma 0.5) and each standoff level",
   "b3_certified_region.csv": "certified fraction per level (margin 0 and 3 dB) vs overlap and median G",
+  "prop3_leakage.csv": "Prop.3 check: non-reciprocal-wall share of reflector-gate energy, median/max per level",
   "c_hi": 6.525630404964621e-14,
   "scripts": [
     "scripts/wpe_defensive.py"

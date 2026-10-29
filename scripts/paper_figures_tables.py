@@ -34,12 +34,10 @@ plt.rcParams.update({"font.size": 8, "axes.labelsize": 8, "legend.fontsize": 7, 
 SIZE = (3.5, 2.5)
 
 
-def save(fig, out: Path, name: str, tight_bbox: bool = False) -> None:
+def save(fig, out: Path, name: str) -> None:
     fig.tight_layout(pad=0.3)
-    # tight_bbox expands the saved canvas to include a wide above-axes legend (Fig. A only).
-    kw = {"bbox_inches": "tight"} if tight_bbox else {}
-    fig.savefig(out / f"{name}.pdf", metadata={"Subject": "data provenance: docs/results/paper/README.json"}, **kw)
-    fig.savefig(out / f"{name}.png", **kw)
+    fig.savefig(out / f"{name}.pdf", metadata={"Subject": "data provenance: docs/results/paper/README.json"})
+    fig.savefig(out / f"{name}.png")
     plt.close(fig)
 
 
@@ -56,9 +54,9 @@ def fig_a(out: Path) -> pd.DataFrame:
     s = pd.read_csv(R / "phase8c/standoff/standoffs.csv")
     phi, tau = float(s["delta_r_phi_m"].median()), float(s["delta_r_tau_baseline_m"].median())
     fig, ax = plt.subplots(figsize=SIZE)
-    for method, colour, label, marker in (("exact_oracle", OKABE["blue"], "Exact oracle", "o"),
-                                          ("imperfect_robust", OKABE["vermillion"], "Imperfect robust", "s"),
-                                          ("mapfree_coarse_to_fine", OKABE["green"], "Coarse-to-fine (common)", "^")):
+    for method, colour, label, marker in (("exact_oracle", OKABE["blue"], "Oracle", "o"),
+                                          ("imperfect_robust", OKABE["vermillion"], "Robust probe", "s"),
+                                          ("mapfree_coarse_to_fine", OKABE["green"], "Map-free", "^")):
         m = d[d["method"] == method].sort_values("delta_r_m")
         series(ax, m["delta_r_m"], m, colour, label, marker)
     # C1 passive check (A12.4 re-run with the corrected gate, its frozen thresholds), docs/results/wpc_a12
@@ -68,15 +66,16 @@ def fig_a(out: Path) -> pd.DataFrame:
                  "passive_n_geometries": "n_geometries"})
     c1["delta_r_m"] = c1["run"].str.extract(r"standoff_(\d+)m")[0].astype(float)
     c1 = c1.sort_values("delta_r_m").assign(method="c1_passive", rate="supported_pass")
-    series(ax, c1["delta_r_m"], c1, OKABE["purple"], "Receive-side check", "D", dashed=True)
-    # Fraction of geometries NOT certified against any single-antenna emitter (B3), docs/results/wpe.
+    series(ax, c1["delta_r_m"], c1, OKABE["purple"], "Receive-side", "D", dashed=True)
+    # Fraction of geometries NOT certified against any single-antenna emitter (B3), docs/results/wpe:
+    # plotted as a grey dotted line with small markers at the six standoff levels (not steps).
     cert = pd.read_csv(R / "wpe/b3_certified_region.csv")
     cert = cert[cert["run"].str.startswith("standoff_")].copy()
     cert["delta_r_m"] = cert["run"].str.extract(r"standoff_(\d+)m")[0].astype(float)
     cert = cert.sort_values("delta_r_m")
     cert["point"] = 1.0 - cert["certified_fraction_m0"]
-    ax.step(cert["delta_r_m"], cert["point"], where="mid", color="0.5", linestyle=":", linewidth=1.0,
-            label="Uncertified (any single-antenna emitter)")
+    ax.plot(cert["delta_r_m"], cert["point"], color="0.5", linestyle=":", linewidth=1.0,
+            marker="o", markersize=2.5, label="Not certified")
     for x, text, style in ((phi, r"median $\Delta R_\phi$", ":"), (tau, r"median $\Delta R_\tau$", "-.")):
         ax.axvline(x, color=OKABE["black"], linestyle=style, linewidth=0.8)
         ax.text(x + 0.4, 0.8, text, rotation=90, fontsize=7, va="center")
@@ -84,8 +83,8 @@ def fig_a(out: Path) -> pd.DataFrame:
     ax.set_ylabel("Replay SUPPORTED rate")
     ax.set_xlim(2, 31)
     ax.set_ylim(-0.02, 1.02)
-    ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2)
-    save(fig, out, "fig_a_standoff_sweep", tight_bbox=True)
+    ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=3)
+    save(fig, out, "fig_a_standoff_sweep")
     unc = cert.assign(method="uncertified_single_emitter", rate="uncertified_fraction", lo=None, hi=None,
                       source="docs/results/wpe/b3_certified_region.csv")
     d = pd.concat([d.assign(source="docs/results/phase8c/standoff"),
