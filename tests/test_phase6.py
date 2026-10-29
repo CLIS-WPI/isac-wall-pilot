@@ -1,18 +1,38 @@
 from __future__ import annotations
 
+import copy
+
 import pytest
 
+import isac_verify.phase6 as phase6
 from isac_verify.config import PilotConfig
 from isac_verify.axis import delay_axis_verification
 from isac_verify.phase6 import phase6_diagnostics
+from isac_verify.wall_paths import blocker_spec
 from isac_verify.receiver import ProcessingChoices
 from isac_verify.verification import classify_evidence, planner_field_names
+
+
+def _blocker_on_planned_side(original):
+    """P8-15: blocker_spec always uses the positive wall; put the absorber on the plan's wall instead."""
+
+    def blocked(*, config: PilotConfig, plan, **kwargs):
+        data = copy.deepcopy(config.data)
+        data["physical"]["walls"]["positive"]["offset_m"] = data["physical"]["walls"][plan.wall_side]["offset_m"]
+        spec = blocker_spec(PilotConfig(path=config.path, data=data))
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(phase6, "blocker_spec", lambda _config: spec)
+            return original(config=config, plan=plan, **kwargs)
+
+    return blocked
 
 
 @pytest.fixture(scope="module")
 def phase6_summary(config: PilotConfig, tmp_path_factory) -> dict:
     output = tmp_path_factory.mktemp("phase6-tests")
-    return phase6_diagnostics(config, output)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(phase6, "_blocked_diagnostic", _blocker_on_planned_side(phase6._blocked_diagnostic))
+        return phase6_diagnostics(config, output)
 
 
 def test_delay_axis_agrees_across_receiver_modules(

@@ -1013,3 +1013,8 @@ declared processing choices, not post-hoc tuning.
   moves by a median 3–6% (narrow, robust); this was not decomposed. The full held-out run was not re-run.
 - **C1 re-run (A12.4, `docs/results/wpc_a12/`):** recomputed E_D within 2.1e-7 relative of the stored rows;
   robust beam angle identical except 905 of 7,680 rows where the planned wall flipped sign.
+- **A-1 (2026-10-29): phase-6 blocker test fixed (test fixture only).** `tests/test_phase6.py` now monkeypatches
+  `phase6._blocked_diagnostic` so `blocker_spec` is built with the positive-wall offset set to the plan's wall
+  side; the absorber therefore sits on the planned wall, as intended. Package code is unchanged. With the
+  absorber on the planned (negative) wall the blocked diagnostic reads E_W = 1.299e-14 W, N_W = 5.03e-15 W,
+  score 0.0010 (the pre-fix values), status UNRESOLVED; the test passes. Full suite: 77 passed.
