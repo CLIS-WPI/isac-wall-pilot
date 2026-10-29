@@ -1,0 +1,8 @@
+{
+  "label": "EXPLORATORY, post hoc (D1-D3). Nothing here was pre-registered.",
+  "d1_threshold_free.csv": "AUC (target vs replay) of active S_c1 and passive S_pass with geometry-bootstrap CI; oracle s_lo (target SUPPORTED >= 0.99 on the level's own rows, all other frozen conditions kept) and replay SUPPORTED there. Held-out sigma 0.5 and the 6 standoff levels; calibration per sigma (secondary)",
+  "d2_combination_rules.csv": "target / replay SUPPORTED for active, passive, passive AND active, passive OR active, frozen thresholds",
+  "d3_pair_energy.csv": "noiseless relay energy by path pair in the active wall gate and the passive gate (ho_10 main, ho_02 standoff_10m; replay, record 0, sigma 0.5, twin 0); TX gains of the wall and direct beams at the downlink departure angle; receive response (Hann and rectangular) at the uplink arrival angle, steered to each gate centre, in the receiver map's (mirrored) angle convention. S0_passive = noiseless passive score; run_S_c1 = the run's (noisy) active score",
+  "scripts": ["scripts/wpd_score_analysis.py", "scripts/wpd_mechanism.py"],
+  "see_also": "docs/DEVIATIONS.md P8-14 (mirrored receiver AoA axis; C1 passive gate observed the opposite wall's reciprocal path)"
+}

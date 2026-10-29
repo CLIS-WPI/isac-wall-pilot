@@ -11,7 +11,17 @@
     "fig_a_standoff_sweep.{pdf,png,csv}": "presentational; data from docs/results/phase8c/standoff (block 2, pre-registered A5.2/A6.2)",
     "fig_b_power_sweep.{pdf,png,csv}": "presentational; data from docs/results/phase8c/block45 and the main held-out run. The 10 dBm imperfect_narrow target point is new: exploratory, post hoc (labelled in the CSV)",
     "table_heldout_criteria.tex": "confirmatory numbers re-presented from docs/results/phase8b (A4.2); no new numbers",
-    "table_stress_summary.tex": "pre-registered stress outcomes re-presented from docs/results/phase8c; no new numbers"
+    "table_stress_summary.tex": "pre-registered stress outcomes re-presented from docs/results/phase8c; no new numbers",
+    "table_wpb_operating_points.tex": "WP-B B3: secondary, approximate (10 dB grid); from docs/results/wpb/b3_operating_points.csv",
+    "table_wpc_passive.tex": "WP-C C1: pre-registered (A11.1); from docs/results/wpc/c1_passive_vs_active.csv; caveat DEVIATIONS P8-14",
+    "table_wpc_controller.tex": "WP-C C2: pre-registered (A11.2); from docs/results/wpc/c2_controller.csv",
+    "table_wpd_threshold_free.tex": "D1: exploratory, post hoc; from docs/results/wpd/d1_threshold_free.csv"
   },
-  "scripts": ["scripts/paper_e1_thin_wall.py", "scripts/paper_e2_escalation.py", "scripts/paper_figures_tables.py"]
+  "scripts": [
+    "scripts/paper_e1_thin_wall.py",
+    "scripts/paper_e2_escalation.py",
+    "scripts/paper_figures_tables.py",
+    "scripts/paper_wp_tables.py"
+  ],
+  "tables_versioned": "2026-10-29: WP-B/WP-C/D1 tables added (paper_wp_tables.py)"
 }

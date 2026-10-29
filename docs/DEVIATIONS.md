@@ -956,3 +956,22 @@ declared processing choices, not post-hoc tuning.
 - **Evidence:** test `test_candidate_beyond_wall_is_unresolved_not_observable`;
   74 tests passed; `results/phase8a_diag/eq_stress5`: cal_00 x 2 records,
   rows=120 compared_columns=104 differing=[] against the calibration v5 shard.
+
+### P8-14 — C1 passive gate observed the opposite wall's reciprocal path (receiver AoA axis is mirrored)
+
+- **Type:** defect in a post-freeze script (`scripts/wpc_passive.py`, `passive_gate`), found post hoc by D3.
+  No package code, frozen decision or committed result is changed.
+- **What:** `receiver.angular_delay_map` combines `sum_n a_n(theta) w_n h_n`, so a path arriving at link angle
+  phi peaks at map angle −phi. D3 (`scripts/wpd_mechanism.py`) asserts this on measured noiseless maps: e.g.
+  ho_10 uplink `wall_clutter_positive_wall` at link AoA +33.97° peaks at map −34.0°; all 8 checked paths
+  mirror within the 0.25° grid. A11.1 centres the passive AoA window at the twin wall path's departure angle
+  (`plan.predicted_aod_deg`, link convention). In map coordinates that window looks at the OTHER wall's
+  reciprocal path: on ho_10, 94.9% of the relay's passive-gate energy is LoS-down × positive-wall-up while
+  the plan's wall side is negative.
+- **Effect:** the passive score is internally consistent (twin ratio r_pass, calibration and evaluation all
+  use the same mirrored gate, and the corridor walls are symmetric in delay), but it is not the "same wall
+  side as the active plan" that A11 describes. The C1 numbers stand as the result of the gate as built; their
+  sensitivity to the mirror was NOT measured (it needs new GPU runs).
+- **Frozen pipeline:** unaffected in practice: its AoA gates are centred on the measured candidate AoA, which
+  lies within ±0.11° of 0 in every held-out and calibration row (true azimuth 0), where the mirror is the
+  identity.
