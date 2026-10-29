@@ -34,10 +34,12 @@ plt.rcParams.update({"font.size": 8, "axes.labelsize": 8, "legend.fontsize": 7, 
 SIZE = (3.5, 2.5)
 
 
-def save(fig, out: Path, name: str) -> None:
+def save(fig, out: Path, name: str, tight_bbox: bool = False) -> None:
     fig.tight_layout(pad=0.3)
-    fig.savefig(out / f"{name}.pdf", metadata={"Subject": "data provenance: docs/results/paper/README.json"})
-    fig.savefig(out / f"{name}.png")
+    # tight_bbox expands the saved canvas to include a wide above-axes legend (Fig. A only).
+    kw = {"bbox_inches": "tight"} if tight_bbox else {}
+    fig.savefig(out / f"{name}.pdf", metadata={"Subject": "data provenance: docs/results/paper/README.json"}, **kw)
+    fig.savefig(out / f"{name}.png", **kw)
     plt.close(fig)
 
 
@@ -66,7 +68,15 @@ def fig_a(out: Path) -> pd.DataFrame:
                  "passive_n_geometries": "n_geometries"})
     c1["delta_r_m"] = c1["run"].str.extract(r"standoff_(\d+)m")[0].astype(float)
     c1 = c1.sort_values("delta_r_m").assign(method="c1_passive", rate="supported_pass")
-    series(ax, c1["delta_r_m"], c1, OKABE["purple"], "C1 passive check", "D", dashed=True)
+    series(ax, c1["delta_r_m"], c1, OKABE["purple"], "Receive-side check", "D", dashed=True)
+    # Fraction of geometries NOT certified against any single-antenna emitter (B3), docs/results/wpe.
+    cert = pd.read_csv(R / "wpe/b3_certified_region.csv")
+    cert = cert[cert["run"].str.startswith("standoff_")].copy()
+    cert["delta_r_m"] = cert["run"].str.extract(r"standoff_(\d+)m")[0].astype(float)
+    cert = cert.sort_values("delta_r_m")
+    cert["point"] = 1.0 - cert["certified_fraction_m0"]
+    ax.step(cert["delta_r_m"], cert["point"], where="mid", color="0.5", linestyle=":", linewidth=1.0,
+            label="Uncertified (any single-antenna emitter)")
     for x, text, style in ((phi, r"median $\Delta R_\phi$", ":"), (tau, r"median $\Delta R_\tau$", "-.")):
         ax.axvline(x, color=OKABE["black"], linestyle=style, linewidth=0.8)
         ax.text(x + 0.4, 0.8, text, rotation=90, fontsize=7, va="center")
@@ -75,9 +85,11 @@ def fig_a(out: Path) -> pd.DataFrame:
     ax.set_xlim(2, 31)
     ax.set_ylim(-0.02, 1.02)
     ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2)
-    save(fig, out, "fig_a_standoff_sweep")
+    save(fig, out, "fig_a_standoff_sweep", tight_bbox=True)
+    unc = cert.assign(method="uncertified_single_emitter", rate="uncertified_fraction", lo=None, hi=None,
+                      source="docs/results/wpe/b3_certified_region.csv")
     d = pd.concat([d.assign(source="docs/results/phase8c/standoff"),
-                   c1.assign(source="docs/results/wpc_a12/c1_passive_vs_active.csv")], ignore_index=True)
+                   c1.assign(source="docs/results/wpc_a12/c1_passive_vs_active.csv"), unc], ignore_index=True)
     d = d[["method", "rate", "delta_r_m", "point", "lo", "hi", "n_geometries", "source"]].assign(
         median_delta_r_phi_m=phi, median_delta_r_tau_m=tau)
     d.to_csv(out / "fig_a_standoff_sweep.csv", index=False)

@@ -237,8 +237,14 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
     cp = cp.merge(e_req, on=["run", "geometry_id"], how="left")
     cp["kappa_E_req"] = cp["kappa"] * cp["E_req"]
     cp["margin3db_factor"] = 10 ** 0.3
-    cp["certified_m0"] = (~cp["overlap"]) & (cp["kappa_E_req"] > c_hi) & cp["kappa"].notna()
-    cp["certified_m3db"] = (~cp["overlap"]) & (cp["kappa_E_req"] > c_hi * cp["margin3db_factor"]) & cp["kappa"].notna()
+    # Window check (external review): the forced LoS copy must be caught by the consistency statistic,
+    # i.e. its delay sits inside the surveillance window AND outside the direct gate (overlap == False).
+    survey_lo, survey_hi = (float(v) for v in config.get("phase6", "processing", "delay_search_ns"))
+    cp["los_in_survey"] = ((cp["los_copy_at_refl_center_ns"] >= survey_lo)
+                           & (cp["los_copy_at_refl_center_ns"] <= survey_hi))
+    certifiable = (~cp["overlap"]) & cp["los_in_survey"] & cp["kappa"].notna()
+    cp["certified_m0"] = certifiable & (cp["kappa_E_req"] > c_hi)
+    cp["certified_m3db"] = certifiable & (cp["kappa_E_req"] > c_hi * cp["margin3db_factor"])
     cp.to_csv(out / "b1_b3_per_geometry.csv", index=False)
     cert = []
     for run, part in cp.groupby("run"):
@@ -247,7 +253,8 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
                      "median_G_db": float(part["G_db"].median()), "median_kappa_db": float(part["kappa_db"].median()),
                      "certified_fraction_m0": float(part["certified_m0"].mean()),
                      "certified_fraction_m3db": float(part["certified_m3db"].mean()),
-                     "n_certified_m0": int(part["certified_m0"].sum())})
+                     "n_certified_m0": int(part["certified_m0"].sum()),
+                     "n_window_failed": int(((~part["overlap"]) & (~part["los_in_survey"])).sum())})
     cert_df = pd.DataFrame(cert).set_index("run").reindex(["heldout", *STANDOFFS]).reset_index()
     cert_df.to_csv(out / "b3_certified_region.csv", index=False)
     (out / "README.json").write_text(json.dumps({

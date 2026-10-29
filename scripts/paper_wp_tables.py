@@ -115,6 +115,31 @@ def d1(out: Path, src: str, name: str) -> None:
         r"& Active & Passive & $s_{lo}$ & Replay & $s_{lo}$ & Replay & Active & Passive \\", r"\midrule"], rows)
 
 
+def e_b3(out: Path) -> None:  # Amendment 13 (defensive): B3 certified region, with B2 false rejection in the caption.
+    cert = pd.read_csv(R / "wpe/b3_certified_region.csv").set_index("run")
+    fr = pd.read_csv(R / "wpe/b2_false_rejection.csv").set_index("run")
+    c_hi = json.loads((R / "wpe/b2_threshold.json").read_text())["c_hi"]
+    rows = []
+    for run, label in RUN.items():
+        c = cert.loc[run]
+        rows.append(f"{label} & {c.certified_fraction_m0:.3f} ({int(c.n_certified_m0)}/{int(c.n_geometries)}) & "
+                    f"{c.overlap_fraction:.3f} & {c.median_G_db:+.1f} & {c.median_kappa_db:+.1f} \\\\")
+    fr_note = "; ".join(
+        f"{RUN[run].replace('$', '')}: {fr.loc[run].false_rejection:.4f} "
+        f"[{fr.loc[run].ci95_lo:.4f}, {fr.loc[run].ci95_hi:.4f}] ({int(fr.loc[run].n_rejected)}/{int(fr.loc[run].n_records)})"
+        for run in RUN)
+    write(out, "table_wpe_certified.tex", [
+        "% Amendment 13 (defensive), B3: certified region against the single-antenna-emitter relay class, per level",
+        "% (n=24 held-out geometries, 24 per standoff). CERTIFIED = relay delay-resolved (LoS copy outside the direct",
+        "% gate) AND its forced LoS copy falls inside the surveillance window AND kappa*E_req > c_hi; the 3 dB-margin",
+        "% variant is identical. G = reflector-gate angle response at the relay wall arrival vs the steered peak;",
+        "% kappa = LoS-into-candidate-gate over wall-into-reflector-gate. Source: docs/results/wpe/b3_certified_region.csv.",
+        f"% c_hi = {c_hi:.3e} (0.99 quantile of C over 1920 calibration genuine targets; realized calibration FR 1.04%).",
+        f"% B2 genuine-target false rejection (point [95% CI] (rejected/records)): {fr_note}.",
+        "% columns: l r r r r", r"\toprule",
+        r"Level & Certified & Overlap & Median $G$ (dB) & Median $\kappa$ (dB) \\", r"\midrule"], rows)
+
+
 def main() -> None:
     out = Path(sys.argv[1])
     b3(out)
@@ -127,8 +152,9 @@ def main() -> None:
     c2(out)
     d1(out, "wpd_a12", "table_wpd_threshold_free.tex")
     d1(out, "wpd", "table_wpd_threshold_free_a11.tex")
+    e_b3(out)
     for name in ("wpb_operating_points", "wpc_passive", "wpc_passive_a11", "wpc_controller", "wpd_threshold_free",
-                 "wpd_threshold_free_a11"):
+                 "wpd_threshold_free_a11", "wpe_certified"):
         print((out / f"table_{name}.tex").read_text())
 
 
