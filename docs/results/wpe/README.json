@@ -1,0 +1,11 @@
+{
+  "label": "Amendment 13 (defensive) pre-registered: B1 coupling, B2 consistency statistic, B3 certified region. No attacker code.",
+  "b1_b3_per_geometry.csv": "per geometry/level: G (dB), kappa (dB), delay offset, overlap, E_req, kappa*E_req, certified flags",
+  "b2_threshold.json": "B2 c_hi (0.99 quantile of C over calibration genuine targets); committed before eval",
+  "b2_false_rejection.csv": "B2 genuine-target false rejection on held-out (sigma 0.5) and each standoff level",
+  "b3_certified_region.csv": "certified fraction per level (margin 0 and 3 dB) vs overlap and median G",
+  "c_hi": 6.525630404964621e-14,
+  "scripts": [
+    "scripts/wpe_defensive.py"
+  ]
+}
