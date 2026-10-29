@@ -1,0 +1,5 @@
+A9.2(a) eq_stress5 cal_00 x2 vs calibration v5 shard (code bbea099):
+rows=120 compared_columns=104 differing=[]
+A10.1 probe_power_0dbm ho_00/ho_01, code f325771 vs completed run at 5c8b0a5:
+geometry_00 rows=48 compared_columns=104 differing=[]
+geometry_01 rows=48 compared_columns=104 differing=[]

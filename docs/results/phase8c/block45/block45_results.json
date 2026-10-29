@@ -1,0 +1,3930 @@
+{
+  "baseline": {
+    "robust_target": {
+      "point": 0.9986979166666666,
+      "ci95": [
+        0.99609375,
+        1.0
+      ],
+      "n_rows": 768,
+      "n_geometries": 24
+    },
+    "robust_replay": {
+      "point": 0.061197916666666664,
+      "ci95": [
+        0.0,
+        0.15755208333333334
+      ],
+      "n_rows": 768,
+      "n_geometries": 24
+    },
+    "c2f_target_common": {
+      "point": 0.8671875,
+      "ci95": [
+        0.7382486979166667,
+        0.9700520833333334
+      ],
+      "n_rows": 768,
+      "n_geometries": 24
+    }
+  },
+  "levels": {
+    "probe_power_m20dbm": {
+      "validity": {
+        "rows_expected": true,
+        "split_is_heldout": true,
+        "level_label": true,
+        "methods": true,
+        "decision_source_frozen": true,
+        "reclassification_matches_run": true,
+        "preflight_pass": true,
+        "source_commit_clean": true,
+        "source_commit": "f3257714eda676189c7f890db545bc3b422dafaf",
+        "acquisition_failed_rows": 105,
+        "geometries_equal_main": true,
+        "wall_thickness_m": [
+          0.1
+        ],
+        "power_dbm": [
+          -20.0
+        ]
+      },
+      "robust_target": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_target_no_s_hi": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay_minus_baseline": {
+        "point": -0.061197916666666664,
+        "ci95": [
+          -0.15755208333333334,
+          0.0
+        ],
+        "ci_lower_gt_0": false
+      },
+      "robust_target_minus_baseline": {
+        "point": -0.9986979166666666,
+        "ci95": [
+          -1.0,
+          -0.99609375
+        ],
+        "ci_lower_gt_0": false
+      },
+      "n_geometries_ge1": 17,
+      "robust_replay_ge1": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 136,
+        "n_geometries": 17
+      },
+      "robust_replay_lt1": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 56,
+        "n_geometries": 7
+      },
+      "baseline_robust_replay_same_lt1_geometries": {
+        "point": 0.20982142857142858,
+        "ci95": [
+          0.0,
+          0.48214285714285715
+        ],
+        "n_rows": 224,
+        "n_geometries": 7
+      },
+      "narrow_target": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "narrow_replay": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_target_common": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_replay_common": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "acquisition_failed_rows_by_world": {
+        "target": 48,
+        "replay": 57
+      },
+      "direct_gate_snr_median": 3.4601762373952294,
+      "robust_target_S_ratio_to_baseline_matched_median": 0.6958799162314743,
+      "robust_target_S_ratio_n": 80,
+      "robust_target_fraction_S_above_s_hi": 0.19791666666666666,
+      "a9_3_acquisition_counts": {
+        "replay": {
+          "records": 192,
+          "acquisition_failed": 19,
+          "detected": 173,
+          "false_acquisitions_gt_2m": 7,
+          "outside_twin_free_space": 2,
+          "median_position_error_m": 0.6295852428264357
+        },
+        "target": {
+          "records": 192,
+          "acquisition_failed": 16,
+          "detected": 176,
+          "false_acquisitions_gt_2m": 23,
+          "outside_twin_free_space": 19,
+          "median_position_error_m": 0.7505890269933697
+        }
+      },
+      "runtime": {
+        "workers": 24,
+        "end_to_end_s": 1117.6338492530049,
+        "worker_wall_s": {
+          "min": 451.8462204509997,
+          "median": 1062.1031041274837,
+          "max": 1109.8207898279652
+        },
+        "nvml_samples": 38,
+        "nvml_sample_errors": 0,
+        "compute_processes": 25,
+        "graphics_pids": [
+          2104
+        ],
+        "foreign_compute_processes": 0
+      },
+      "stratified": [
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        }
+      ]
+    },
+    "probe_power_m10dbm": {
+      "validity": {
+        "rows_expected": true,
+        "split_is_heldout": true,
+        "level_label": true,
+        "methods": true,
+        "decision_source_frozen": true,
+        "reclassification_matches_run": true,
+        "preflight_pass": true,
+        "source_commit_clean": true,
+        "source_commit": "f3257714eda676189c7f890db545bc3b422dafaf",
+        "acquisition_failed_rows": 0,
+        "geometries_equal_main": true,
+        "wall_thickness_m": [
+          0.1
+        ],
+        "power_dbm": [
+          -10.0
+        ]
+      },
+      "robust_target": {
+        "point": 0.6458333333333334,
+        "ci95": [
+          0.4947916666666667,
+          0.7864583333333334
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_target_no_s_hi": {
+        "point": 0.7395833333333334,
+        "ci95": [
+          0.5729166666666666,
+          0.890625
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay": {
+        "point": 0.005208333333333333,
+        "ci95": [
+          0.0,
+          0.015625
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay_minus_baseline": {
+        "point": -0.05598958333333333,
+        "ci95": [
+          -0.15234375,
+          0.010416666666666666
+        ],
+        "ci_lower_gt_0": false
+      },
+      "robust_target_minus_baseline": {
+        "point": -0.35286458333333326,
+        "ci95": [
+          -0.50390625,
+          -0.21354166666666663
+        ],
+        "ci_lower_gt_0": false
+      },
+      "n_geometries_ge1": 17,
+      "robust_replay_ge1": {
+        "point": 0.007352941176470588,
+        "ci95": [
+          0.0,
+          0.022058823529411766
+        ],
+        "n_rows": 136,
+        "n_geometries": 17
+      },
+      "robust_replay_lt1": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 56,
+        "n_geometries": 7
+      },
+      "baseline_robust_replay_same_lt1_geometries": {
+        "point": 0.20982142857142858,
+        "ci95": [
+          0.0,
+          0.48214285714285715
+        ],
+        "n_rows": 224,
+        "n_geometries": 7
+      },
+      "narrow_target": {
+        "point": 0.7760416666666666,
+        "ci95": [
+          0.6770833333333334,
+          0.8645833333333334
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "narrow_replay": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_target_common": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_replay_common": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "acquisition_failed_rows_by_world": {
+        "target": 0,
+        "replay": 0
+      },
+      "direct_gate_snr_median": 44.20852992897944,
+      "robust_target_S_ratio_to_baseline_matched_median": 0.9722136535939725,
+      "robust_target_S_ratio_n": 96,
+      "robust_target_fraction_S_above_s_hi": 0.15625,
+      "a9_3_acquisition_counts": {
+        "replay": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.2028735296943991
+        },
+        "target": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 1,
+          "outside_twin_free_space": 1,
+          "median_position_error_m": 0.20266223307664724
+        }
+      },
+      "runtime": {
+        "workers": 24,
+        "end_to_end_s": 1293.6942553599947,
+        "worker_wall_s": {
+          "min": 1208.1290242749965,
+          "median": 1280.6601410105068,
+          "max": 1285.2750001489767
+        },
+        "nvml_samples": 44,
+        "nvml_sample_errors": 0,
+        "compute_processes": 25,
+        "graphics_pids": [
+          2104
+        ],
+        "foreign_compute_processes": 0
+      },
+      "stratified": [
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.7132352941176471,
+          "ci95": [
+            0.5955882352941176,
+            0.8235294117647058
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.08088235294117647,
+          "ci95": [
+            0.0,
+            0.20588235294117646
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.007352941176470588,
+          "ci95": [
+            0.0,
+            0.022058823529411766
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.5441176470588235,
+          "ci95": [
+            0.3602941176470588,
+            0.7134191176470561
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.03676470588235294,
+          "ci95": [
+            0.0,
+            0.10294117647058823
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.9285714285714286,
+          "ci95": [
+            0.8928571428571429,
+            0.9821428571428571
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.07142857142857142,
+          "ci95": [
+            0.0,
+            0.17857142857142858
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.8928571428571429,
+          "ci95": [
+            0.8392857142857143,
+            0.9464285714285714
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.07142857142857142,
+          "ci95": [
+            0.0,
+            0.14285714285714285
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        }
+      ]
+    },
+    "probe_power_0dbm": {
+      "validity": {
+        "rows_expected": true,
+        "split_is_heldout": true,
+        "level_label": true,
+        "methods": true,
+        "decision_source_frozen": true,
+        "reclassification_matches_run": true,
+        "preflight_pass": true,
+        "source_commit_clean": true,
+        "source_commit": "5c8b0a57b891d1421b4f81dbebe24f376f4efa91",
+        "acquisition_failed_rows": 0,
+        "geometries_equal_main": true,
+        "wall_thickness_m": [
+          0.1
+        ],
+        "power_dbm": [
+          0.0
+        ]
+      },
+      "robust_target": {
+        "point": 0.984375,
+        "ci95": [
+          0.9635416666666666,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_target_no_s_hi": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay": {
+        "point": 0.041666666666666664,
+        "ci95": [
+          0.0,
+          0.09375
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay_minus_baseline": {
+        "point": -0.01953125,
+        "ci95": [
+          -0.0703125,
+          0.020833333333333332
+        ],
+        "ci_lower_gt_0": false
+      },
+      "robust_target_minus_baseline": {
+        "point": -0.01432291666666663,
+        "ci95": [
+          -0.03255208333333337,
+          0.0013020833333333703
+        ],
+        "ci_lower_gt_0": false
+      },
+      "n_geometries_ge1": 17,
+      "robust_replay_ge1": {
+        "point": 0.014705882352941176,
+        "ci95": [
+          0.0,
+          0.04411764705882353
+        ],
+        "n_rows": 136,
+        "n_geometries": 17
+      },
+      "robust_replay_lt1": {
+        "point": 0.10714285714285714,
+        "ci95": [
+          0.0,
+          0.26785714285714285
+        ],
+        "n_rows": 56,
+        "n_geometries": 7
+      },
+      "baseline_robust_replay_same_lt1_geometries": {
+        "point": 0.20982142857142858,
+        "ci95": [
+          0.0,
+          0.48214285714285715
+        ],
+        "n_rows": 224,
+        "n_geometries": 7
+      },
+      "narrow_target": {
+        "point": 0.9947916666666666,
+        "ci95": [
+          0.984375,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "narrow_replay": {
+        "point": 0.036458333333333336,
+        "ci95": [
+          0.0,
+          0.09895833333333333
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_target_common": {
+        "point": 0.4427083333333333,
+        "ci95": [
+          0.2916666666666667,
+          0.6041666666666666
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_replay_common": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "acquisition_failed_rows_by_world": {
+        "target": 0,
+        "replay": 0
+      },
+      "direct_gate_snr_median": 479.3469151225138,
+      "robust_target_S_ratio_to_baseline_matched_median": 0.9958855604992778,
+      "robust_target_S_ratio_n": 96,
+      "robust_target_fraction_S_above_s_hi": 0.015625,
+      "a9_3_acquisition_counts": {
+        "replay": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.06336834200530658
+        },
+        "target": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.0626992088281614
+        }
+      },
+      "runtime": {
+        "workers": 24,
+        "end_to_end_s": 1297.7837447109632,
+        "worker_wall_s": {
+          "min": 1282.4921108360286,
+          "median": 1284.5684185115097,
+          "max": 1288.5536886550253
+        },
+        "nvml_samples": 44,
+        "nvml_sample_errors": 0,
+        "compute_processes": 25,
+        "graphics_pids": [
+          2104
+        ],
+        "foreign_compute_processes": 0
+      },
+      "stratified": [
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.9926470588235294,
+          "ci95": [
+            0.9779411764705882,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.014705882352941176,
+          "ci95": [
+            0.0,
+            0.04411764705882353
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.9779411764705882,
+          "ci95": [
+            0.9558823529411765,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.36764705882352944,
+          "ci95": [
+            0.19117647058823528,
+            0.5588235294117647
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.125,
+          "ci95": [
+            0.0,
+            0.30357142857142855
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.10714285714285714,
+          "ci95": [
+            0.0,
+            0.26785714285714285
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.625,
+          "ci95": [
+            0.35714285714285715,
+            0.875
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        }
+      ]
+    },
+    "probe_power_p20dbm": {
+      "validity": {
+        "rows_expected": true,
+        "split_is_heldout": true,
+        "level_label": true,
+        "methods": true,
+        "decision_source_frozen": true,
+        "reclassification_matches_run": true,
+        "preflight_pass": true,
+        "source_commit_clean": true,
+        "source_commit": "5c8b0a57b891d1421b4f81dbebe24f376f4efa91",
+        "acquisition_failed_rows": 0,
+        "geometries_equal_main": true,
+        "wall_thickness_m": [
+          0.1
+        ],
+        "power_dbm": [
+          20.0
+        ]
+      },
+      "robust_target": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_target_no_s_hi": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay": {
+        "point": 0.0625,
+        "ci95": [
+          0.0,
+          0.16666666666666666
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay_minus_baseline": {
+        "point": 0.0013020833333333356,
+        "ci95": [
+          -0.015625,
+          0.01953125
+        ],
+        "ci_lower_gt_0": false
+      },
+      "robust_target_minus_baseline": {
+        "point": 0.0013020833333333703,
+        "ci95": [
+          0.0,
+          0.00390625
+        ],
+        "ci_lower_gt_0": false
+      },
+      "n_geometries_ge1": 17,
+      "robust_replay_ge1": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 136,
+        "n_geometries": 17
+      },
+      "robust_replay_lt1": {
+        "point": 0.21428571428571427,
+        "ci95": [
+          0.0,
+          0.5
+        ],
+        "n_rows": 56,
+        "n_geometries": 7
+      },
+      "baseline_robust_replay_same_lt1_geometries": {
+        "point": 0.20982142857142858,
+        "ci95": [
+          0.0,
+          0.48214285714285715
+        ],
+        "n_rows": 224,
+        "n_geometries": 7
+      },
+      "narrow_target": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "narrow_replay": {
+        "point": 0.041666666666666664,
+        "ci95": [
+          0.0,
+          0.125
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_target_common": {
+        "point": 0.984375,
+        "ci95": [
+          0.953125,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_replay_common": {
+        "point": 0.3229166666666667,
+        "ci95": [
+          0.15625,
+          0.5104166666666666
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "acquisition_failed_rows_by_world": {
+        "target": 0,
+        "replay": 0
+      },
+      "direct_gate_snr_median": 48539.804349581005,
+      "robust_target_S_ratio_to_baseline_matched_median": 0.9963308096011082,
+      "robust_target_S_ratio_n": 96,
+      "robust_target_fraction_S_above_s_hi": 0.0,
+      "a9_3_acquisition_counts": {
+        "replay": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.0063681006036919886
+        },
+        "target": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.006628526841427783
+        }
+      },
+      "runtime": {
+        "workers": 24,
+        "end_to_end_s": 1295.8676491660299,
+        "worker_wall_s": {
+          "min": 1281.880162040994,
+          "median": 1282.139297685033,
+          "max": 1286.746666259016
+        },
+        "nvml_samples": 44,
+        "nvml_sample_errors": 0,
+        "compute_processes": 25,
+        "graphics_pids": [
+          2104
+        ],
+        "foreign_compute_processes": 0
+      },
+      "stratified": [
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.11764705882352941,
+          "ci95": [
+            0.0,
+            0.29411764705882354
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.11764705882352941,
+          "ci95": [
+            0.0,
+            0.29411764705882354
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.16176470588235295,
+          "ci95": [
+            0.0,
+            0.3382352941176471
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.9779411764705882,
+          "ci95": [
+            0.9338235294117647,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.14285714285714285,
+          "ci95": [
+            0.0,
+            0.42857142857142855
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.7857142857142857,
+          "ci95": [
+            0.5,
+            0.9821428571428571
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.21428571428571427,
+          "ci95": [
+            0.0,
+            0.5
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.8571428571428571,
+          "ci95": [
+            0.5714285714285714,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.7142857142857143,
+          "ci95": [
+            0.42857142857142855,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        }
+      ]
+    },
+    "wall_thickness_50mm": {
+      "validity": {
+        "rows_expected": true,
+        "split_is_heldout": true,
+        "level_label": true,
+        "methods": true,
+        "decision_source_frozen": true,
+        "reclassification_matches_run": true,
+        "preflight_pass": true,
+        "source_commit_clean": true,
+        "source_commit": "5c8b0a57b891d1421b4f81dbebe24f376f4efa91",
+        "acquisition_failed_rows": 0,
+        "geometries_equal_main": true,
+        "wall_thickness_m": [
+          0.05
+        ],
+        "power_dbm": [
+          10.0
+        ]
+      },
+      "robust_target": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_target_no_s_hi": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay": {
+        "point": 0.13020833333333334,
+        "ci95": [
+          0.03125,
+          0.25
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay_minus_baseline": {
+        "point": 0.06901041666666669,
+        "ci95": [
+          0.016927083333333336,
+          0.13151041666666669
+        ],
+        "ci_lower_gt_0": true
+      },
+      "robust_target_minus_baseline": {
+        "point": 0.0013020833333333703,
+        "ci95": [
+          0.0,
+          0.00390625
+        ],
+        "ci_lower_gt_0": false
+      },
+      "n_geometries_ge1": 17,
+      "robust_replay_ge1": {
+        "point": 0.058823529411764705,
+        "ci95": [
+          0.0,
+          0.14705882352941177
+        ],
+        "n_rows": 136,
+        "n_geometries": 17
+      },
+      "robust_replay_lt1": {
+        "point": 0.30357142857142855,
+        "ci95": [
+          0.03571428571428571,
+          0.6428571428571429
+        ],
+        "n_rows": 56,
+        "n_geometries": 7
+      },
+      "baseline_robust_replay_same_lt1_geometries": {
+        "point": 0.20982142857142858,
+        "ci95": [
+          0.0,
+          0.48214285714285715
+        ],
+        "n_rows": 224,
+        "n_geometries": 7
+      },
+      "narrow_target": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "narrow_replay": {
+        "point": 0.10416666666666667,
+        "ci95": [
+          0.0,
+          0.22916666666666666
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_target_common": {
+        "point": 0.890625,
+        "ci95": [
+          0.7760416666666666,
+          0.984375
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_replay_common": {
+        "point": 0.3333333333333333,
+        "ci95": [
+          0.16666666666666666,
+          0.5416666666666666
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "acquisition_failed_rows_by_world": {
+        "target": 0,
+        "replay": 0
+      },
+      "direct_gate_snr_median": 4860.0323527547835,
+      "robust_target_S_ratio_to_baseline_matched_median": 1.0250550175461879,
+      "robust_target_S_ratio_n": 96,
+      "robust_target_fraction_S_above_s_hi": 0.0,
+      "a9_3_acquisition_counts": {
+        "replay": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.020264292070655048
+        },
+        "target": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.01990847213134986
+        }
+      },
+      "runtime": {
+        "workers": 24,
+        "end_to_end_s": 1296.2144729309948,
+        "worker_wall_s": {
+          "min": 1282.0115656430135,
+          "median": 1282.9607112029917,
+          "max": 1287.4330008170218
+        },
+        "nvml_samples": 44,
+        "nvml_sample_errors": 0,
+        "compute_processes": 25,
+        "graphics_pids": [
+          2104
+        ],
+        "foreign_compute_processes": 0
+      },
+      "stratified": [
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.029411764705882353,
+          "ci95": [
+            0.0,
+            0.08823529411764706
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.08823529411764706,
+          "ci95": [
+            0.0,
+            0.23529411764705882
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.058823529411764705,
+          "ci95": [
+            0.0,
+            0.14705882352941177
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.11764705882352941,
+          "ci95": [
+            0.0,
+            0.29411764705882354
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.17647058823529413,
+          "ci95": [
+            0.0,
+            0.35294117647058826
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.9044117647058824,
+          "ci95": [
+            0.7573529411764706,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.2857142857142857,
+          "ci95": [
+            0.0,
+            0.7142857142857143
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.6071428571428571,
+          "ci95": [
+            0.35714285714285715,
+            0.8214285714285714
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.30357142857142855,
+          "ci95": [
+            0.03571428571428571,
+            0.6428571428571429
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.7142857142857143,
+          "ci95": [
+            0.42857142857142855,
+            0.9285714285714286
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.7142857142857143,
+          "ci95": [
+            0.42857142857142855,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.8571428571428571,
+          "ci95": [
+            0.6785714285714286,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        }
+      ]
+    },
+    "wall_thickness_200mm": {
+      "validity": {
+        "rows_expected": true,
+        "split_is_heldout": true,
+        "level_label": true,
+        "methods": true,
+        "decision_source_frozen": true,
+        "reclassification_matches_run": true,
+        "preflight_pass": true,
+        "source_commit_clean": true,
+        "source_commit": "5c8b0a57b891d1421b4f81dbebe24f376f4efa91",
+        "acquisition_failed_rows": 0,
+        "geometries_equal_main": true,
+        "wall_thickness_m": [
+          0.2
+        ],
+        "power_dbm": [
+          10.0
+        ]
+      },
+      "robust_target": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_target_no_s_hi": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay": {
+        "point": 0.07291666666666667,
+        "ci95": [
+          0.0,
+          0.1875
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay_minus_baseline": {
+        "point": 0.011718750000000007,
+        "ci95": [
+          0.0,
+          0.029947916666666657
+        ],
+        "ci_lower_gt_0": false
+      },
+      "robust_target_minus_baseline": {
+        "point": 0.0013020833333333703,
+        "ci95": [
+          0.0,
+          0.00390625
+        ],
+        "ci_lower_gt_0": false
+      },
+      "n_geometries_ge1": 17,
+      "robust_replay_ge1": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 136,
+        "n_geometries": 17
+      },
+      "robust_replay_lt1": {
+        "point": 0.25,
+        "ci95": [
+          0.0,
+          0.5714285714285714
+        ],
+        "n_rows": 56,
+        "n_geometries": 7
+      },
+      "baseline_robust_replay_same_lt1_geometries": {
+        "point": 0.20982142857142858,
+        "ci95": [
+          0.0,
+          0.48214285714285715
+        ],
+        "n_rows": 224,
+        "n_geometries": 7
+      },
+      "narrow_target": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "narrow_replay": {
+        "point": 0.06770833333333333,
+        "ci95": [
+          0.0,
+          0.17708333333333334
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_target_common": {
+        "point": 0.875,
+        "ci95": [
+          0.7447916666666666,
+          0.984375
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_replay_common": {
+        "point": 0.21875,
+        "ci95": [
+          0.078125,
+          0.3802083333333333
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "acquisition_failed_rows_by_world": {
+        "target": 0,
+        "replay": 0
+      },
+      "direct_gate_snr_median": 4862.425916247815,
+      "robust_target_S_ratio_to_baseline_matched_median": 1.0181596801792232,
+      "robust_target_S_ratio_n": 96,
+      "robust_target_fraction_S_above_s_hi": 0.0,
+      "a9_3_acquisition_counts": {
+        "replay": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.02026235111811439
+        },
+        "target": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.01991201589721995
+        }
+      },
+      "runtime": {
+        "workers": 24,
+        "end_to_end_s": 1291.6878137569875,
+        "worker_wall_s": {
+          "min": 1275.7046336710337,
+          "median": 1278.2147982130118,
+          "max": 1284.108250478981
+        },
+        "nvml_samples": 44,
+        "nvml_sample_errors": 0,
+        "compute_processes": 25,
+        "graphics_pids": [
+          2104
+        ],
+        "foreign_compute_processes": 0
+      },
+      "stratified": [
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.04411764705882353,
+          "ci95": [
+            0.0,
+            0.11764705882352941
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0661764705882353,
+          "ci95": [
+            0.0,
+            0.16911764705882354
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.9044117647058824,
+          "ci95": [
+            0.7573529411764706,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.23214285714285715,
+          "ci95": [
+            0.0,
+            0.5535714285714286
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.2857142857142857,
+          "ci95": [
+            0.0,
+            0.7142857142857143
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.25,
+          "ci95": [
+            0.0,
+            0.5714285714285714
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.35714285714285715,
+          "ci95": [
+            0.07142857142857142,
+            0.7142857142857143
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.5892857142857143,
+          "ci95": [
+            0.23214285714285715,
+            0.875
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.8035714285714286,
+          "ci95": [
+            0.5178571428571429,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        }
+      ]
+    },
+    "rcs_p6db": {
+      "validity": {
+        "rows_expected": true,
+        "split_is_heldout": true,
+        "level_label": true,
+        "methods": true,
+        "decision_source_frozen": true,
+        "reclassification_matches_run": true,
+        "preflight_pass": true,
+        "source_commit_clean": true,
+        "source_commit": "5c8b0a57b891d1421b4f81dbebe24f376f4efa91",
+        "acquisition_failed_rows": 0,
+        "geometries_equal_main": true,
+        "wall_thickness_m": [
+          0.1
+        ],
+        "power_dbm": [
+          10.0
+        ],
+        "replay_rows_identical_to_main_matched": {
+          "rows": 288,
+          "baseline_rows": 288,
+          "compared_columns": 109,
+          "differing": []
+        }
+      },
+      "robust_target": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_target_no_s_hi": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay": {
+        "point": 0.052083333333333336,
+        "ci95": [
+          0.0,
+          0.140625
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay_minus_baseline": {
+        "point": -0.009114583333333329,
+        "ci95": [
+          -0.03125,
+          0.00390625
+        ],
+        "ci_lower_gt_0": false
+      },
+      "robust_target_minus_baseline": {
+        "point": -0.9986979166666666,
+        "ci95": [
+          -1.0,
+          -0.99609375
+        ],
+        "ci_lower_gt_0": false
+      },
+      "n_geometries_ge1": 17,
+      "robust_replay_ge1": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 136,
+        "n_geometries": 17
+      },
+      "robust_replay_lt1": {
+        "point": 0.17857142857142858,
+        "ci95": [
+          0.0,
+          0.42857142857142855
+        ],
+        "n_rows": 56,
+        "n_geometries": 7
+      },
+      "baseline_robust_replay_same_lt1_geometries": {
+        "point": 0.20982142857142858,
+        "ci95": [
+          0.0,
+          0.48214285714285715
+        ],
+        "n_rows": 224,
+        "n_geometries": 7
+      },
+      "narrow_target": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "narrow_replay": {
+        "point": 0.046875,
+        "ci95": [
+          0.0,
+          0.13541666666666666
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_target_common": {
+        "point": 0.890625,
+        "ci95": [
+          0.765625,
+          0.9895833333333334
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_replay_common": {
+        "point": 0.15625,
+        "ci95": [
+          0.03125,
+          0.3125
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "acquisition_failed_rows_by_world": {
+        "target": 0,
+        "replay": 0
+      },
+      "direct_gate_snr_median": 4879.807434463772,
+      "robust_target_S_ratio_to_baseline_matched_median": 3.9855154476992336,
+      "robust_target_S_ratio_n": 96,
+      "robust_target_fraction_S_above_s_hi": 1.0,
+      "a9_3_acquisition_counts": {
+        "replay": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.020268863214929118
+        },
+        "target": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.020293825214125857
+        }
+      },
+      "runtime": {
+        "workers": 24,
+        "end_to_end_s": 1294.9448435509694,
+        "worker_wall_s": {
+          "min": 1274.8231824609684,
+          "median": 1281.5807953510084,
+          "max": 1285.3902101000422
+        },
+        "nvml_samples": 44,
+        "nvml_sample_errors": 0,
+        "compute_processes": 25,
+        "graphics_pids": [
+          2104
+        ],
+        "foreign_compute_processes": 0
+      },
+      "stratified": [
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.9117647058823529,
+          "ci95": [
+            0.7647058823529411,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.16071428571428573,
+          "ci95": [
+            0.0,
+            0.44642857142857145
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.17857142857142858,
+          "ci95": [
+            0.0,
+            0.4642857142857143
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.17857142857142858,
+          "ci95": [
+            0.0,
+            0.42857142857142855
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.25,
+          "ci95": [
+            0.0,
+            0.5714285714285714
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.5357142857142857,
+          "ci95": [
+            0.14285714285714285,
+            0.8571428571428571
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.8392857142857143,
+          "ci95": [
+            0.5892857142857143,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        }
+      ]
+    },
+    "rcs_m6db": {
+      "validity": {
+        "rows_expected": true,
+        "split_is_heldout": true,
+        "level_label": true,
+        "methods": true,
+        "decision_source_frozen": true,
+        "reclassification_matches_run": true,
+        "preflight_pass": true,
+        "source_commit_clean": true,
+        "source_commit": "5c8b0a57b891d1421b4f81dbebe24f376f4efa91",
+        "acquisition_failed_rows": 0,
+        "geometries_equal_main": true,
+        "wall_thickness_m": [
+          0.1
+        ],
+        "power_dbm": [
+          10.0
+        ],
+        "replay_rows_identical_to_main_matched": {
+          "rows": 288,
+          "baseline_rows": 288,
+          "compared_columns": 109,
+          "differing": []
+        }
+      },
+      "robust_target": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_target_no_s_hi": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay": {
+        "point": 0.052083333333333336,
+        "ci95": [
+          0.0,
+          0.140625
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "robust_replay_minus_baseline": {
+        "point": -0.009114583333333329,
+        "ci95": [
+          -0.03125,
+          0.00390625
+        ],
+        "ci_lower_gt_0": false
+      },
+      "robust_target_minus_baseline": {
+        "point": 0.0013020833333333703,
+        "ci95": [
+          0.0,
+          0.00390625
+        ],
+        "ci_lower_gt_0": false
+      },
+      "n_geometries_ge1": 17,
+      "robust_replay_ge1": {
+        "point": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "n_rows": 136,
+        "n_geometries": 17
+      },
+      "robust_replay_lt1": {
+        "point": 0.17857142857142858,
+        "ci95": [
+          0.0,
+          0.42857142857142855
+        ],
+        "n_rows": 56,
+        "n_geometries": 7
+      },
+      "baseline_robust_replay_same_lt1_geometries": {
+        "point": 0.20982142857142858,
+        "ci95": [
+          0.0,
+          0.48214285714285715
+        ],
+        "n_rows": 224,
+        "n_geometries": 7
+      },
+      "narrow_target": {
+        "point": 1.0,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "narrow_replay": {
+        "point": 0.046875,
+        "ci95": [
+          0.0,
+          0.13541666666666666
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_target_common": {
+        "point": 0.7239583333333334,
+        "ci95": [
+          0.5677083333333334,
+          0.8697916666666666
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "c2f_replay_common": {
+        "point": 0.15625,
+        "ci95": [
+          0.03125,
+          0.3125
+        ],
+        "n_rows": 192,
+        "n_geometries": 24
+      },
+      "acquisition_failed_rows_by_world": {
+        "target": 0,
+        "replay": 0
+      },
+      "direct_gate_snr_median": 4858.440838155104,
+      "robust_target_S_ratio_to_baseline_matched_median": 0.25009458111591865,
+      "robust_target_S_ratio_n": 96,
+      "robust_target_fraction_S_above_s_hi": 0.0,
+      "a9_3_acquisition_counts": {
+        "replay": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.020268863214929118
+        },
+        "target": {
+          "records": 192,
+          "acquisition_failed": 0,
+          "detected": 192,
+          "false_acquisitions_gt_2m": 0,
+          "outside_twin_free_space": 0,
+          "median_position_error_m": 0.02018777851120632
+        }
+      },
+      "runtime": {
+        "workers": 24,
+        "end_to_end_s": 1294.9103170970338,
+        "worker_wall_s": {
+          "min": 1281.070134936017,
+          "median": 1281.8261901180085,
+          "max": 1287.6209561130381
+        },
+        "nvml_samples": 44,
+        "nvml_sample_errors": 0,
+        "compute_processes": 25,
+        "graphics_pids": [
+          2104
+        ],
+        "foreign_compute_processes": 0
+      },
+      "stratified": [
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "ge1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.7058823529411765,
+          "ci95": [
+            0.5073529411764706,
+            0.8823529411764706
+          ],
+          "n_rows": 136,
+          "n_geometries": 17
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.16071428571428573,
+          "ci95": [
+            0.0,
+            0.44642857142857145
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.17857142857142858,
+          "ci95": [
+            0.0,
+            0.4642857142857143
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_narrow",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.17857142857142858,
+          "ci95": [
+            0.0,
+            0.42857142857142855
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.25,
+          "ci95": [
+            0.0,
+            0.5714285714285714
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "imperfect_robust",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "replay",
+          "rate": "supported_common",
+          "point": 0.5357142857142857,
+          "ci95": [
+            0.14285714285714285,
+            0.8571428571428571
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported",
+          "point": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        },
+        {
+          "stratum": "lt1",
+          "method": "mapfree_coarse_to_fine",
+          "world": "target",
+          "rate": "supported_common",
+          "point": 0.7678571428571429,
+          "ci95": [
+            0.48214285714285715,
+            0.9821428571428571
+          ],
+          "n_rows": 56,
+          "n_geometries": 7
+        }
+      ]
+    }
+  },
+  "predictions": {
+    "A8.1(a)": false,
+    "A8.1(b)": {
+      "P_robust": -20.0,
+      "P_c2f": 0.0,
+      "verdict": "matched"
+    },
+    "A8.1(c)": true,
+    "A8.2(a) ge1": false,
+    "A8.2(a) lt1 at 50 mm > baseline": true,
+    "A8.2(b) +6 dB": true,
+    "A8.2(b) -6 dB": true
+  }
+}
