@@ -1,0 +1,82 @@
+{
+  "label": "A11.1 pre-registered calibration (calibration geometries only)",
+  "rows": 3840,
+  "status_counts": {
+    "computed": 3840
+  },
+  "floor_k": {
+    "value": 1.537541091153092,
+    "n": 3840,
+    "order_statistic_index_1based": 3802,
+    "false_exceedance_rate_target": 0.01,
+    "false_exceedance_rate_realized": 0.009895833333333333
+  },
+  "s_hi": {
+    "value": 1.2088774810275964,
+    "n": 1920,
+    "quantile": 0.995
+  },
+  "s_lo": {
+    "value": 0.5567079875132209,
+    "binding_sigma": "2",
+    "cells": {
+      "0": {
+        "value": 0.10351453186302188,
+        "replay_rows": 384,
+        "n_allowed": 19,
+        "n_eligible_replay_rows": 226,
+        "max_rate": 0.05
+      },
+      "0.25": {
+        "value": 0.1200220984224237,
+        "replay_rows": 384,
+        "n_allowed": 19,
+        "n_eligible_replay_rows": 247,
+        "max_rate": 0.05
+      },
+      "0.5": {
+        "value": 0.1543478900748579,
+        "replay_rows": 384,
+        "n_allowed": 19,
+        "n_eligible_replay_rows": 256,
+        "max_rate": 0.05
+      },
+      "1": {
+        "value": 0.24789115183321073,
+        "replay_rows": 384,
+        "n_allowed": 19,
+        "n_eligible_replay_rows": 281,
+        "max_rate": 0.05
+      },
+      "2": {
+        "value": 0.5567079875132209,
+        "replay_rows": 384,
+        "n_allowed": 19,
+        "n_eligible_replay_rows": 377,
+        "max_rate": 0.05
+      }
+    }
+  },
+  "calibration_rates": {
+    "0": {
+      "replay": 0.0,
+      "target": 1.0
+    },
+    "0.25": {
+      "replay": 0.0,
+      "target": 1.0
+    },
+    "0.5": {
+      "replay": 0.0,
+      "target": 1.0
+    },
+    "1": {
+      "replay": 0.0,
+      "target": 1.0
+    },
+    "2": {
+      "replay": 0.049479166666666664,
+      "target": 0.9739583333333334
+    }
+  }
+}
