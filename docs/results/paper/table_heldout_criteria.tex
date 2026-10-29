@@ -1,0 +1,21 @@
+% Held-out criteria (ANALYSIS_PLAN A4.2); confirmatory, from docs/results/phase8b. No new numbers.
+% columns: l l r c c c
+\toprule
+Criterion & Pass if & Point & 95\% CI & Point meets & Interval holds \\
+\midrule
+target SUPPORT, $\sigma\le0.5$ (\S16) & $\ge$ 0.8 & 0.998 & [0.996, 1.000] & true &  \\
+useful target SUPPORT, $\sigma\le0.5$ (rule 8) & $\ge$ 0.5 & 0.998 & [0.996, 1.000] & true &  \\
+attack SUPPORT, pooled (\S16) & $\le$ 0.1 & 0.053 & [0.004, 0.131] & true &  \\
+NOT\_OBSERVABLE (\S16) & $\le$ 0.2 & 0.000 & [0.000, 0.000] & true &  \\
+replay SUPPORTED, pooled (rule 8 / A2.3) & $\le$ 0.05 & 0.053 & [0.004, 0.131] & false & false \\
+replay SUPPORTED, $\sigma=0.5$ (rule 8 / A2.3) & $\le$ 0.05 & 0.061 & [0.000, 0.158] & false & false \\
+replay SUPPORTED, $\sigma=1.0$ (rule 8 / A2.3) & $\le$ 0.05 & 0.029 & [0.000, 0.074] & true & true \\
+\quad component: advantage, $\sigma=0.5$ & $>0$ & 0.132 & [0.029, 0.262] & true & true \\
+\quad component: advantage, $\sigma=1.0$ & $>0$ & 0.132 & [0.029, 0.262] & true & true \\
+advantage at $\sigma=0.5$ or $1.0$ (rule 8) & $>0$ at either sigma (components above) &  &  & true & true \\
+\quad component: like-for-like, $\sigma=0.5$ & $>0$ & 0.133 & [0.030, 0.262] & true & true \\
+\quad component: like-for-like, $\sigma=1.0$ & $>0$ & 0.133 & [0.030, 0.262] & true & true \\
+like-for-like at $\sigma=0.5$ or $1.0$ (rule 8, A2.1) & $>0$ at either sigma (components above) &  &  & true & true \\
+\midrule
+\multicolumn{6}{l}{A4.1 label: INCONCLUSIVE} \\
+\bottomrule

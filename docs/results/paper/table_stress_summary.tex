@@ -1,0 +1,28 @@
+% Stress summary: imperfect_robust at sigma 0.5, geometry-bootstrap 95% CI; from docs/results/phase8c.
+% Pre-registered outcomes as reported (A5-A8). No new numbers.
+% columns: c l r c r c l
+\toprule
+Block & Level & \multicolumn{2}{c}{Target SUPPORTED} & \multicolumn{2}{c}{Replay SUPPORTED} & Prediction \\
+\midrule
+1 & Bandwidth 245.76 MHz & 0.995 & [0.984, 1.000] & 0.000 & [0.000, 0.000] & A5.1(a), (b) matched \\
+1 & Bandwidth 61.44 MHz & 1.000 & [1.000, 1.000] & 0.057 & [0.000, 0.146] & A5.1(a) matched; (b) not matched \\
+2 & Standoff $\Delta R=3$ m & 1.000 & [1.000, 1.000] & 1.000 & [1.000, 1.000] & A6.2 2$\times$2 (pooled): mapped matched (descriptive) \\
+2 & Standoff $\Delta R=6$ m & 1.000 & [1.000, 1.000] & 1.000 & [1.000, 1.000] & A6.2 2$\times$2 (pooled): mapped matched (descriptive) \\
+2 & Standoff $\Delta R=10$ m & 1.000 & [1.000, 1.000] & 0.953 & [0.865, 1.000] & A6.2 2$\times$2 (pooled): mapped matched (descriptive) \\
+2 & Standoff $\Delta R=15$ m & 1.000 & [1.000, 1.000] & 0.156 & [0.042, 0.292] & A6.2 2$\times$2 (pooled): mapped matched (descriptive) \\
+2 & Standoff $\Delta R=20$ m & 1.000 & [1.000, 1.000] & 0.052 & [0.000, 0.135] & A6.2 at 20 m matched (descriptive) \\
+2 & Standoff $\Delta R=30$ m & 1.000 & [1.000, 1.000] & 0.000 & [0.000, 0.000] & A6.2 2$\times$2 (pooled): mapped matched (descriptive) \\
+3 & Array calibration error (D11) & 0.995 & [0.984, 1.000] & 0.057 & [0.000, 0.146] & A7.1 replay and target matched \\
+4 & Probe power $-20$ dBm & 0.000 & [0.000, 0.000] & 0.000 & [0.000, 0.000] & A8.1(a) not matched; (b), (c) matched \\
+4 & Probe power $-10$ dBm & 0.646 & [0.495, 0.786] & 0.005 & [0.000, 0.016] & A8.1(a) not matched (0.646 $<$ 0.95); (b), (c) matched \\
+4 & Probe power 0 dBm & 0.984 & [0.964, 1.000] & 0.042 & [0.000, 0.094] & A8.1(b), (c) matched \\
+4 & Probe power $+20$ dBm & 1.000 & [1.000, 1.000] & 0.062 & [0.000, 0.167] & A8.1(b), (c) matched \\
+5 & Wall thickness 0.05 m & 1.000 & [1.000, 1.000] & 0.130 & [0.031, 0.250] & A8.2(a) $\ge$1 stratum not matched (0.059); $<$1 stratum matched \\
+5 & Wall thickness 0.20 m & 1.000 & [1.000, 1.000] & 0.073 & [0.000, 0.188] & A8.2(a) $\ge$1 stratum 0.000 (joint prediction not matched) \\
+5 & Target RCS $+6$ dB & 0.000 & [0.000, 0.000] & 0.052 & [0.000, 0.141] & A8.2(b) +6 dB matched \\
+5 & Target RCS $-6$ dB & 1.000 & [1.000, 1.000] & 0.052 & [0.000, 0.141] & A8.2(b) $-$6 dB matched \\
+\midrule
+5 & Relay gain & \multicolumn{4}{c}{NOT RUN} & S is normalized by $E_D$ (argument, not a result) \\
+5 & Wall material $\pm$20\% & \multicolumn{4}{c}{NOT RUN} & bracketed by the thickness levels \\
+5 & Blocker & \multicolumn{4}{c}{NOT RUN} & covered by test 15 and Phase 4 \\
+\bottomrule

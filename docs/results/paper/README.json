@@ -1,0 +1,17 @@
+{
+  "generated": "2026-10-28",
+  "no_new_trials": "All files come from saved runs. The only GPU job was E1's noiseless pair decomposition (scripts/phase8c_pair_probe.py, existing script, no trials generated).",
+  "files": {
+    "e1_thin_wall_geometries.csv": "exploratory, post hoc (scripts/paper_e1_thin_wall.py)",
+    "e1_thin_wall_replay_supported.csv": "exploratory, post hoc (scripts/paper_e1_thin_wall.py)",
+    "e1_pair_probe_ho02_50mm.csv": "exploratory, post hoc (scripts/phase8c_pair_probe.py ho_02:wall_thickness_50mm, replay, record 0, twin 0, sigma 0.5, noiseless)",
+    "e2_escalation.csv": "exploratory, post hoc (scripts/paper_e2_escalation.py)",
+    "e2_escalation_README.json": "exploratory, post hoc: pairing and seed-sharing statement",
+    "table_e2_policy.tex": "exploratory, post hoc (booktabs rows; matched records 0,1,4,5)",
+    "fig_a_standoff_sweep.{pdf,png,csv}": "presentational; data from docs/results/phase8c/standoff (block 2, pre-registered A5.2/A6.2)",
+    "fig_b_power_sweep.{pdf,png,csv}": "presentational; data from docs/results/phase8c/block45 and the main held-out run. The 10 dBm imperfect_narrow target point is new: exploratory, post hoc (labelled in the CSV)",
+    "table_heldout_criteria.tex": "confirmatory numbers re-presented from docs/results/phase8b (A4.2); no new numbers",
+    "table_stress_summary.tex": "pre-registered stress outcomes re-presented from docs/results/phase8c; no new numbers"
+  },
+  "scripts": ["scripts/paper_e1_thin_wall.py", "scripts/paper_e2_escalation.py", "scripts/paper_figures_tables.py"]
+}

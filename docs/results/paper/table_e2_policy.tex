@@ -1,0 +1,11 @@
+% E2 escalation policy: exploratory, post hoc. imperfect_robust, sigma 0.5, records 0,1,4,5 paired
+% across the main run and bw246 (shared seeds: second probe not an independent realization).
+% Cost: mean wall-probe spectrum-time per candidate, unit = one 122.88 MHz probe.
+% columns: l r c r c r r
+\toprule
+Policy & \multicolumn{2}{c}{Target SUPPORTED} & \multicolumn{2}{c}{Replay SUPPORTED} & Cost (target) & Cost (replay) \\
+\midrule
+P0: 122.88 MHz only & 1.000 & [1.000, 1.000] & 0.062 & [0.000, 0.167] & 1.00 & 1.00 \\
+P1: 245.76 MHz only & 0.990 & [0.969, 1.000] & 0.000 & [0.000, 0.000] & 2.00 & 2.00 \\
+P2: escalate on SUPPORTED & 0.990 & [0.969, 1.000] & 0.000 & [0.000, 0.000] & 3.00 & 1.12 \\
+\bottomrule

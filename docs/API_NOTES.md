@@ -979,13 +979,18 @@ the zero-delay padded-FFT roundtrip error was
   `h_eff` as `[num_symbols, num_rx, fft_size]` = `[64, 16, 2048]`, applies the
   declared delay window over the last axis, permutes to
   `[num_rx, num_symbols, fft_size]`, and calls
-  `ofdm_to_delay_doppler_channel(windowed, l_min=0, l_max=103)`.
-- **Output:** `h_dd` has shape `[16, 64, 104]`. The zero-Doppler bin is
+  `ofdm_to_delay_doppler_channel(windowed, l_min=0, l_max=62)`, with
+  `l_max = ceil(delay_search_ns[1] * 1e-9 * W) = ceil(61.44) = 62`
+  (`receiver.py`; corrected 2026-10-28 from `l_max=103`, documentation only).
+- **Output:** `h_dd` has shape `[16, 64, 63]` (63 lags, last lag 504.56 ns).
+  The zero-Doppler bin is
   `num_symbols // 2 = 32`; lag `l` maps to delay `l / W`, where
   `W = fft_size * subcarrier_spacing_hz = 2048 * 60 kHz = 122.88 MHz`.
-  The natural lag spacing is `8.138020833 ns`, not `4.883 ns`.
+  The natural lag spacing is `8.138020833 ns`, not `4.883 ns`. These lag
+  counts are for the baseline 122.88 MHz profile; other profiles scale with W.
 - **Guard:** `guard_noise_power` calls the same function with
-  `l_min=113, l_max=133` for the declared `[550, 650] ns` guard. Only the
+  `l_min=68, l_max=79` (`ceil(67.58)`, `floor(79.87)`; 12 lags; corrected
+  2026-10-28 from `113, 133`) for the declared `[550, 650] ns` guard. Only the
   zero-Doppler, all-lag, all-RX magnitudes are used to form a median noise
   sanity estimate.
 - **Windows:** delay uses a non-periodic Hann window over the 2048

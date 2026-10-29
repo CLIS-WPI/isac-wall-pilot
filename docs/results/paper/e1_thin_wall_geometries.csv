@@ -1,0 +1,7 @@
+label,geometry_id,stratum,supported_rows,ratio_median,rows_in_cell
+"exploratory, post hoc",ho_02,ge1,4,1.0647488201329929,8
+"exploratory, post hoc",ho_10,lt1,8,0.7236244691030922,8
+"exploratory, post hoc",ho_15,lt1,1,0.8603845563936321,8
+"exploratory, post hoc",ho_19,lt1,7,0.8088475499946823,8
+"exploratory, post hoc",ho_21,lt1,1,0.9478359434714975,8
+"exploratory, post hoc",ho_23,ge1,4,1.0021959115528367,8

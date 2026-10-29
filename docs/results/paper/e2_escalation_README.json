@@ -1,0 +1,9 @@
+{
+  "label": "exploratory, post hoc",
+  "method": "imperfect_robust",
+  "sigma_map_m": 0.5,
+  "pairing": "same (geometry_id, world, record_index) in both runs; primary: records 0,1,4,5 (same twin)",
+  "seed_streams_shared": true,
+  "note": "Seed streams (probe symbols, receiver noise, relay noise, twin error, geometry) are shared across the two runs, so the 245.76 MHz probe is not an independent noise realization of the 122.88 MHz probe (the arrays differ in size, so the draws are not identical either; their dependence was not characterized). P2's rates are not those of an independently re-drawn second probe.",
+  "cost_unit": "one 122.88 MHz wall probe; a 245.76 MHz probe of the same duration costs 2"
+}
