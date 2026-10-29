@@ -1,0 +1,10 @@
+{
+  "label": "ANALYSIS_PLAN A12.4 pre-registered: C1 re-run with the A12.1 receiver fix (5cb272b); the passive gate lies on the planned wall side. Anything else derived from these files is exploratory, post hoc.",
+  "c1_passive_thresholds.json": "A11.1 rules on the 12 calibration geometries, fixed receiver (committed 1a1c622 before any held-out or standoff re-run score)",
+  "c1_passive_vs_active.csv": "passive vs frozen active imperfect_robust SUPPORTED, held-out sigma 0.5 and 6 standoff levels",
+  "c1_verdicts.json": "the A11.1 matched rules evaluated on the re-run",
+  "c1_passive_rows.parquet": "per-record passive and active rows",
+  "a12_4_verdicts.json": "A12.4 matched rules (AUC unchanged at 1.000; replay within 0.10 of the mirrored run) and the stored-vs-recomputed E_D / beam_phi record",
+  "old_tables": "the mirrored A11.1 outputs stay in docs/results/wpc and docs/results/wpd",
+  "scripts": ["scripts/wpc_passive.py (a12 mode)", "scripts/wpc_passive_analysis.py", "scripts/a12_c1_verdicts.py"]
+}

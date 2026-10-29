@@ -1,11 +1,13 @@
 % C2 (ANALYSIS_PLAN A11.2, pre-registered): escalate a SUPPORTED first probe with S < s_esc = 0.1784 to a
 % FRESH 245.76 MHz trial (new seed bases 33201/34201/35201, same twin draw); authorize only if SUPPORTED.
-% Cost unit: one 122.88 MHz wall probe; '+direct' adds the fresh trial's own 245.76 MHz direct action.
+% Probes per candidate = 1 + escalations / candidates (wall probes sent, any bandwidth).
+% Spectrum-time cost unit: one 122.88 MHz wall probe (a 245.76 MHz probe costs 2); '+direct' adds the
+% fresh trial's own 245.76 MHz direct action.
 % 74 new trials (47 held-out, 27 at 15 m). Source: docs/results/wpc/c2_controller.csv.
-% columns: l r c r r r r r r
+% columns: l r c r r r r r r r r
 \toprule
-Run & Replays authorized & 95\% CI & Targets held & Escalated & Fresh SUPPORTED & Cost (replay) & Cost +direct (replay) & Cost (target) \\
+Run & Replays authorized & 95\% CI & Targets held & Escalated & Fresh SUPPORTED & Probes/cand. (replay) & Probes/cand. (target) & Cost (replay) & Cost +direct (replay) & Cost (target) \\
 \midrule
-Held-out, $\sigma=0.5$ & 0/768 & [0.000, 0.000] & 1/768 & 47 & 0 & 1.122 & 1.245 & 1.00 \\
-$\Delta R=15$ m & 24/192 & [0.010, 0.260] & 0/192 & 27 & 21 & 1.281 & 1.562 & 1.00 \\
+Held-out, $\sigma=0.5$ & 0/768 & [0.000, 0.000] & 1/768 & 47 & 0 & 1.061 & 1.000 & 1.122 & 1.245 & 1.00 \\
+$\Delta R=15$ m & 24/192 & [0.010, 0.260] & 0/192 & 27 & 21 & 1.141 & 1.000 & 1.281 & 1.562 & 1.00 \\
 \bottomrule

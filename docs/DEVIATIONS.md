@@ -1004,3 +1004,12 @@ declared processing choices, not post-hoc tuning.
   to negative (−26.557°). The probe now illuminates the unblocked wall: blocked E_W = 8.50e-12 W vs
   N_W = 5.03e-15 W (pre-fix 1.30e-14 W), score 1.068 (pre-fix 0.0010). Kept failing; not changed.
   The planner's wall side in symmetric corridors is decided by this sub-0.01° tie-break (see A12.3).
+- **Impact measured (A12.3, `docs/results/a12/`):** ho_02 and ho_10, records 0–3, 480 rows vs the frozen run.
+  The measured candidate AoA flips sign exactly in all rows. The planned wall side flips in 112 rows
+  (exact_oracle 80, narrow 16, robust 16). 3 robust `supported` decisions differ, all ho_10 replay rows near
+  s_lo = 0.0218 (S 0.0208→0.0229 and 0.0182→0.0224 with the same wall; 0.0221→0.0217 with a flipped wall).
+  S_c1 relative difference: max 0.674, median 0.0053; 138 of 240 finite rows ≥ 1e-3. The pre-registered
+  expectation (identical decisions, < 1e-3) is NOT matched. With the wall side unchanged, target S still
+  moves by a median 3–6% (narrow, robust); this was not decomposed. The full held-out run was not re-run.
+- **C1 re-run (A12.4, `docs/results/wpc_a12/`):** recomputed E_D within 2.1e-7 relative of the stored rows;
+  robust beam angle identical except 905 of 7,680 rows where the planned wall flipped sign.

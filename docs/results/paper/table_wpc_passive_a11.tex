@@ -1,0 +1,19 @@
+% Passive twin baseline (direct action only) vs the frozen active imperfect_robust probe, SUPPORTED rate,
+% sigma 0.5; geometry bootstrap 95% CI. Passive thresholds from the 12 calibration geometries:
+% k=1.5373, s_lo=0.6192 (binding sigma=2), s_hi=1.5543; active s_lo=0.022.
+% ANALYSIS_PLAN A11.1 as run: pre-fix receiver, so the passive gate observed the opposite wall's
+% reciprocal path (DEVIATIONS P8-14). Prediction (passive replay higher at 15 and 20 m) NOT matched.
+% Source: docs/results/wpc/c1_passive_vs_active.csv.
+% columns: l r r r c r c r c
+\toprule
+Run & \multicolumn{2}{c}{Target} & \multicolumn{4}{c}{Replay SUPPORTED} & \multicolumn{2}{c}{Passive $-$ active} \\
+& Passive & Active & \multicolumn{2}{c}{Passive} & \multicolumn{2}{c}{Active} & & \\
+\midrule
+Held-out, $\sigma=0.5$ & 1.000 & 0.999 & 0.000 & [0.000, 0.000] & 0.061 & [0.000, 0.158] & -0.061 & [-0.158, 0.000] \\
+$\Delta R=3$ m & 1.000 & 1.000 & 1.000 & [1.000, 1.000] & 1.000 & [1.000, 1.000] & 0.000 & [0.000, 0.000] \\
+$\Delta R=6$ m & 1.000 & 1.000 & 0.964 & [0.896, 1.000] & 1.000 & [1.000, 1.000] & -0.036 & [-0.104, 0.000] \\
+$\Delta R=10$ m & 1.000 & 1.000 & 0.521 & [0.339, 0.703] & 0.953 & [0.865, 1.000] & -0.432 & [-0.615, -0.255] \\
+$\Delta R=15$ m & 1.000 & 1.000 & 0.115 & [0.000, 0.240] & 0.156 & [0.042, 0.292] & -0.042 & [-0.094, -0.005] \\
+$\Delta R=20$ m & 1.000 & 1.000 & 0.000 & [0.000, 0.000] & 0.052 & [0.000, 0.135] & -0.052 & [-0.135, 0.000] \\
+$\Delta R=30$ m & 1.000 & 1.000 & 0.000 & [0.000, 0.000] & 0.000 & [0.000, 0.000] & 0.000 & [0.000, 0.000] \\
+\bottomrule

@@ -1,0 +1,89 @@
+{
+  "label": "A12.4 matched rules (pre-registered) and self-check record",
+  "auc_passive": {
+    "heldout": {
+      "new": 1.0,
+      "mirrored": 1.0
+    },
+    "standoff_03m": {
+      "new": 0.8751627604166666,
+      "mirrored": 0.8521050347222222
+    },
+    "standoff_06m": {
+      "new": 0.9838324652777778,
+      "mirrored": 0.9785698784722222
+    },
+    "standoff_10m": {
+      "new": 0.9993489583333334,
+      "mirrored": 0.9996744791666666
+    },
+    "standoff_15m": {
+      "new": 1.0,
+      "mirrored": 1.0
+    },
+    "standoff_20m": {
+      "new": 1.0,
+      "mirrored": 1.0
+    },
+    "standoff_30m": {
+      "new": 1.0,
+      "mirrored": 1.0
+    }
+  },
+  "auc_unchanged_1000": {
+    "heldout": true,
+    "standoff_10m": false,
+    "standoff_15m": true,
+    "standoff_20m": true,
+    "standoff_30m": true
+  },
+  "replay_passive": {
+    "heldout": {
+      "new": 0.0,
+      "mirrored": 0.0
+    },
+    "standoff_03m": {
+      "new": 1.0,
+      "mirrored": 1.0
+    },
+    "standoff_06m": {
+      "new": 0.96875,
+      "mirrored": 0.9635416666666666
+    },
+    "standoff_10m": {
+      "new": 0.5625,
+      "mirrored": 0.5208333333333334
+    },
+    "standoff_15m": {
+      "new": 0.11458333333333333,
+      "mirrored": 0.11458333333333333
+    },
+    "standoff_20m": {
+      "new": 0.0,
+      "mirrored": 0.0
+    },
+    "standoff_30m": {
+      "new": 0.0,
+      "mirrored": 0.0
+    }
+  },
+  "replay_similar_within_0.10": {
+    "heldout": true,
+    "standoff_03m": true,
+    "standoff_06m": true,
+    "standoff_10m": true,
+    "standoff_15m": true,
+    "standoff_20m": true,
+    "standoff_30m": true
+  },
+  "self_check": {
+    "rows": 7680,
+    "E_D_rows": 7680,
+    "E_D_rel_diff_max": 2.1317811692521263e-07,
+    "E_D_rel_diff_median": 0.0,
+    "beam_rows": 7680,
+    "beam_phi_sign_flips": 905,
+    "beam_phi_abs_diff_max_same_sign": 0.0,
+    "beam_phi_abs_diff_median_same_sign": 0.0
+  }
+}

@@ -17,9 +17,9 @@ mapfree_coarse_to_fine,supported_common,10.0,0.59375,0.40625,0.7708333333333334,
 mapfree_coarse_to_fine,supported_common,15.0,0.46875,0.2708333333333333,0.6666666666666666,24,docs/results/phase8c/standoff,14.34688966908239,21.672833239282355
 mapfree_coarse_to_fine,supported_common,20.0,0.3697916666666667,0.19270833333333334,0.5572916666666666,24,docs/results/phase8c/standoff,14.34688966908239,21.672833239282355
 mapfree_coarse_to_fine,supported_common,30.0,0.03125,0.0,0.08333333333333333,24,docs/results/phase8c/standoff,14.34688966908239,21.672833239282355
-c1_passive,supported_pass,3.0,1.0,1.0,1.0,24,docs/results/wpc/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
-c1_passive,supported_pass,6.0,0.9635416666666666,0.8958333333333334,1.0,24,docs/results/wpc/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
-c1_passive,supported_pass,10.0,0.5208333333333334,0.3385416666666667,0.703125,24,docs/results/wpc/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
-c1_passive,supported_pass,15.0,0.11458333333333333,0.0,0.23958333333333334,24,docs/results/wpc/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
-c1_passive,supported_pass,20.0,0.0,0.0,0.0,24,docs/results/wpc/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
-c1_passive,supported_pass,30.0,0.0,0.0,0.0,24,docs/results/wpc/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
+c1_passive,supported_pass,3.0,1.0,1.0,1.0,24,docs/results/wpc_a12/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
+c1_passive,supported_pass,6.0,0.96875,0.9166666666666666,1.0,24,docs/results/wpc_a12/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
+c1_passive,supported_pass,10.0,0.5625,0.3802083333333333,0.7447916666666666,24,docs/results/wpc_a12/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
+c1_passive,supported_pass,15.0,0.11458333333333333,0.0,0.23958333333333334,24,docs/results/wpc_a12/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
+c1_passive,supported_pass,20.0,0.0,0.0,0.0,24,docs/results/wpc_a12/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355
+c1_passive,supported_pass,30.0,0.0,0.0,0.0,24,docs/results/wpc_a12/c1_passive_vs_active.csv,14.34688966908239,21.672833239282355

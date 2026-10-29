@@ -59,8 +59,8 @@ def fig_a(out: Path) -> pd.DataFrame:
                                           ("mapfree_coarse_to_fine", OKABE["green"], "Coarse-to-fine (common)", "^")):
         m = d[d["method"] == method].sort_values("delta_r_m")
         series(ax, m["delta_r_m"], m, colour, label, marker)
-    # C1 passive check (A11.1, frozen passive thresholds), replay rows of docs/results/wpc
-    c1 = pd.read_csv(R / "wpc/c1_passive_vs_active.csv")
+    # C1 passive check (A12.4 re-run with the corrected gate, its frozen thresholds), docs/results/wpc_a12
+    c1 = pd.read_csv(R / "wpc_a12/c1_passive_vs_active.csv")
     c1 = c1[(c1["world"] == "replay") & c1["run"].str.startswith("standoff_")].rename(
         columns={"passive_point": "point", "passive_ci95_lo": "lo", "passive_ci95_hi": "hi",
                  "passive_n_geometries": "n_geometries"})
@@ -77,7 +77,7 @@ def fig_a(out: Path) -> pd.DataFrame:
     ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=2)
     save(fig, out, "fig_a_standoff_sweep")
     d = pd.concat([d.assign(source="docs/results/phase8c/standoff"),
-                   c1.assign(source="docs/results/wpc/c1_passive_vs_active.csv")], ignore_index=True)
+                   c1.assign(source="docs/results/wpc_a12/c1_passive_vs_active.csv")], ignore_index=True)
     d = d[["method", "rate", "delta_r_m", "point", "lo", "hi", "n_geometries", "source"]].assign(
         median_delta_r_phi_m=phi, median_delta_r_tau_m=tau)
     d.to_csv(out / "fig_a_standoff_sweep.csv", index=False)

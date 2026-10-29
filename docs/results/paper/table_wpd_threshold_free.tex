@@ -1,17 +1,17 @@
 % D1: EXPLORATORY, post hoc. AUC of the score (target vs replay; rows without a finite score rank lowest).
 % Oracle s_lo: largest s_lo with target SUPPORTED >= 0.99 on that level's own rows, every other frozen
 % condition kept; replay SUPPORTED at that s_lo. Not a usable operating point (fitted on the evaluated rows).
-% Source: docs/results/wpd/d1_threshold_free.csv (bootstrap CIs there).
+% Source: docs/results/wpd_a12/d1_threshold_free.csv (bootstrap CIs there).
 % columns: l r r r r r r r r
 \toprule
 Run & \multicolumn{2}{c}{AUC} & \multicolumn{2}{c}{Active, oracle} & \multicolumn{2}{c}{Passive, oracle} & \multicolumn{2}{c}{Replay, frozen} \\
 & Active & Passive & $s_{lo}$ & Replay & $s_{lo}$ & Replay & Active & Passive \\
 \midrule
-Held-out, $\sigma=0.5$ & 1.000 & 1.000 & 0.648 & 0.000 & 0.923 & 0.000 & 0.061 & 0.000 \\
-$\Delta R=3$ m & 0.844 & 0.852 & 0.648 & 0.688 & 0.892 & 0.693 & 1.000 & 1.000 \\
-$\Delta R=6$ m & 0.980 & 0.979 & 0.648 & 0.109 & 0.892 & 0.219 & 1.000 & 0.964 \\
-$\Delta R=10$ m & 1.000 & 1.000 & 0.648 & 0.010 & 0.892 & 0.016 & 0.953 & 0.521 \\
-$\Delta R=15$ m & 1.000 & 1.000 & 0.648 & 0.000 & 0.892 & 0.000 & 0.156 & 0.115 \\
-$\Delta R=20$ m & 1.000 & 1.000 & 0.648 & 0.000 & 0.892 & 0.000 & 0.052 & 0.000 \\
-$\Delta R=30$ m & 1.000 & 1.000 & 0.648 & 0.000 & 0.892 & 0.000 & 0.000 & 0.000 \\
+Held-out, $\sigma=0.5$ & 1.000 & 1.000 & 0.648 & 0.000 & 0.823 & 0.000 & 0.061 & 0.000 \\
+$\Delta R=3$ m & 0.844 & 0.875 & 0.648 & 0.688 & 0.831 & 0.734 & 1.000 & 1.000 \\
+$\Delta R=6$ m & 0.980 & 0.984 & 0.648 & 0.109 & 0.831 & 0.172 & 1.000 & 0.969 \\
+$\Delta R=10$ m & 1.000 & 0.999 & 0.648 & 0.010 & 0.831 & 0.026 & 0.953 & 0.562 \\
+$\Delta R=15$ m & 1.000 & 1.000 & 0.648 & 0.000 & 0.831 & 0.000 & 0.156 & 0.115 \\
+$\Delta R=20$ m & 1.000 & 1.000 & 0.648 & 0.000 & 0.831 & 0.000 & 0.052 & 0.000 \\
+$\Delta R=30$ m & 1.000 & 1.000 & 0.648 & 0.000 & 0.831 & 0.000 & 0.000 & 0.000 \\
 \bottomrule

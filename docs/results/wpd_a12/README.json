@@ -1,0 +1,5 @@
+{
+  "label": "D1/D2 definitions (scripts/wpd_score_analysis.py) applied to the A12.4 passive rows. The passive AUC is part of the A12.4 matched rule; everything else is exploratory, post hoc.",
+  "d1_threshold_free.csv": "AUC of active S_c1 and passive S_pass; oracle s_lo replay SUPPORTED",
+  "d2_combination_rules.csv": "active, passive, AND, OR with the A12.4 frozen passive thresholds"
+}

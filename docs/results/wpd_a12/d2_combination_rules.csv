@@ -1,0 +1,53 @@
+label,run,sigma_map_m,secondary,rule,target_point,target_ci95_lo,target_ci95_hi,target_n_rows,target_n_geometries,target_geometries_with_any_supported,target_cp95_upper_if_zero,replay_point,replay_ci95_lo,replay_ci95_hi,replay_n_rows,replay_n_geometries,replay_geometries_with_any_supported,replay_cp95_upper_if_zero
+"exploratory, post hoc",heldout,0.5,False,active,0.9986979166666666,0.99609375,1.0,768,24,24,,0.061197916666666664,0.0,0.15755208333333334,768,24,2,
+"exploratory, post hoc",heldout,0.5,False,passive,1.0,1.0,1.0,768,24,24,,0.0,0.0,0.0,768,24,0,0.11734615615494881
+"exploratory, post hoc",heldout,0.5,False,passive AND active,0.9986979166666666,0.99609375,1.0,768,24,24,,0.0,0.0,0.0,768,24,0,0.11734615615494881
+"exploratory, post hoc",heldout,0.5,False,passive OR active,1.0,1.0,1.0,768,24,24,,0.061197916666666664,0.0,0.15755208333333334,768,24,2,
+"exploratory, post hoc",standoff_03m,0.5,True,active,1.0,1.0,1.0,192,24,24,,1.0,1.0,1.0,192,24,24,
+"exploratory, post hoc",standoff_03m,0.5,True,passive,1.0,1.0,1.0,192,24,24,,1.0,1.0,1.0,192,24,24,
+"exploratory, post hoc",standoff_03m,0.5,True,passive AND active,1.0,1.0,1.0,192,24,24,,1.0,1.0,1.0,192,24,24,
+"exploratory, post hoc",standoff_03m,0.5,True,passive OR active,1.0,1.0,1.0,192,24,24,,1.0,1.0,1.0,192,24,24,
+"exploratory, post hoc",standoff_06m,0.5,True,active,1.0,1.0,1.0,192,24,24,,1.0,1.0,1.0,192,24,24,
+"exploratory, post hoc",standoff_06m,0.5,True,passive,1.0,1.0,1.0,192,24,24,,0.96875,0.9166666666666666,1.0,192,24,24,
+"exploratory, post hoc",standoff_06m,0.5,True,passive AND active,1.0,1.0,1.0,192,24,24,,0.96875,0.9166666666666666,1.0,192,24,24,
+"exploratory, post hoc",standoff_06m,0.5,True,passive OR active,1.0,1.0,1.0,192,24,24,,1.0,1.0,1.0,192,24,24,
+"exploratory, post hoc",standoff_10m,0.5,True,active,1.0,1.0,1.0,192,24,24,,0.953125,0.8645833333333334,1.0,192,24,23,
+"exploratory, post hoc",standoff_10m,0.5,True,passive,1.0,1.0,1.0,192,24,24,,0.5625,0.3802083333333333,0.7447916666666666,192,24,17,
+"exploratory, post hoc",standoff_10m,0.5,True,passive AND active,1.0,1.0,1.0,192,24,24,,0.5625,0.3802083333333333,0.7447916666666666,192,24,17,
+"exploratory, post hoc",standoff_10m,0.5,True,passive OR active,1.0,1.0,1.0,192,24,24,,0.953125,0.8645833333333334,1.0,192,24,23,
+"exploratory, post hoc",standoff_15m,0.5,True,active,1.0,1.0,1.0,192,24,24,,0.15625,0.041666666666666664,0.2916666666666667,192,24,6,
+"exploratory, post hoc",standoff_15m,0.5,True,passive,1.0,1.0,1.0,192,24,24,,0.11458333333333333,0.0,0.23958333333333334,192,24,3,
+"exploratory, post hoc",standoff_15m,0.5,True,passive AND active,1.0,1.0,1.0,192,24,24,,0.11458333333333333,0.0,0.23958333333333334,192,24,3,
+"exploratory, post hoc",standoff_15m,0.5,True,passive OR active,1.0,1.0,1.0,192,24,24,,0.15625,0.041666666666666664,0.2916666666666667,192,24,6,
+"exploratory, post hoc",standoff_20m,0.5,True,active,1.0,1.0,1.0,192,24,24,,0.052083333333333336,0.0,0.13541666666666666,192,24,3,
+"exploratory, post hoc",standoff_20m,0.5,True,passive,1.0,1.0,1.0,192,24,24,,0.0,0.0,0.0,192,24,0,0.11734615615494881
+"exploratory, post hoc",standoff_20m,0.5,True,passive AND active,1.0,1.0,1.0,192,24,24,,0.0,0.0,0.0,192,24,0,0.11734615615494881
+"exploratory, post hoc",standoff_20m,0.5,True,passive OR active,1.0,1.0,1.0,192,24,24,,0.052083333333333336,0.0,0.13541666666666666,192,24,3,
+"exploratory, post hoc",standoff_30m,0.5,True,active,1.0,1.0,1.0,192,24,24,,0.0,0.0,0.0,192,24,0,0.11734615615494881
+"exploratory, post hoc",standoff_30m,0.5,True,passive,1.0,1.0,1.0,192,24,24,,0.0,0.0,0.0,192,24,0,0.11734615615494881
+"exploratory, post hoc",standoff_30m,0.5,True,passive AND active,1.0,1.0,1.0,192,24,24,,0.0,0.0,0.0,192,24,0,0.11734615615494881
+"exploratory, post hoc",standoff_30m,0.5,True,passive OR active,1.0,1.0,1.0,192,24,24,,0.0,0.0,0.0,192,24,0,0.11734615615494881
+"exploratory, post hoc",calibration,0,True,active,0.9947916666666666,0.984375,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,0,True,passive,1.0,1.0,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,0,True,passive AND active,0.9947916666666666,0.984375,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,0,True,passive OR active,1.0,1.0,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,0.25,True,active,0.9921875,0.9791666666666666,1.0,384,12,12,,0.005208333333333333,0.0,0.015625,384,12,1,
+"exploratory, post hoc",calibration,0.25,True,passive,1.0,1.0,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,0.25,True,passive AND active,0.9921875,0.9791666666666666,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,0.25,True,passive OR active,1.0,1.0,1.0,384,12,12,,0.005208333333333333,0.0,0.015625,384,12,1,
+"exploratory, post hoc",calibration,0.5,True,active,0.9895833333333334,0.9713541666666666,1.0,384,12,12,,0.005208333333333333,0.0,0.015625,384,12,1,
+"exploratory, post hoc",calibration,0.5,True,passive,1.0,1.0,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,0.5,True,passive AND active,0.9895833333333334,0.9713541666666666,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,0.5,True,passive OR active,1.0,1.0,1.0,384,12,12,,0.005208333333333333,0.0,0.015625,384,12,1,
+"exploratory, post hoc",calibration,1,True,active,1.0,1.0,1.0,384,12,12,,0.018229166666666668,0.0,0.0546875,384,12,1,
+"exploratory, post hoc",calibration,1,True,passive,1.0,1.0,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,1,True,passive AND active,1.0,1.0,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,1,True,passive OR active,1.0,1.0,1.0,384,12,12,,0.018229166666666668,0.0,0.0546875,384,12,1,
+"exploratory, post hoc",calibration,2,True,active,0.9973958333333334,0.9921875,1.0,384,12,12,,0.049479166666666664,0.0,0.13802083333333334,384,12,2,
+"exploratory, post hoc",calibration,2,True,passive,0.9739583333333334,0.9296875,1.0,384,12,12,,0.049479166666666664,0.0,0.10416666666666667,384,12,3,
+"exploratory, post hoc",calibration,2,True,passive AND active,0.9713541666666666,0.9270833333333334,1.0,384,12,12,,0.0,0.0,0.0,384,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,2,True,passive OR active,1.0,1.0,1.0,384,12,12,,0.09895833333333333,0.010416666666666666,0.23697916666666666,384,12,4,
+"exploratory, post hoc",calibration,pooled,True,active,0.9947916666666666,0.9875,1.0,1920,12,12,,0.015625,0.0,0.04479166666666667,1920,12,2,
+"exploratory, post hoc",calibration,pooled,True,passive,0.9947916666666666,0.9859375,1.0,1920,12,12,,0.009895833333333333,0.0,0.020833333333333332,1920,12,3,
+"exploratory, post hoc",calibration,pooled,True,passive AND active,0.9895833333333334,0.9786458333333333,1.0,1920,12,12,,0.0,0.0,0.0,1920,12,0,0.22092219194555585
+"exploratory, post hoc",calibration,pooled,True,passive OR active,1.0,1.0,1.0,1920,12,12,,0.025520833333333333,0.0020833333333333333,0.06458333333333334,1920,12,4,
