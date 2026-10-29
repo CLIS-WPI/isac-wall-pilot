@@ -778,3 +778,64 @@ thresholds, and C2 is a controller evaluated offline plus fresh trials.
   - *Labels:* WP-B stress-level re-analyses are secondary. C1 and C2 are
     pre-registered here; anything else computed from them is exploratory,
     post hoc.
+
+## Amendment 12 — 2026-10-29
+
+Written after external review round 2 and after D1–D3 (`docs/results/wpd/`,
+commit da6232a), before any A12 code change, test, trial or direct action.
+D3 showed that the receiver angle map is mirrored relative to the link angles
+(a path at link angle φ peaks at map angle −φ; `docs/DEVIATIONS.md` P8-14,
+`docs/API_NOTES.md` Phase 8C). **No threshold, gate rule, primary rule,
+decision criterion, frozen config value, earlier label or earlier prediction
+outcome changes.** The frozen held-out and stress results stay as recorded and
+are NOT re-run; A12.3 measures the impact of the fix on a subset.
+
+- **A12.1 Receiver sign fix (post-freeze code change).** In
+  `receiver.angular_delay_map` and `receiver._zero_padded_delay_profile`, the
+  receive combiner becomes `sum_n conj(a_n(θ)) w_n h_n` (matched to
+  `h ~ a_RX(φ)`, the RT arrival convention in API_NOTES), so a path at link
+  angle φ peaks at map angle +φ. Nothing else changes. Recorded in
+  DEVIATIONS with the D3 evidence.
+- **A12.2 Tests** (noiseless; must fail on the pre-fix code and pass after it;
+  both runs are reported):
+  (a) single synthetic paths with `h = a_RX(φ)` at φ = +30° and −20° peak in
+  the angular-delay map at the same signed angle (within one 0.25° grid step);
+  (b) ray-traced target world in an ASYMMETRIC corridor (walls at y = +12 m
+  and y = −18 m) with the candidate at bearing +10° (range 40 m): with the
+  measured candidate, the `exact_oracle` plan and the A11 reciprocal-path gate
+  (`scripts/wpc_passive.passive_gate`), the true outgoing-wall path on the
+  planned wall side has ≥ 50% of its whole-map energy inside the probe's wall
+  gate (wall beam) and the true reciprocal-wall path on the planned side has
+  ≥ 50% inside the reciprocal gate (direct beam); the opposite wall's
+  corresponding path has ≤ 5% of its whole-map energy inside each gate.
+- **A12.3 Impact on the frozen probe results.** Held-out ho_02 and ho_10
+  (chosen here: ho_10 carries the main run's replay SUPPORTED rows near s_lo;
+  ho_02 is the D3/E1 geometry), all 5 σ, records 0–3, both worlds, all
+  methods, run with the fixed code through `phase8a._run_slots` (same seeds)
+  into a separate directory. Compared with the frozen run's rows on the same
+  keys. *Pre-registered expectation:* identical decisions (`status`,
+  `supported`, `supported_common`) on every row, and |ΔS_c1|/|S_c1| < 1e-3 on
+  every row with finite S_c1. Every differing row and column is reported.
+- **A12.4 C1 re-run with the corrected gate.** `scripts/wpc_passive.py` with
+  the fixed receiver: the passive gate, unchanged in code, now lies on the
+  planned wall side. Same records, σ, twins and seeds as A11.1. Thresholds
+  are re-fitted by the A11.1 rules on the 12 calibration geometries and
+  committed before any held-out or standoff score of the re-run is computed;
+  then held-out σ = 0.5 and the six standoff levels, compared with the frozen
+  active rows as in A11.1. The A11 exact-equality self-check against the
+  stored rows (E_D, beam_phi_deg) is replaced by recording the stored values
+  next to the recomputed ones; the differences are reported (they measure
+  A12.1). *Pre-registered expectation:* AUC (D1 definition) of S_pass
+  unchanged, i.e. 1.000 on held-out and at ΔR ≥ 10 m; replay SUPPORTED
+  "similar" to the mirrored A11.1 run, i.e. |new − mirrored| ≤ 0.10 at every
+  level (point estimates). New thresholds and both tables are reported.
+  Outputs go to `docs/results/wpc_a12/` and `docs/results/wpd_a12/`; the A11
+  outputs are kept unchanged.
+- **A12.5 Presentation.** Fig. A uses the corrected C1 curve;
+  `table_wpc_passive.tex` and `table_wpd_threshold_free.tex` are regenerated
+  from the A12.4 outputs (the mirrored versions are kept with a `_a11`
+  suffix); `table_wpc_controller.tex` reports both mean probes per candidate
+  (1 + escalations/n) and spectrum-time cost (wall probes only, and including
+  the fresh direct action).
+- **Labels:** A12.2–A12.4 are pre-registered here; anything else computed
+  from them is exploratory, post hoc.
