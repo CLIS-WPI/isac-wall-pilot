@@ -24,6 +24,7 @@ from phase8c_bandwidth_analysis import MATCHED_RECORDS, SIGMA, stratified_rates,
 POWER_LEVELS = {"probe_power_m20dbm": -20.0, "probe_power_m10dbm": -10.0, "probe_power_0dbm": 0.0,
                 "probe_power_p20dbm": 20.0}
 BASELINE_POWER_DBM = 10.0
+OUTSIDE = "candidate_outside_twin_free_space"  # A9.1 reason
 KEY = ["geometry_id", "world", "record_index", "method", "sigma_map_m"]
 
 
@@ -57,6 +58,28 @@ def _check_a8_1b() -> None:
     assert a8_1b(-20.0, -10.0) == "matched" and a8_1b(-10.0, -10.0) == "not matched"
     assert a8_1b(None, -10.0) == "matched" and a8_1b(None, -20.0).startswith("indeterminate")
     assert a8_1b(-20.0, None) == "not matched"
+
+
+def acquisition_counts(frame: pd.DataFrame) -> dict:
+    """A9.3 (evaluator side), per world, in (geometry, world, record) units: detected records, false
+    acquisitions (measured candidate > 2 m from the true claimed position), outside-free-space records."""
+    unit = ["geometry_id", "world", "record_index"]
+    rec = frame.groupby(unit).agg(
+        r=("candidate_range_m", "first"), phi=("candidate_aoa_deg", "first"), r_true=("candidate_distance_m", "first"),
+        phi_true=("true_candidate_azimuth_deg", "first"),
+        failed=("status", lambda v: bool((v == "ACQUISITION_FAILED").any())),
+        outside=("status_reason", lambda v: bool((v == OUTSIDE).any())))
+    dphi = np.radians(rec["phi"] - rec["phi_true"])
+    error = np.sqrt(rec["r"] ** 2 + rec["r_true"] ** 2 - 2 * rec["r"] * rec["r_true"] * np.cos(dphi))
+    detected = ~rec["failed"] & np.isfinite(rec["r"])
+    out = {}
+    for world, idx in rec.groupby(level="world").groups.items():
+        d = detected.loc[idx]
+        out[world] = {"records": int(len(idx)), "acquisition_failed": int(rec.loc[idx, "failed"].sum()),
+                      "detected": int(d.sum()), "false_acquisitions_gt_2m": int((error.loc[idx][d] > 2.0).sum()),
+                      "outside_twin_free_space": int(rec.loc[idx, "outside"].sum()),
+                      "median_position_error_m": float(error.loc[idx][d].median()) if d.any() else float("nan")}
+    return out
 
 
 def replay_identical(frame: pd.DataFrame, baseline: pd.DataFrame) -> dict:
@@ -135,6 +158,7 @@ def main() -> None:
             "robust_target_S_ratio_to_baseline_matched_median": float(ratio.median()),
             "robust_target_S_ratio_n": int(ratio.notna().sum()),
             "robust_target_fraction_S_above_s_hi": float((rt["S_c1"] > s_hi).mean()),
+            "a9_3_acquisition_counts": acquisition_counts(frame),
             "stratified": stratified_rates(frame, draws),
         }
         if level.startswith("rcs_"):

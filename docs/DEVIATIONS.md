@@ -939,3 +939,20 @@ declared processing choices, not post-hoc tuning.
 - **Equivalence evidence** (`results/phase8a_diag/eq_stress4`): cal_00 x 2
   records on the baseline config. All 104 non-timing columns of the 120 rows
   are identical to the calibration v5 shard. 73 tests passed.
+
+### P8-13 — Candidate outside the twin's free space: UNRESOLVED / NOT_OBSERVABLE row instead of crash (ANALYSIS_PLAN A9)
+
+- **Type:** planner behaviour change, only on records that previously raised an
+  uncaught `SceneError`.
+- **What:** `phase7._acquire_record` catches the direct-action PSF twin's
+  `SceneError` and flags the record; `evaluate_record` then gives every method
+  of that record the A9.1 row. `_plan_for` raises `TwinFreeSpaceError` for the
+  wall-plan twin and only that method gets the A9.1 row. Row: status
+  UNRESOLVED, `status_reason` `candidate_outside_twin_free_space`,
+  `path_availability` NOT_OBSERVABLE, energies NaN.
+- **Why:** levels −20 dBm (12 of 24 geometries) and −10 dBm (1 of 24, slot 20)
+  crashed with `SceneError` for false candidates outside the corridor. Both
+  partial outputs are kept as `FAILED_*` evidence and never merged.
+- **Evidence:** test `test_candidate_beyond_wall_is_unresolved_not_observable`;
+  74 tests passed; `results/phase8a_diag/eq_stress5`: cal_00 x 2 records,
+  rows=120 compared_columns=104 differing=[] against the calibration v5 shard.

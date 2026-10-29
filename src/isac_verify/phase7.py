@@ -63,6 +63,13 @@ class Phase7Error(RuntimeError):
     """Raised when a smoke-stage invariant is violated."""
 
 
+class TwinFreeSpaceError(Phase7Error):
+    """The measured candidate lies outside the twin's free space (ANALYSIS_PLAN A9.1)."""
+
+
+OUTSIDE_TWIN_FREE_SPACE = "candidate_outside_twin_free_space"
+
+
 METHODS = (
     "direct_only",
     "exact_oracle",
@@ -491,7 +498,24 @@ def _acquire_record(
         "positive": float(config.get("physical", "walls", "positive", "offset_m")),
         "negative": float(config.get("physical", "walls", "negative", "offset_m")),
     }
-    twin = _twin_paths(config, candidate, nominal_offsets, timing)
+    try:
+        twin = _twin_paths(config, candidate, nominal_offsets, timing)
+    except SceneError:
+        # A9.1: no PSF and no direct gate for this record; evaluate_record labels every method.
+        return {
+            "observation": observation,
+            "direct_map": direct_map,
+            "candidate": candidate,
+            "point_spread": None,
+            "direct_gate": None,
+            "direct_energy": None,
+            OUTSIDE_TWIN_FREE_SPACE: True,
+            "direct_seeds": {
+                "probe_symbols": probe_seed,
+                "receiver_noise": noise_seed,
+                "relay_noise": relay_seed,
+            },
+        }
     psf = _measure_psf(
         config=config,
         choices=choices,
@@ -567,7 +591,7 @@ def _plan_for(
             ),
         )
     except SceneError as exc:
-        raise Phase7Error(f"twin map violates corridor validity: {exc}") from exc
+        raise TwinFreeSpaceError(f"twin map violates corridor validity: {exc}") from exc
     sigma_range = max(
         0.5 * config.speed_of_light * candidate.delay_sigma_s,
         float(
@@ -1262,6 +1286,44 @@ def _mapped_extras(
     return extras
 
 
+def _outside_free_space_row(
+    row: dict[str, Any],
+    *,
+    config: PilotConfig,
+    true_relay_deg: float,
+    runtime_s: float,
+    total_symbols: int,
+    symbol_duration_s: float,
+) -> dict[str, Any]:
+    """A9.1: UNRESOLVED / NOT_OBSERVABLE row for a candidate outside the twin's free space."""
+    nan = float("nan")
+    return _finish_row(
+        row,
+        E_D=nan,
+        N_D=nan,
+        E_W=nan,
+        N_W=nan,
+        S=nan,
+        S_available=False,
+        wall_excess_snr=nan,
+        wall_excess_snr_available=False,
+        status="UNRESOLVED",
+        reason=OUTSIDE_TWIN_FREE_SPACE,
+        path_availability="NOT_OBSERVABLE",
+        plan=None,
+        selected_weights=None,
+        config=config,
+        true_relay_deg=true_relay_deg,
+        runtime_s=runtime_s,
+        total_symbols=total_symbols,
+        total_energy_j=(
+            dbm_to_watt(config.get("waveform", "nominal_total_power_dbm"))
+            * symbol_duration_s
+            * total_symbols
+        ),
+    )
+
+
 def evaluate_record(
     *,
     config: PilotConfig,
@@ -1318,6 +1380,16 @@ def evaluate_record(
                 split=split,
                 inflations=inflations,
             )
+            if base.get(OUTSIDE_TWIN_FREE_SPACE):
+                rows.append(_outside_free_space_row(
+                    row,
+                    config=config,
+                    true_relay_deg=true_relay_deg,
+                    runtime_s=_now() - method_start,
+                    total_symbols=profile.num_symbols,
+                    symbol_duration_s=profile.symbol_duration_s,
+                ))
+                continue
             if base["candidate"].status != "ACQUIRED":
                 path_availability = (
                     "NOT_ATTEMPTED"
@@ -1476,17 +1548,28 @@ def evaluate_record(
                     },
                 )
             else:
-                plan, direct_twin, wall_twin = _plan_for(
-                    config=config,
-                    choices=choices,
-                    base=base,
-                    world=world,
-                    method=method,
-                    sigma_m=sigma_m,
-                    twin_offsets=twin_offsets,
-                    direct_weights=direct_weights,
-                    timing=timing,
-                )
+                try:
+                    plan, direct_twin, wall_twin = _plan_for(
+                        config=config,
+                        choices=choices,
+                        base=base,
+                        world=world,
+                        method=method,
+                        sigma_m=sigma_m,
+                        twin_offsets=twin_offsets,
+                        direct_weights=direct_weights,
+                        timing=timing,
+                    )
+                except TwinFreeSpaceError:  # A9.1: only this method's twin walls exclude the candidate
+                    rows.append(_outside_free_space_row(
+                        row,
+                        config=config,
+                        true_relay_deg=true_relay_deg,
+                        runtime_s=_now() - method_start,
+                        total_symbols=profile.num_symbols,
+                        symbol_duration_s=profile.symbol_duration_s,
+                    ))
+                    continue
                 if plan.beam is None or plan.beam.weights is None:
                     row = _finish_row(
                         row,

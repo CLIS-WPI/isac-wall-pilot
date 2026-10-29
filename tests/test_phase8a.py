@@ -331,3 +331,56 @@ def test_block45_levels_power_thickness_rcs(config: PilotConfig, monkeypatch: py
     for i, path in enumerate(out["links"]["target"]):
         assert torch.allclose(path.matrix, ones * (gain if i in (1, 3) else 1.0)), i
     assert out["links"]["downlink"] is links["downlink"]
+
+
+def test_candidate_beyond_wall_is_unresolved_not_observable(
+    config: PilotConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A9.1: a measured candidate beyond a wall gives UNRESOLVED / NOT_OBSERVABLE rows, no exception."""
+    from dataclasses import replace
+
+    import isac_verify.phase7 as p7
+    from isac_verify.beams import ArrayGeometry, dbm_to_watt, direct_beam
+    from isac_verify.phase8a import prepare_geometry
+    from isac_verify.receiver import ProcessingChoices, noise_calibration
+    from isac_verify.scenes import SceneError, WallSpec, validate_corridor_layout
+
+    half_width = 13.0
+    config_g = geometry_config(config, {"candidate_distance_m": 65.0, "relay_distance_m": 30.0,
+                                        "half_width_m": half_width, "wall_thickness_m": 0.10})
+    prepared = prepare_geometry(config_g)
+    assert prepared["rejection"] is None
+    choices = ProcessingChoices.from_config(config_g)
+    noise = noise_calibration(choices=choices, config=config_g, records=4, seed=8801)
+    weights = direct_beam(float(config_g.get("experiment_a", "reference_beam_phi_deg")),
+                          dbm_to_watt(config_g.get("waveform", "nominal_total_power_dbm")),
+                          ArrayGeometry.from_config(config_g)).weights
+    real = p7.estimate_candidate
+
+    def beyond_wall(*args, **kwargs):
+        candidate = real(*args, **kwargs)
+        x, _, z = candidate.position_m
+        return replace(candidate, position_m=(x, half_width + 5.0, z)) if candidate.detected else candidate
+
+    monkeypatch.setattr(p7, "estimate_candidate", beyond_wall)
+    seeds = {"streams": geometry_seed_streams(config, "calibration", 0, 1)}
+    for world in ("target", "replay"):
+        base = p7._acquire_record(config=config_g, choices=choices, world=world, record_index=0,
+                                  direct_weights=weights, links=prepared["links"],
+                                  calibration=prepared["calibration"], noise_full=noise, timing={}, seeds=seeds)
+        assert base["candidate"].detected and base[p7.OUTSIDE_TWIN_FREE_SPACE]
+        with pytest.raises(SceneError):  # the validator itself still rejects this point
+            validate_corridor_layout(config_g, [WallSpec.from_config(config_g, side, off) for side, off in
+                                                (("positive", half_width), ("negative", -half_width))],
+                                     points_m=(base["candidate"].position_m,))
+        rows = p7.evaluate_record(
+            config=config_g, choices=choices, world=world, record_index=0, base=base, sigmas=[0.5],
+            twin_z=twin_draws(config, "calibration", 0, 1), seeds=seeds, direct_weights=weights,
+            links=prepared["links"], calibration=prepared["calibration"], noise_full=noise,
+            noise_by_symbols={}, timing={}, representative={},
+            true_candidate_deg=prepared["true_candidate_deg"], true_relay_deg=prepared["true_relay_deg"])
+        assert {row["method"] for row in rows} == set(p7.METHODS)
+        for row in rows:
+            assert row["status"] == "UNRESOLVED", row["method"]
+            assert row["path_availability"] == "NOT_OBSERVABLE", row["method"]
+            assert row["status_reason"] == "candidate_outside_twin_free_space", row["method"]
