@@ -1,0 +1,7 @@
+{
+  "label": "ANALYSIS_PLAN A12.3 pre-registered (a12_3_impact.json, a12_3_flagged_rows.csv); a12_3_by_wall_side.json is exploratory, post hoc",
+  "a12_3_impact.json": "fixed receiver (5cb272b) vs frozen held-out run: ho_02 and ho_10, records 0-3, 5 sigma, 2 worlds, 6 methods (480 rows); decision and S_c1 differences, every differing non-timing column",
+  "a12_3_flagged_rows.csv": "rows with a decision difference or |dS_c1|/|S_c1| >= 1e-3",
+  "a12_3_by_wall_side.json": "the same differences split by whether the planned wall side flipped; the 3 decision flips",
+  "scripts": ["scripts/a12_impact.py", "scripts/a12_impact_split.py"]
+}

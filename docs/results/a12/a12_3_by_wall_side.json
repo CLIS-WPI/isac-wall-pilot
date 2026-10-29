@@ -1,0 +1,84 @@
+{
+  "side_same=False": {
+    "rows": 112,
+    "rel_max": 0.6741660982229769,
+    "rel_median": 1.3432844980914353e-05,
+    "rows_rel_ge_1e-3": 15
+  },
+  "side_same=True": {
+    "rows": 128,
+    "rel_max": 0.2513674933647909,
+    "rel_median": 0.05083665462709101,
+    "rows_rel_ge_1e-3": 123
+  },
+  "side_same_rel_median_by_world_method": {
+    "replay/imperfect_narrow": 0.047708564337422765,
+    "replay/imperfect_robust": 0.05504500719762326,
+    "target/imperfect_narrow": 0.027558256815367884,
+    "target/imperfect_robust": 0.055810413907546125
+  },
+  "side_flips_by_method": {
+    "exact_oracle": 80,
+    "imperfect_narrow": 16,
+    "imperfect_robust": 16
+  },
+  "side_flips_by_sigma": {
+    "0": 48,
+    "0.25": 16,
+    "0.5": 16,
+    "1": 16,
+    "2": 16
+  },
+  "side_flips_by_geometry": {
+    "ho_02": 56,
+    "ho_10": 56
+  },
+  "candidate_aoa_old_vs_new_sum_max_abs": 0.0,
+  "decision_flips": [
+    {
+      "geometry_id": "ho_10",
+      "world": "replay",
+      "record_index": 0,
+      "sigma_map_m": 1.0,
+      "method": "imperfect_robust",
+      "supported_old": false,
+      "supported_new": true,
+      "S_c1_old": 0.02079391054090749,
+      "S_c1_new": 0.022920692277457338,
+      "wall_side_old": "negative",
+      "wall_side_new": "negative",
+      "beam_phi_deg_old": -22.00012657734964,
+      "beam_phi_deg_new": -22.00012657734964
+    },
+    {
+      "geometry_id": "ho_10",
+      "world": "replay",
+      "record_index": 1,
+      "sigma_map_m": 2.0,
+      "method": "imperfect_robust",
+      "supported_old": false,
+      "supported_new": true,
+      "S_c1_old": 0.018202660633865657,
+      "S_c1_new": 0.022438953260754322,
+      "wall_side_old": "negative",
+      "wall_side_new": "negative",
+      "beam_phi_deg_old": -18.983299420173008,
+      "beam_phi_deg_new": -18.983299420173008
+    },
+    {
+      "geometry_id": "ho_10",
+      "world": "replay",
+      "record_index": 3,
+      "sigma_map_m": 0.0,
+      "method": "imperfect_robust",
+      "supported_old": true,
+      "supported_new": false,
+      "S_c1_old": 0.022136420096569118,
+      "S_c1_new": 0.02169372319593529,
+      "wall_side_old": "negative",
+      "wall_side_new": "positive",
+      "beam_phi_deg_old": -23.244203265320536,
+      "beam_phi_deg_new": 23.244203265320536
+    }
+  ]
+}

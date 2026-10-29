@@ -50,6 +50,8 @@ def compare(out: Path, frozen_path: Path, result: Path) -> None:
 
     def differs(col: str) -> pd.Series:
         a, b = m[f"{col}_old"], m[f"{col}_new"]
+        if a.dtype == object:  # list-valued columns compare by their text form
+            a, b = a.astype(str), b.astype(str)
         return ~((a == b) | (a.isna() & b.isna()))
 
     decisions = {c: int(differs(c).sum()) for c in ("status", "supported", "supported_common")}
