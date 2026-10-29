@@ -839,3 +839,58 @@ are NOT re-run; A12.3 measures the impact of the fix on a subset.
   the fresh direct action).
 - **Labels:** A12.2–A12.4 are pre-registered here; anything else computed
   from them is exploratory, post hoc.
+
+## Amendment 13 — 2026-10-29
+
+Written after external review round 2's stage B was declined in its attacker
+form and re-scoped as a purely DEFENSIVE robustness certification, before any
+A13 code or run. **No attacker signal, relay output or evasion filter is ever
+constructed.** All quantities are analytical bounds on, or consistency
+statistics for, the EXISTING verifier, computed from channel data and genuine
+records already defined by the frozen pipeline. **No threshold, gate rule,
+primary rule, decision criterion, frozen config value, earlier label or earlier
+prediction outcome changes.** B2's one new statistic has its own threshold,
+calibrated on the 12 calibration geometries and committed before any held-out
+or standoff value is computed. All of B1–B3 are pre-registered here; anything
+else derived from them is exploratory, post hoc.
+
+- **B13.1 Channel coupling bound** (analytical, from existing noiseless path
+  data; no relay output is constructed). For each held-out geometry at σ = 0.5
+  and each standoff level, from the relay position's uplink channels (the
+  per-path coefficients, arrival angles and delays that `prepare_geometry`
+  already solves): the LoS uplink path and the wall uplink path(s). Report
+  (a) `G`, the receive-side reflector gate's response (Hann receive taper,
+      steered to the twin's reciprocal arrival angle) evaluated at the relay's
+      wall-uplink arrival angle, in dB relative to its steered peak;
+  (b) `kappa`, the energy any signal emitted from p_A deposits in the
+      candidate-bearing angle gate through the LoS uplink, per unit energy it
+      deposits in the reflector gate through the wall uplink:
+      `kappa = (|c_los|^2 R_cand(theta_los)) / (|c_wall|^2 R_refl(theta_wall))`,
+      where `R_cand` is the receive response steered to the candidate bearing
+      and `R_refl` the reflector gate's steered response; waveform-independent,
+      since both are copies of one emitted signal with a fixed relative delay;
+  (c) the fixed uplink delay offset `tau_los - tau_wall` between the two copies,
+      and an `overlap` flag: whether placing the wall copy at the reflector-gate
+      centre puts the LoS copy inside the direct gate.
+  Report `kappa` in dB and the overlap flag per geometry and level.
+- **B13.2 Defensive consistency statistic** for the receive-side check:
+  `C = (measured energy in the candidate-bearing angle gate over the
+  surveillance delay window, outside the direct and reflector gates) - (the
+  twin-predicted energy there under the same direct beam)`. Calibrated for 1%
+  false rejection of GENUINE targets on the 12 calibration geometries (pooled
+  σ): the threshold `c_hi` is the 0.99 quantile of C over genuine-target
+  calibration records. Committed before any held-out or standoff C is computed.
+  Report its false-rejection rate (fraction of genuine targets with C > c_hi)
+  on held-out genuine targets (σ = 0.5) and at each standoff level.
+- **B13.3 Certified region** (analytical). For each geometry and level,
+  `E_req`, the reflector-gate energy required for S = 1, from the twin ratio and
+  the measured direct energy of the genuine-target records:
+  `E_req = (E_D - N_D) * r_dt + N_W`. When `overlap` is false, any single
+  emitter that reaches `S = 1` must deposit at least `kappa * E_req` in the
+  candidate-bearing gate outside the direct and reflector gates. Mark the
+  (geometry, level) CERTIFIED when `kappa * E_req > c_hi * (1 + margin)` with a
+  stated margin (0.0, reported alongside a 3 dB-margin variant). Report the
+  certified fraction per standoff level and compare it with the per-geometry
+  delay resolution (`overlap`) and the angle resolution (`G`). Nothing here
+  authorizes or constructs an emitter; CERTIFIED means the existing check
+  provably rejects this relay class there.
