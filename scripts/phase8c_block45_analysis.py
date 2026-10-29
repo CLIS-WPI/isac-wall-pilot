@@ -82,6 +82,22 @@ def acquisition_counts(frame: pd.DataFrame) -> dict:
     return out
 
 
+def runtime_check(run_dir: Path) -> dict:
+    """A10.4: per-worker wall times and the NVML process list. Expected compute processes: the parent plus one
+    per worker; anything else (or a graphics process other than the display server seen in every run) is foreign."""
+    t = json.loads((run_dir / "timing.json").read_text())
+    wall = pd.Series(t["worker_wall_s"], dtype=float)
+    procs = t["gpu_processes_observed"]["processes"]
+    compute = [p for p in procs if p["kind"] == "compute"]
+    graphics = sorted(p["pid"] for p in procs if p["kind"] != "compute")
+    return {"workers": int(t["workers"]), "end_to_end_s": float(t["end_to_end_s"]),
+            "worker_wall_s": {"min": float(wall.min()), "median": float(wall.median()), "max": float(wall.max())},
+            "nvml_samples": int(t["gpu_processes_observed"]["samples"]),
+            "nvml_sample_errors": len(t["gpu_processes_observed"]["sample_errors"]),
+            "compute_processes": len(compute), "graphics_pids": graphics,
+            "foreign_compute_processes": len(compute) - (int(t["workers"]) + 1)}
+
+
 def replay_identical(frame: pd.DataFrame, baseline: pd.DataFrame) -> dict:
     """RCS validity: replay rows on matched records equal the main run's in every common non-timing column."""
     a = frame[(frame["world"] == "replay") & frame["record_index"].isin(MATCHED_RECORDS)]
@@ -159,6 +175,7 @@ def main() -> None:
             "robust_target_S_ratio_n": int(ratio.notna().sum()),
             "robust_target_fraction_S_above_s_hi": float((rt["S_c1"] > s_hi).mean()),
             "a9_3_acquisition_counts": acquisition_counts(frame),
+            "runtime": runtime_check(run_dir),
             "stratified": stratified_rates(frame, draws),
         }
         if level.startswith("rcs_"):
