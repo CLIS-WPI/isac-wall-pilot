@@ -947,3 +947,36 @@ generated.
   rejection (with CI) and the revised conservative certified fraction at the
   held-out level (σ = 0.5) and at ΔR = 20 m and ΔR = 30 m. Pre-registered here
   before any confirmation geometry is generated.
+
+## Amendment 15 — 2026-10-29
+
+Written after external review round 3 addendum, which (1) corrected a caption
+wording error and (2) asked for a descriptive coverage map of the certificate
+as a design guide. Still purely DEFENSIVE: **no attacker signal, relay output
+or evasion filter is constructed.** This amendment is DESCRIPTIVE and introduces
+**no new thresholds**: it recomputes the ALREADY-FROZEN Amendment 14 certificate
+(frozen `c_hi`, frozen receive-side `s_lo` and `k` floor, `eps_C = 3` dB) over a
+grid of operating conditions. Pre-registered here before the grid is run.
+
+- **B15.1 Caption correction (item 1).** The uncertified held-out and fresh
+  geometries fail `ghost_in_excluded_gate` because each flagged route's widened
+  ghost interval overlaps the **direct** gate, not the reflector gate. Verified
+  over all 164 original and 67 fresh excluded-gate losses: every flagged route
+  overlaps the direct gate; none overlaps only the reflector gate. The
+  `table_wpe_certified.tex` caption is corrected accordingly.
+- **B15.2 Coverage grid (item 2).** On the 24 held-out geometries, recompute the
+  frozen certificate (`certified_rev` exactly as in the Amendment 14 report) for
+  the Cartesian grid of
+  (a) occupied bandwidth ∈ {61.44, 122.88, 245.76 MHz} (config RF profiles
+      `bw61`, `baseline`, `bw246`), changing only the active OFDM profile — so
+      the point-spread width and the candidate delay/range uncertainty scale
+      with bandwidth — not the A3.3 stress grid; and
+  (b) map uncertainty `sigma_map` ∈ {0, 0.25, 0.5, 1 m}, changing only the
+      twin-error widening of the consistency window and the twin offsets.
+  The 122.88 MHz × 0.5 m cell reproduces the frozen Amendment 14 held-out result
+  (correctness check).
+- **B15.3 Reported quantities.** Per (bandwidth, sigma_map) cell: the certified
+  fraction over the 24 geometries and, for the uncertified ones, the overlap
+  margin in ns (the largest extent of any widened ghost interval into the direct
+  gate), reported as median and max. One figure: certified fraction vs
+  bandwidth, one line per sigma_map. No decision threshold is chosen or changed.

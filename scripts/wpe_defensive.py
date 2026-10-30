@@ -12,10 +12,13 @@ Modes:
                                    RUN = calibration | heldout | standoff_XXm
   calibrate CONS_DIR OUT       B2: c_hi = 0.99 quantile of C over calibration genuine targets (CPU; commit before eval)
   report COUPLE_DIR CONS_DIR OUT GEOMETRIES.csv   B1/B2/B3 tables + certified region (CPU)
+  coverage SLOT OUT            Amdt 15: frozen B3 certificate on held-out SLOT over bandwidth x sigma_map grid (GPU)
+  coverage_report COV_DIR OUT PAPER_OUT   Amdt 15: certified fraction per cell + overlap margins + figure (CPU)
 """
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import sys
@@ -96,7 +99,17 @@ def _accepted_confirmation(config: PilotConfig, slot: int):
     raise RuntimeError(f"confirmation slot {slot}: no feasible geometry in 1000 draws")
 
 
-def _setup(run: str, slot: int):
+def _with_profile(config: PilotConfig, name: str) -> PilotConfig:
+    """Isolated bandwidth change: only the active OFDM profile (read by ProcessingChoices / the acquisition), so a
+    coverage cell differs from frozen Amendment 14 in bandwidth alone, not in the A3.3 stress grid that
+    stress_config would also apply. baseline_bandwidth_profile is reporting-only but kept consistent."""
+    data = copy.deepcopy(config.data)
+    data["phase6"]["processing"]["profile"] = name
+    data["rf"]["baseline_bandwidth_profile"] = name
+    return PilotConfig(path=config.path, data=data)
+
+
+def _setup(run: str, slot: int, profile: str | None = None):
     from isac_verify.phase8a import SPLIT
     base_config = PilotConfig.load("configs/pilot.yaml")
     confirm = run.startswith("conf_")
@@ -105,6 +118,8 @@ def _setup(run: str, slot: int):
     if split == HELDOUT:
         approve_heldout()
     config = stress_config(base_config, level) if level.startswith("standoff_") else base_config
+    if profile is not None:
+        config = _with_profile(config, profile)
     choices = ProcessingChoices.from_config(config)
     noise_full = noise_calibration(choices=choices, config=config,
                                    records=int(config.get("phase6", "processing", "noise_calibration_records")),
@@ -137,10 +152,22 @@ def couple(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
     base = _acquire_record(config=config_g, choices=choices, world="target", record_index=0,
                            direct_weights=direct_weights, links=prepared["links"], calibration=prepared["calibration"],
                            noise_full=noise_full, timing={}, seeds=seeds)
-    offsets = _twin_offsets(config_g, SIGMA, z["positive"], z["negative"])
+    row = _cert_row(run, gid, config, config_g, choices, array, rx_array, w, z, base, direct_weights, prepared,
+                    geometry, SIGMA)
+    pd.DataFrame([row]).to_parquet(out_dir / f"{run}_{slot:02d}.parquet", index=False)
+    print(f"{run} {gid}: kappa={row.get('kappa_db', float('nan')):.2f} kappa_lb={row.get('kappa_lb_db', float('nan')):.2f} dB "
+          f"routes={row.get('n_gate_routes')} win_lo={row.get('window_lo_ns', float('nan')):.1f}ns "
+          f"ghosts_ok={row.get('cons_ghost_in_survey_all')}&{row.get('cons_ghost_out_direct_all')}", flush=True)
+
+
+def _cert_row(run, gid, config, config_g, choices, array, rx_array, w, z, base, direct_weights, prepared,
+              geometry, sigma):
+    """Revised certificate row for one geometry at one map-uncertainty sigma; bandwidth is carried by config/choices.
+    Factored out of couple so the coverage sweep (Amendment 15) can recompute it per (bandwidth, sigma) cell."""
+    offsets = _twin_offsets(config_g, sigma, z["positive"], z["negative"])
     plan, _, _ = _plan_for(config=config_g, choices=choices, base=base, world="target", method=METHOD,
-                           sigma_m=SIGMA, twin_offsets=offsets, direct_weights=direct_weights, timing={})
-    refl = passive_gate(config_g, plan, base["candidate"], offsets, SIGMA)
+                           sigma_m=sigma, twin_offsets=offsets, direct_weights=direct_weights, timing={})
+    refl = passive_gate(config_g, plan, base["candidate"], offsets, sigma)
     dgate, side = plan.direct_gate, plan.wall_side
     phi_w, cand = float(plan.predicted_aod_deg), float(base["candidate"].azimuth_deg)
     uplink = {p.family: p for p in prepared["links"]["uplink"]}
@@ -185,7 +212,7 @@ def couple(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
         survey_hi_ns = float(config.get("phase6", "processing", "delay_search_ns")[1])
         window_lo_ns = twin_window_lo_s(config_g, refl.delay_min_s, float(base["candidate"].range_m),
                                         float(base["candidate"].delay_sigma_s), offsets["positive"],
-                                        offsets["negative"], base["point_spread"].delay_width_s, SIGMA) * 1e9
+                                        offsets["negative"], base["point_spread"].delay_width_s, sigma) * 1e9
         ghosts, in_window_all, out_excluded_all = [], True, True
         for p in routes:
             dlt = (p.delay_s - los.delay_s) * 1e9  # path difference vs LoS (ns); ghost interval = gate - dlt
@@ -231,10 +258,7 @@ def couple(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
                 "twin_bearing_resid_w": float("nan"), "E_min": float("nan"), "r_pass": float("nan"),
                 "N_pass": float("nan"), "E_D_net": float("nan"), "scope": "missing uplink",
                 "missing_uplink": f"los={los is not None} wall_{side}={wall is not None}"}
-    pd.DataFrame([row]).to_parquet(out_dir / f"{run}_{slot:02d}.parquet", index=False)
-    print(f"{run} {gid}: kappa={row.get('kappa_db', float('nan')):.2f} kappa_lb={row.get('kappa_lb_db', float('nan')):.2f} dB "
-          f"routes={row.get('n_gate_routes')} win_lo={row.get('window_lo_ns', float('nan')):.1f}ns "
-          f"ghosts_ok={row.get('cons_ghost_in_survey_all')}&{row.get('cons_ghost_out_direct_all')}", flush=True)
+    return row
 
 
 def leakage(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
@@ -478,6 +502,96 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
         print(pd.DataFrame(leak_rows).round(6).to_string())
 
 
+# Amendment 15 (descriptive): coverage of the FROZEN Amendment 14 certificate over bandwidth x map-uncertainty.
+COV_BANDWIDTHS = ["bw61", "baseline", "bw246"]   # 61.44, 122.88 (frozen), 245.76 MHz
+COV_SIGMAS = [0.0, 0.25, 0.5, 1.0]
+
+
+def _direct_overlap_ns(ghosts: str, dmin: float, dmax: float) -> float:
+    """Largest overlap (ns) of any route's widened ghost interval with the (excluded) direct gate; 0 if none reach it."""
+    best = 0.0
+    for seg in str(ghosts).split(";"):
+        if not seg or ":" not in seg:
+            continue
+        _, rng, _ = seg.rsplit(":", 2)
+        g_lo, g_hi = (float(x) for x in rng.split("-"))
+        best = max(best, min(g_hi, dmax) - max(g_lo, dmin))
+    return best
+
+
+def coverage(slot: int, out_dir: Path) -> None:
+    """Recompute the frozen Amendment 14 certificate on held-out geometry `slot` across the bandwidth x sigma_map
+    grid. Descriptive only: frozen c_hi and the frozen receive-side s_lo/k floor; no threshold is re-fitted. Bandwidth
+    enters via _cert_row's config/choices (PSF width, candidate uncertainty); sigma_map via the twin-error widening."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    gid = f"ho_{slot:02d}"
+    c_hi = json.loads(Path("docs/results/wpe/b2_threshold.json").read_text())["c_hi"]
+    margin = c_hi * 10 ** 0.3   # eps_C = 3 dB, identical to report()
+    rows = []
+    for profile in COV_BANDWIDTHS:
+        _, config, config_g, choices, noise_full, direct_weights, geometry, prepared, _ = _setup("heldout", slot, profile)
+        bw_mhz = float(config.data["rf"]["profiles"][profile]["occupied_bandwidth_hz"]) / 1e6
+        array, rx_array = ArrayGeometry.from_config(config_g), choices.receiver_array
+        w = _aoa_window(choices)
+        seeds = {"streams": geometry_seed_streams(config, HELDOUT, slot, 1)}
+        twins = int(config.section("phase8", "grid")["twin_realizations_per_sigma"])
+        z = twin_draws(config, HELDOUT, slot, twins)[0]
+        base = _acquire_record(config=config_g, choices=choices, world="target", record_index=0,
+                               direct_weights=direct_weights, links=prepared["links"],
+                               calibration=prepared["calibration"], noise_full=noise_full, timing={}, seeds=seeds)
+        for sigma in COV_SIGMAS:
+            row = _cert_row("heldout", gid, config, config_g, choices, array, rx_array, w, z, base,
+                            direct_weights, prepared, geometry, sigma)
+            ghosts_ok = bool(row["cons_ghost_in_survey_all"]) and bool(row["cons_ghost_out_direct_all"])
+            kappa_lb = float(row["kappa_lb"])
+            forced = kappa_lb * float(row["E_min"]) - float(row["twin_bearing_resid_w"])
+            certified = bool(ghosts_ok and math.isfinite(kappa_lb) and forced > margin)
+            overlap = _direct_overlap_ns(row["gate_route_ghosts"], row["direct_delay_min_ns"],
+                                         row["direct_delay_max_ns"])
+            rows.append({"geometry_id": gid, "slot": slot, "bandwidth": profile, "bandwidth_mhz": bw_mhz,
+                         "sigma_map_m": sigma, "certified_rev": certified,
+                         "cons_ghost_in_survey_all": bool(row["cons_ghost_in_survey_all"]),
+                         "cons_ghost_out_direct_all": bool(row["cons_ghost_out_direct_all"]),
+                         "kappa_lb_db": float(row["kappa_lb_db"]), "window_lo_ns": float(row["window_lo_ns"]),
+                         "direct_overlap_ns": overlap})
+            print(f"cov {gid} {profile}({bw_mhz:.2f}MHz) sigma={sigma}: cert={certified} "
+                  f"overlap={overlap:.1f}ns win_lo={row['window_lo_ns']:.1f}", flush=True)
+    pd.DataFrame(rows).to_parquet(out_dir / f"ho_{slot:02d}.parquet", index=False)
+
+
+def coverage_report(cov_dir: Path, out: Path, paper_out: Path) -> None:
+    """Aggregate the coverage grid: certified fraction per (bandwidth, sigma_map) cell, overlap margins for the
+    uncertified ones, and one figure (certified fraction vs bandwidth, one line per sigma_map)."""
+    df = pd.concat([pd.read_parquet(p) for p in sorted(cov_dir.glob("ho_*.parquet"))], ignore_index=True)
+    cells = []
+    for (bw, bw_mhz, sig), part in df.groupby(["bandwidth", "bandwidth_mhz", "sigma_map_m"]):
+        unc = part[~part["certified_rev"]]
+        cells.append({"bandwidth": bw, "bandwidth_mhz": bw_mhz, "sigma_map_m": sig, "n_geometries": len(part),
+                      "n_certified": int(part["certified_rev"].sum()),
+                      "certified_fraction": float(part["certified_rev"].mean()),
+                      "n_uncertified": len(unc),
+                      "median_direct_overlap_ns": float(unc["direct_overlap_ns"].median()) if len(unc) else float("nan"),
+                      "max_direct_overlap_ns": float(unc["direct_overlap_ns"].max()) if len(unc) else float("nan")})
+    cells_df = pd.DataFrame(cells).sort_values(["sigma_map_m", "bandwidth_mhz"]).reset_index(drop=True)
+    cells_df.to_csv(out / "b4_coverage.csv", index=False)
+    from paper_figures_tables import OKABE, SIZE, plt, save
+    colours = [OKABE["blue"], OKABE["green"], OKABE["orange"], OKABE["vermillion"]]
+    fig, ax = plt.subplots(figsize=SIZE)
+    for sig, colour in zip(COV_SIGMAS, colours):
+        m = cells_df[cells_df["sigma_map_m"] == sig].sort_values("bandwidth_mhz")
+        ax.plot(m["bandwidth_mhz"], m["certified_fraction"], marker="o", markersize=3, color=colour,
+                label=fr"$\sigma_{{\rm map}}={sig}$ m")
+    ax.set_xlabel("Occupied bandwidth (MHz)")
+    ax.set_ylabel("Certified fraction (held-out)")
+    ax.set_xticks([61.44, 122.88, 245.76])
+    ax.set_ylim(-0.02, 1.02)
+    ax.legend(frameon=False, loc="upper left", ncol=2)
+    save(fig, paper_out, "fig_c_coverage")
+    cells_df.to_csv(paper_out / "fig_c_coverage.csv", index=False)
+    pd.set_option("display.width", 220)
+    print(cells_df.round(4).to_string())
+
+
 def main() -> None:
     np.seterr(all="ignore")
     mode = sys.argv[1]
@@ -489,6 +603,10 @@ def main() -> None:
         consistency(sys.argv[2], int(sys.argv[3]), Path(sys.argv[4]), Path(sys.argv[5]))
     elif mode == "calibrate":
         calibrate(Path(sys.argv[2]), Path(sys.argv[3]))
+    elif mode == "coverage":
+        coverage(int(sys.argv[2]), Path(sys.argv[3]))
+    elif mode == "coverage_report":
+        coverage_report(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]))
     else:
         report(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4]), Path(sys.argv[5]))
 

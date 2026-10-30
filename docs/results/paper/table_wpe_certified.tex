@@ -6,8 +6,9 @@
 % and reflector gates; (ii) kappa_lb*E_min - twin_bearing_resid > c_hi*10^(eps_C/10), eps_C = 3 dB. kappa_lb is
 % the reverse-triangle lower bound kappa_lb = max(sqrt(g_L) - sum_i sqrt(g_i^bear), 0)^2 / (sum_i sqrt
 % e_i^refl)^2 <= kappa; E_min is the smallest reflector-gate energy passing the passive s_lo and k-floor rules.
-% Nearly every loss is ghost_in_excluded_gate: a reciprocal/opposite-wall route whose ghost interval overlaps
-% the masked reflector gate (kappa_lb ~ kappa, so the bound is tight; the loss is geometric, not a weak bound).
+% Nearly every loss is ghost_in_excluded_gate: a non-LoS route whose widened ghost interval overlaps the
+% masked DIRECT gate (every excluded-gate loss here does; none overlap only the reflector gate). kappa_lb ~
+% kappa, so the bound is tight; the loss is geometric (the ghost lands on the direct peak), not a weak bound.
 % Source: docs/results/wpe/b3_certified_region.csv, b3_conservative_losses.csv.
 % c_hi = 1.001e-13 (0.99 quantile of C over 1920 calibration genuine targets; realized calibration FR 1.04%).
 % B2 genuine-target false rejection (point [95% CI] (rejected/records)): Held-out, \sigma=0.5: 0.0208 [0.0013, 0.0443] (16/768); \Delta R=3 m: 0.0208 [0.0000, 0.0521] (4/192); \Delta R=6 m: 0.0208 [0.0000, 0.0521] (4/192); \Delta R=10 m: 0.0208 [0.0000, 0.0521] (4/192); \Delta R=15 m: 0.0208 [0.0000, 0.0521] (4/192); \Delta R=20 m: 0.0208 [0.0000, 0.0521] (4/192); \Delta R=30 m: 0.0208 [0.0000, 0.0521] (4/192).
