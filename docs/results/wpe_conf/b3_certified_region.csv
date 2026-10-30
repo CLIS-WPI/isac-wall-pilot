@@ -1,0 +1,4 @@
+run,n_geometries,median_kappa_db,median_kappa_lb_db,median_window_lo_ns,certified_fraction_rev,n_certified_rev,n_ghost_outside_window,n_ghost_in_excluded_gate,n_bound_too_weak
+conf_heldout,24,49.70016515790012,48.68240932869045,202.56423477948977,0.125,3,0,21,0
+conf_standoff_20m,24,16.713397945715492,16.685647839166656,202.56423477948977,0.0,0,0,24,0
+conf_standoff_30m,24,47.1255948932906,46.38152785167511,202.56423477948977,0.08333333333333333,2,0,22,0

@@ -27,5 +27,5 @@ uncertified_single_emitter,uncertified_fraction,3.0,1.0,,,24,docs/results/wpe/b3
 uncertified_single_emitter,uncertified_fraction,6.0,1.0,,,24,docs/results/wpe/b3_certified_region.csv,14.34688966908239,21.672833239282355
 uncertified_single_emitter,uncertified_fraction,10.0,1.0,,,24,docs/results/wpe/b3_certified_region.csv,14.34688966908239,21.672833239282355
 uncertified_single_emitter,uncertified_fraction,15.0,1.0,,,24,docs/results/wpe/b3_certified_region.csv,14.34688966908239,21.672833239282355
-uncertified_single_emitter,uncertified_fraction,20.0,0.9583333333333334,,,24,docs/results/wpe/b3_certified_region.csv,14.34688966908239,21.672833239282355
-uncertified_single_emitter,uncertified_fraction,30.0,0.625,,,24,docs/results/wpe/b3_certified_region.csv,14.34688966908239,21.672833239282355
+uncertified_single_emitter,uncertified_fraction,20.0,1.0,,,24,docs/results/wpe/b3_certified_region.csv,14.34688966908239,21.672833239282355
+uncertified_single_emitter,uncertified_fraction,30.0,0.9583333333333334,,,24,docs/results/wpe/b3_certified_region.csv,14.34688966908239,21.672833239282355

@@ -1,0 +1,6 @@
+{
+  "label": "B14.5 (revised window) pre-registered: 1% genuine false rejection over the 12 calibration geometries, pooled sigma; 0.99 quantile of C under the twin-derived whole-gate-span window. Committed before eval.",
+  "c_hi": 1.0008701353326262e-13,
+  "n_calibration_target_records": 1920,
+  "realized_false_rejection": 0.010416666666666666
+}

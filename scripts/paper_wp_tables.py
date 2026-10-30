@@ -122,26 +122,28 @@ def e_b3(out: Path) -> None:  # Amendment 13 (defensive): B3 certified region, w
     rows = []
     for run, label in RUN.items():
         c = cert.loc[run]
-        rows.append(f"{label} & {c.certified_fraction_m0:.3f} ({int(c.n_certified_m0)}/{int(c.n_geometries)}) & "
-                    f"{c.certified_fraction_cons_m0:.3f} ({int(c.n_certified_cons_m0)}/{int(c.n_geometries)}) & "
-                    f"{c.median_kappa_db:+.1f} & {c.median_kappa_cons_db:+.1f} \\\\")
+        rows.append(f"{label} & {c.certified_fraction_rev:.3f} ({int(c.n_certified_rev)}/{int(c.n_geometries)}) & "
+                    f"{c.median_kappa_db:+.1f} & {c.median_kappa_lb_db:+.1f} \\\\")
     fr_note = "; ".join(
         f"{RUN[run].replace('$', '')}: {fr.loc[run].false_rejection:.4f} "
         f"[{fr.loc[run].ci95_lo:.4f}, {fr.loc[run].ci95_hi:.4f}] ({int(fr.loc[run].n_rejected)}/{int(fr.loc[run].n_records)})"
         for run in RUN)
     write(out, "table_wpe_certified.tex", [
-        "% Amendment 13 (defensive), B3: certified region against the single-antenna-emitter relay class, per level",
-        "% (n=24 held-out geometries, 24 per standoff). Single-route CERTIFIED = reciprocal wall route delay-resolved",
-        "% (its LoS ghost outside the direct gate) AND inside the surveillance window AND kappa*E_req > c_hi.",
-        "% Conservative CERTIFIED (multi-route, Cauchy-Schwarz over every non-LoS gate route): EVERY route's LoS ghost",
-        "% inside the window and outside the direct gate AND kappa_cons*E_req > c_hi, kappa_cons = e_cand/(sum_i sqrt",
-        "% e_i^refl)^2 <= kappa. The 3 dB-margin variant is identical. Every conservative loss here is a double-bounce",
-        "% route whose ghost falls just below the 300 ns window (not a weak bound: kappa_cons ~ kappa).",
+        "% Amendment 14 (defensive), B3: revised certified region against the second-order relay class, per level",
+        "% (n=24 held-out geometries, 24 per standoff). Scope: ANY signal from the EVALUATED (ray-traced) relay position,",
+        "% not a verifier-side guarantee over unknown positions. REVISED CERTIFIED (all conditions): (i) the ghost delay",
+        "% interval of every non-LoS gate route, shifted by its path diff over R_A and widened by 3-sigma twin error,",
+        "% 3-sigma candidate sigma and the PSF width, lies inside the surveillance window AND outside the excluded direct",
+        "% and reflector gates; (ii) kappa_lb*E_min - twin_bearing_resid > c_hi*10^(eps_C/10), eps_C = 3 dB. kappa_lb is",
+        "% the reverse-triangle lower bound kappa_lb = max(sqrt(g_L) - sum_i sqrt(g_i^bear), 0)^2 / (sum_i sqrt",
+        "% e_i^refl)^2 <= kappa; E_min is the smallest reflector-gate energy passing the passive s_lo and k-floor rules.",
+        "% Nearly every loss is ghost_in_excluded_gate: a reciprocal/opposite-wall route whose ghost interval overlaps",
+        "% the masked reflector gate (kappa_lb ~ kappa, so the bound is tight; the loss is geometric, not a weak bound).",
         "% Source: docs/results/wpe/b3_certified_region.csv, b3_conservative_losses.csv.",
         f"% c_hi = {c_hi:.3e} (0.99 quantile of C over 1920 calibration genuine targets; realized calibration FR 1.04%).",
         f"% B2 genuine-target false rejection (point [95% CI] (rejected/records)): {fr_note}.",
-        "% columns: l r r r r", r"\toprule",
-        r"Level & Certified (1-route) & Certified (cons.) & Median $\kappa$ (dB) & Median $\kappa_{\rm cons}$ (dB) \\",
+        "% columns: l r r r", r"\toprule",
+        r"Level & Certified (rev.) & Median $\kappa$ (dB) & Median $\kappa_{\rm lb}$ (dB) \\",
         r"\midrule"], rows)
 
 

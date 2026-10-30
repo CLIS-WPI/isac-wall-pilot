@@ -1,11 +1,13 @@
 {
-  "label": "Amendment 13 (defensive) pre-registered: B1 coupling, B2 consistency statistic, B3 certified region. No attacker code.",
-  "b1_b3_per_geometry.csv": "per geometry/level: G (dB), kappa (dB), delay offset, overlap, E_req, kappa*E_req, certified flags",
-  "b2_threshold.json": "B2 c_hi (0.99 quantile of C over calibration genuine targets); committed before eval",
-  "b2_false_rejection.csv": "B2 genuine-target false rejection on held-out (sigma 0.5) and each standoff level",
-  "b3_certified_region.csv": "certified fraction per level (margin 0 and 3 dB) vs overlap and median G",
+  "label": "Amendment 13 + revision addendum (defensive). Revised certificate: E_min attacker model, kappa_lb lower bound with bearing leakage, twin-derived whole-gate-span window, c_hi*10^(eps_C/10) margin. SCOPE: 2nd-order routes; ANY signal from the EVALUATED relay position (ray-traced); NOT a verifier-side certificate over unknown relay positions. No attacker code.",
+  "b1_b3_per_geometry.csv": "per geometry/level: kappa, kappa_lb, E_min, forced-minus-subtracted, item-3 ghost flags, window_lo_ns, certified_rev, loss reason",
+  "b2_threshold.json": "revised c_hi (0.99 quantile of C over calibration genuine targets, revised window); committed before eval",
+  "b2_false_rejection.csv": "genuine-target false rejection, revised window, per level",
+  "b3_certified_region.csv": "revised certified fraction per level + loss-reason counts + median kappa_lb, window_lo",
+  "b3_conservative_losses.csv": "per-geometry loss reason (ghost_outside_window / ghost_in_excluded_gate / bound_too_weak)",
   "prop3_leakage.csv": "Prop.3 check: non-reciprocal-wall share of reflector-gate energy, median/max per level",
-  "c_hi": 6.525630404964621e-14,
+  "eps_C_db": 3.0,
+  "c_hi": 1.0008701353326262e-13,
   "scripts": [
     "scripts/wpe_defensive.py"
   ]
