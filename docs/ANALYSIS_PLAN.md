@@ -894,3 +894,56 @@ else derived from them is exploratory, post hoc.
   delay resolution (`overlap`) and the angle resolution (`G`). Nothing here
   authorizes or constructs an emitter; CERTIFIED means the existing check
   provably rejects this relay class there.
+
+## Amendment 14 — 2026-10-29
+
+Written after external review round 3, which accepted the conservative
+certificate and asked for a stricter, honest version plus a fresh-geometry
+confirmation. Still purely DEFENSIVE: **no attacker signal, relay output or
+evasion filter is constructed.** This amendment pre-registers the revised
+certificate, the revised consistency window and its recalibrated threshold,
+and a fresh confirmation set. It is frozen before any confirmation geometry is
+generated.
+
+- **B14.1 Attacker minimum energy.** Replace `E_req` (energy for S = 1) with
+  `E_min`, the smallest reflector-gate energy that passes BOTH `s_lo` and the
+  `k` floor of the frozen receive-side (C1 passive) check, given the measured
+  `E_D` and noise: `E_min = max(s_lo * r_pass * (E_D - N_D), k * N_pass) +
+  N_pass`, with the frozen `s_lo = 0.5567`, `k = 1.5375`. A declared margin
+  `eps_C = 3 dB` for measurement and model error enters the certify condition.
+- **B14.2 Lower-bounded forced residual.** The Cauchy–Schwarz bound only
+  upper-bounds the reflector-gate energy per unit emitted energy,
+  `(sum_i sqrt(g_i^refl))^2`. The forced bearing energy is lower-bounded by the
+  reverse triangle inequality (other routes' bearing leakage can partly cancel
+  the LoS ghost): `(sqrt(g_L) - sum_i sqrt(g_i^bear))^2`, clamped at zero. Thus
+  `kappa_lb = (sqrt(g_L) - sum_i sqrt(g_i^bear))^2 / (sum_i sqrt(g_i^refl))^2`,
+  with `g` the combiner energy responses (reflector gate at phi_w; bearing at
+  the candidate). Certify only when
+  `kappa_lb * E_min - (twin-predicted bearing residual the statistic removes)
+  > c_hi * 10^(eps_C/10)`.
+- **B14.3 Window from the whole gate span.** Shift the entire reflector-gate
+  delay interval (not its centre) left by each route's path difference vs LoS,
+  over every relay position on the bearing (`R_A` from 5 m to `R_T` minus the
+  latency-floor standoff), and widen by the 3σ twin-error interval (inflated
+  wall offsets), the candidate range 3σ delay uncertainty and one point-spread
+  width. The consistency window is `[earliest such edge, current upper edge]`.
+  A geometry is certifiable only when EVERY required route's shifted ghost
+  interval lies inside the window AND outside the regions the statistic excludes
+  around BOTH the direct and the reflector gates. Twin only; no truth.
+- **B14.4 Scope (stated in every output).** Routes up to second order. The
+  certificate holds for ANY signal emitted from the EVALUATED relay position,
+  using ray-traced channels. It is NOT yet a verifier-side certificate over
+  unknown relay positions (the window is designed over relay positions on the
+  bearing, but the coupling `kappa_lb` uses the evaluated relay's channels).
+- **B14.5 Recalibration.** With the revised window, recompute the consistency
+  statistic `C` on the 12 calibration geometries and set `c_hi` to its 0.99
+  quantile (1% genuine false rejection). Committed before any held-out,
+  standoff or confirmation `C` is evaluated.
+- **B14.6 Fresh confirmation.** Draw 24 NEW geometries from a new seed stream,
+  base `CONFIRM_SEED_BASE = 814500` (per-slot seed `base + slot`), with the
+  SAME sampling and acceptance as `phase8a.draw_geometry`/`accepted_geometry`
+  (candidate, relay, half-width drawn in that order). With the frozen revised
+  window and recalibrated `c_hi`, report on them: the genuine-target false
+  rejection (with CI) and the revised conservative certified fraction at the
+  held-out level (σ = 0.5) and at ΔR = 20 m and ΔR = 30 m. Pre-registered here
+  before any confirmation geometry is generated.

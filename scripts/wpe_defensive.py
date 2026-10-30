@@ -49,13 +49,62 @@ def combiner_power(h: torch.Tensor, phi_deg: float, array: ArrayGeometry, w: tor
     return float((v * w.to(torch.complex64) * h).sum().abs().square().item())
 
 
+def _route_excess_s(config: PilotConfig, candidate_range_m: float, d_pos: float, d_neg: float,
+                    sigma_map_m: float) -> float:
+    """Largest second-order uplink path excess (hypot(R_A, o) - R_A)/c over every relay position on the bearing
+    (R_A in [5 m, R_T - latency-floor standoff]) and every route, with wall offsets inflated by the 3-sigma twin
+    error. Offsets: single bounce 2|d|, double bounce 2(|d_pos|+|d_neg|). Excess grows as R_A shrinks and o grows."""
+    c = float(config.speed_of_light)
+    standoff_m = c * float(config.get("geometry_reference", "latency_floor_ns")) * 1e-9 / 2.0
+    r = np.linspace(5.0, max(candidate_range_m - standoff_m, 5.0), 64)
+    infl = 3.0 * float(sigma_map_m)  # twin-error interval on each wall offset
+    dp, dn = abs(d_pos) + infl, abs(d_neg) + infl
+    offsets = (2.0 * dp, 2.0 * dn, 2.0 * (dp + dn))
+    return max(float(((np.hypot(r, o) - r) / c).max()) for o in offsets)
+
+
+def twin_window_lo_s(config: PilotConfig, refl_delay_min_s: float, candidate_range_m: float,
+                     candidate_delay_sigma_s: float, d_pos: float, d_neg: float, psf_width_s: float,
+                     sigma_map_m: float) -> float:
+    """Design revision (item 3): shift the WHOLE reflector-gate interval left by the largest route path excess over
+    all relay positions on the bearing, then widen by the point-spread width and the candidate range (delay) 3-sigma
+    uncertainty; the twin-error interval is folded into the excess via inflated wall offsets. Twin walls only; no
+    truth. Lower edge = refl.delay_min - max_excess - psf - 3*candidate_delay_sigma."""
+    max_excess = _route_excess_s(config, candidate_range_m, d_pos, d_neg, sigma_map_m)
+    return refl_delay_min_s - max_excess - psf_width_s - 3.0 * float(candidate_delay_sigma_s)
+
+
+# ANALYSIS_PLAN Amendment 14 (pre-registered): the fresh confirmation seed base for the 24 NEW geometries. Frozen
+# before any confirmation geometry was generated. Per-slot seed = CONFIRM_SEED_BASE + slot; same ranges/acceptance
+# as phase8a.draw_geometry/accepted_geometry (candidate, relay, half-width drawn in that order).
+CONFIRM_SEED_BASE = 814500
+
+
+def _accepted_confirmation(config: PilotConfig, slot: int):
+    geom = config.section("phase8", "geometry")
+    for attempt in range(1001):
+        rng = np.random.default_rng([CONFIRM_SEED_BASE + int(slot), int(attempt)])
+        geometry = {"slot": int(slot), "attempt": int(attempt), "stream_seed": CONFIRM_SEED_BASE + int(slot),
+                    "candidate_distance_m": float(rng.uniform(*geom["candidate_distance_m_range"])),
+                    "relay_distance_m": float(rng.uniform(*geom["relay_distance_m_range"])),
+                    "half_width_m": float(rng.uniform(*geom["true_corridor_half_width_m_range"])),
+                    "wall_thickness_m": float(geom["wall_thickness_m"])}
+        config_g = geometry_config(config, geometry)
+        prepared = prepare_geometry(config_g)
+        if prepared["rejection"] is None:
+            return geometry, config_g, prepared
+    raise RuntimeError(f"confirmation slot {slot}: no feasible geometry in 1000 draws")
+
+
 def _setup(run: str, slot: int):
     from isac_verify.phase8a import SPLIT
     base_config = PilotConfig.load("configs/pilot.yaml")
-    split = SPLIT if run == "calibration" else HELDOUT
+    confirm = run.startswith("conf_")
+    level = run[len("conf_"):] if confirm else run
+    split = SPLIT if level == "calibration" else HELDOUT
     if split == HELDOUT:
         approve_heldout()
-    config = stress_config(base_config, run) if run.startswith("standoff_") else base_config
+    config = stress_config(base_config, level) if level.startswith("standoff_") else base_config
     choices = ProcessingChoices.from_config(config)
     noise_full = noise_calibration(choices=choices, config=config,
                                    records=int(config.get("phase6", "processing", "noise_calibration_records")),
@@ -63,7 +112,10 @@ def _setup(run: str, slot: int):
     direct_weights = direct_beam(float(config.get("experiment_a", "reference_beam_phi_deg")),
                                  dbm_to_watt(config.get("waveform", "nominal_total_power_dbm")),
                                  ArrayGeometry.from_config(config)).weights
-    geometry, config_g, prepared, _ = accepted_geometry(config, slot, split)
+    if confirm:
+        geometry, config_g, prepared = _accepted_confirmation(config, slot)
+    else:
+        geometry, config_g, prepared, _ = accepted_geometry(config, slot, split)
     standoff = config.section("phase8").get("stress_runtime", {}).get("relay_standoff_m")
     if standoff is not None:
         geometry = {**geometry, "relay_distance_m": geometry["candidate_distance_m"] - float(standoff)}
@@ -75,7 +127,7 @@ def _setup(run: str, slot: int):
 
 def couple(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
-    gid = f"ho_{slot:02d}"
+    gid = f"{'cf' if run.startswith('conf_') else 'ho'}_{slot:02d}"
     _, config, config_g, choices, noise_full, direct_weights, geometry, prepared, split = _setup(run, slot)
     array, rx_array = ArrayGeometry.from_config(config_g), choices.receiver_array
     w = _aoa_window(choices)
@@ -114,38 +166,75 @@ def couple(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
                 "los_uplink_delay_ns": los.delay_s * 1e9, "wall_uplink_delay_ns": wall.delay_s * 1e9,
                 "delay_offset_los_minus_wall_ns": offset_ns, "los_copy_at_refl_center_ns": los_at_refl_center_ns,
                 "overlap": bool(dgate.delay_min_s * 1e9 <= los_at_refl_center_ns <= dgate.delay_max_s * 1e9)}
-        # Conservative Cauchy-Schwarz bound over ALL uplink routes that reach the reflector gate (delay in its
-        # window): kappa_cons = e_cand / (sum_i sqrt(e_i^refl))^2 <= kappa (single route), since |a_i| sqrt(G_i) =
-        # sqrt(combiner_power(h_i, phi_w)). Any signal segment reaching the gate through route i also reaches the
-        # bearing through LoS, landing at refl_center - (tau_i - tau_LoS); every such ghost must be caught.
-        survey_lo, survey_hi = (float(v) for v in config.get("phase6", "processing", "delay_search_ns"))
-        # Routes that can carry signal energy to the reflector gate: every non-LoS uplink multipath (reciprocal
-        # wall, opposite wall, double bounces). Uplink one-way delays are a different frame than the round-trip gate,
-        # so inclusion is by route family, not absolute delay; each route's ghost (item 2) handles its delay.
+        # Revised certificate (external-review addendum, SCOPE: second-order routes; for ANY signal emitted from the
+        # EVALUATED relay position, ray-traced channels; NOT yet a verifier-side certificate over unknown relay
+        # positions). Routes = every non-LoS uplink multipath (reciprocal wall, opposite wall, double bounces).
         routes = [p for p in prepared["links"]["uplink"] if p.family != "los"]
-        sqrt_sum, ghosts, in_survey_all, out_direct_all = 0.0, [], True, True
+        # Upper bound on reflector-gate energy per unit emitted energy: (sum_i sqrt(g_i^refl))^2 (Cauchy-Schwarz).
+        sqrt_refl = sum(math.sqrt(max(combiner_power(p.matrix[:, 0].to(torch.complex64), phi_w, rx_array, w), 0.0))
+                        for p in routes)
+        # Item 2: lower bound on forced bearing energy per unit emitted energy by reverse triangle inequality -
+        # other routes leaking into the bearing can partly cancel the LoS ghost: (sqrt(g_L) - sum_i sqrt(g_i^bear))^2.
+        sqrt_bear_others = sum(math.sqrt(max(combiner_power(p.matrix[:, 0].to(torch.complex64), cand, rx_array, w),
+                                             0.0)) for p in routes)
+        bear_lb_amp = max(math.sqrt(max(e_cand, 0.0)) - sqrt_bear_others, 0.0)
+        kappa_lb = (bear_lb_amp ** 2) / sqrt_refl ** 2 if sqrt_refl > 0 else float("nan")
+        kappa_cons = e_cand / sqrt_refl ** 2 if sqrt_refl > 0 else float("nan")  # old upper-numerator bound (kept)
+        # Item 3: shift the WHOLE reflector-gate interval left by each route's path difference (tau_i - tau_LoS) and
+        # check both edges against the twin-derived window and the excluded direct/reflector-gate regions.
+        survey_hi_ns = float(config.get("phase6", "processing", "delay_search_ns")[1])
+        window_lo_ns = twin_window_lo_s(config_g, refl.delay_min_s, float(base["candidate"].range_m),
+                                        float(base["candidate"].delay_sigma_s), offsets["positive"],
+                                        offsets["negative"], base["point_spread"].delay_width_s, SIGMA) * 1e9
+        ghosts, in_window_all, out_excluded_all = [], True, True
         for p in routes:
-            e_i = combiner_power(p.matrix[:, 0].to(torch.complex64), phi_w, rx_array, w)
-            sqrt_sum += math.sqrt(max(e_i, 0.0))
-            ghost_ns = refl.center_delay_s * 1e9 + (los.delay_s - p.delay_s) * 1e9
-            in_survey = survey_lo <= ghost_ns <= survey_hi
-            in_direct = dgate.delay_min_s * 1e9 <= ghost_ns <= dgate.delay_max_s * 1e9
-            in_survey_all &= in_survey
-            out_direct_all &= not in_direct
-            ghosts.append(f"{p.family}:{ghost_ns:.1f}:{'S' if in_survey else 's'}{'D' if in_direct else 'd'}")
-        kappa_cons = e_cand / sqrt_sum ** 2 if sqrt_sum > 0 else float("nan")
+            dlt = (p.delay_s - los.delay_s) * 1e9  # path difference vs LoS (ns); ghost interval = gate - dlt
+            g_lo, g_hi = refl.delay_min_s * 1e9 - dlt, refl.delay_max_s * 1e9 - dlt
+            in_win = (window_lo_ns <= g_lo) and (g_hi <= survey_hi_ns)
+            ov_direct = not (g_hi < dgate.delay_min_s * 1e9 or g_lo > dgate.delay_max_s * 1e9)
+            ov_refl = not (g_hi < refl.delay_min_s * 1e9 or g_lo > refl.delay_max_s * 1e9)
+            in_window_all &= in_win
+            out_excluded_all &= not (ov_direct or ov_refl)
+            ghosts.append(f"{p.family}:{g_lo:.1f}-{g_hi:.1f}:{'W' if in_win else 'w'}"
+                          f"{'X' if (ov_direct or ov_refl) else 'x'}")
         row |= {"kappa_cons": kappa_cons, "kappa_cons_db": 10 * math.log10(max(kappa_cons, 1e-30)),
-                "n_gate_routes": len(routes), "cons_ghost_in_survey_all": bool(in_survey_all),
-                "cons_ghost_out_direct_all": bool(out_direct_all), "gate_route_ghosts": ";".join(ghosts)}
+                "kappa_lb": kappa_lb, "kappa_lb_db": 10 * math.log10(max(kappa_lb, 1e-30)),
+                "n_gate_routes": len(routes), "cons_ghost_in_survey_all": bool(in_window_all),
+                "cons_ghost_out_direct_all": bool(out_excluded_all), "gate_route_ghosts": ";".join(ghosts),
+                "window_lo_ns": window_lo_ns,
+                "scope": "2nd-order routes; evaluated relay position; ray-traced; not verifier-side over unknown positions"}
+        twin_direct = _twin_map(config=config_g, choices=choices, weights=direct_weights,
+                                twin_paths=_twin_paths(config_g, base["candidate"], offsets, {}), timing={})
+        # Item 2 subtraction term: twin-predicted bearing residual the statistic removes (record 0, new window).
+        aoa_half = 0.5 * (dgate.aoa_max_deg - dgate.aoa_min_deg)
+        cand_gate = _cand_residual_gate(cand, dgate, refl, (window_lo_ns * 1e-9, survey_hi_ns * 1e-9), aoa_half)
+        row["twin_bearing_resid_w"] = _residual_energy(twin_direct, cand_gate, dgate, refl)
+        # Item 1: E_min = smallest reflector-gate energy that passes BOTH s_lo and the k floor of the frozen
+        # receive-side check, given this record's measured E_D/noise. Computed in-line so it also covers the fresh
+        # confirmation geometries (which have no stored C1 passive rows). r_pass = twin wall/direct energy ratio.
+        th = json.loads(Path("docs/results/wpc_a12/c1_passive_thresholds.json").read_text())
+        s_lo, floor_k = float(th["s_lo"]["value"]), float(th["floor_k"]["value"])
+        eps = float(config.get("phase6", "evidence", "epsilon_w"))
+        direct = base["direct_energy"]
+        meas_pass, twin_pass, twin_dir = (gate_e(base["direct_map"], refl), gate_e(twin_direct, refl),
+                                          gate_e(twin_direct, dgate))
+        r_pass = twin_pass.energy_w / twin_dir.energy_w if twin_dir.energy_w > 0 else float("nan")
+        n_pass = meas_pass.noise_w
+        e_min = (max(s_lo * r_pass * max(direct.net_energy_w, eps), floor_k * n_pass) + n_pass
+                 if math.isfinite(r_pass) else float("nan"))
+        row |= {"E_min": e_min, "r_pass": r_pass, "N_pass": n_pass, "E_D_net": direct.net_energy_w}
     else:
         row |= {"G_db": float("nan"), "kappa_db": float("nan"), "kappa": float("nan"),
-                "kappa_cons": float("nan"), "kappa_cons_db": float("nan"), "n_gate_routes": 0,
-                "cons_ghost_in_survey_all": False, "cons_ghost_out_direct_all": False, "gate_route_ghosts": "",
+                "kappa_cons": float("nan"), "kappa_cons_db": float("nan"), "kappa_lb": float("nan"),
+                "kappa_lb_db": float("nan"), "n_gate_routes": 0, "cons_ghost_in_survey_all": False,
+                "cons_ghost_out_direct_all": False, "gate_route_ghosts": "", "window_lo_ns": float("nan"),
+                "twin_bearing_resid_w": float("nan"), "E_min": float("nan"), "r_pass": float("nan"),
+                "N_pass": float("nan"), "E_D_net": float("nan"), "scope": "missing uplink",
                 "missing_uplink": f"los={los is not None} wall_{side}={wall is not None}"}
     pd.DataFrame([row]).to_parquet(out_dir / f"{run}_{slot:02d}.parquet", index=False)
-    print(f"{run} {gid}: G={row.get('G_db', float('nan')):.2f} dB kappa={row.get('kappa_db', float('nan')):.2f} dB "
-          f"kappa_cons={row.get('kappa_cons_db', float('nan')):.2f} dB routes={row.get('n_gate_routes')} "
-          f"overlap={row.get('overlap')}", flush=True)
+    print(f"{run} {gid}: kappa={row.get('kappa_db', float('nan')):.2f} kappa_lb={row.get('kappa_lb_db', float('nan')):.2f} dB "
+          f"routes={row.get('n_gate_routes')} win_lo={row.get('window_lo_ns', float('nan')):.1f}ns "
+          f"ghosts_ok={row.get('cons_ghost_in_survey_all')}&{row.get('cons_ghost_out_direct_all')}", flush=True)
 
 
 def leakage(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
@@ -212,7 +301,7 @@ def _residual_energy(m, cand_gate: GateWindow, dgate: GateWindow, refl: GateWind
 def consistency(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     base_config, config, config_g, choices, noise_full, direct_weights, geometry, prepared, split = _setup(run, slot)
-    gid = f"{'ho' if split == HELDOUT else 'cal'}_{slot:02d}"
+    gid = f"{'cf' if run.startswith('conf_') else ('ho' if split == HELDOUT else 'cal')}_{slot:02d}"
     grid = config.section("phase8", "grid")
     records = int(grid["records_per_world"])
     sigmas = [float(v) for v in grid["sigma_map_m"]] if run == "calibration" else [SIGMA]
@@ -246,16 +335,22 @@ def consistency(run: str, slot: int, ref_path: Path, out_dir: Path) -> None:
                 continue
             refl = passive_gate(config_g, plan, base["candidate"], offsets, sigma)
             aoa_half = 0.5 * (plan.direct_gate.aoa_max_deg - plan.direct_gate.aoa_min_deg)
-            cand_gate = _cand_residual_gate(float(base["candidate"].azimuth_deg), plan.direct_gate, refl, survey,
+            # Twin-derived lower edge (design revision, item 3: whole-gate-span shift + widening); upper edge fixed.
+            window_lo_s = twin_window_lo_s(config_g, refl.delay_min_s, float(base["candidate"].range_m),
+                                           float(base["candidate"].delay_sigma_s), offsets["positive"],
+                                           offsets["negative"], base["point_spread"].delay_width_s, sigma)
+            survey_rec = (window_lo_s, survey[1])
+            cand_gate = _cand_residual_gate(float(base["candidate"].azimuth_deg), plan.direct_gate, refl, survey_rec,
                                             aoa_half)
             twin_paths = _twin_paths(config_g, base["candidate"], offsets, {})
             twin_direct = _twin_map(config=config_g, choices=choices, weights=direct_weights, twin_paths=twin_paths,
                                     timing={})
-            c = (_residual_energy(base["direct_map"], cand_gate, plan.direct_gate, refl)
-                 - _residual_energy(twin_direct, cand_gate, plan.direct_gate, refl))
+            e_meas = _residual_energy(base["direct_map"], cand_gate, plan.direct_gate, refl)
+            e_twin = _residual_energy(twin_direct, cand_gate, plan.direct_gate, refl)
             rows.append({"run": run, "geometry_id": gid, "world": "target", "record_index": record,
-                         "sigma_map_m": sigma, "status": "computed", "C": c, "candidate_bearing_deg":
-                         float(base["candidate"].azimuth_deg)})
+                         "sigma_map_m": sigma, "status": "computed", "C": e_meas - e_twin,
+                         "E_resid_meas": e_meas, "E_resid_twin": e_twin, "window_lo_ns": window_lo_s * 1e9,
+                         "candidate_bearing_deg": float(base["candidate"].azimuth_deg)})
     pd.DataFrame(rows).to_parquet(out_dir / f"{run}_{slot:02d}.parquet", index=False)
     print(f"{run} {gid}: rows={len(rows)} computed={sum(r.get('status') == 'computed' for r in rows)}", flush=True)
 
@@ -271,7 +366,8 @@ def calibrate(cons_dir: Path, out: Path) -> None:
     c = cal[cal["status"] == "computed"]["C"].to_numpy(float)
     c_hi = float(np.quantile(c, 0.99))
     (out / "b2_threshold.json").write_text(json.dumps({
-        "label": "B13.2 pre-registered: 1% false rejection of genuine targets on the 12 calibration geometries, pooled sigma",
+        "label": "B14.5 (revised window) pre-registered: 1% genuine false rejection over the 12 calibration geometries, "
+                 "pooled sigma; 0.99 quantile of C under the twin-derived whole-gate-span window. Committed before eval.",
         "c_hi": c_hi, "n_calibration_target_records": int(len(c)),
         "realized_false_rejection": float((c > c_hi).mean())}, indent=2))
     print(json.dumps({"c_hi": c_hi, "n": len(c), "realized_fr": float((c > c_hi).mean())}, indent=1))
@@ -283,74 +379,65 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
 
     config = PilotConfig.load("configs/pilot.yaml")
     c_hi = json.loads((out / "b2_threshold.json").read_text())["c_hi"]
-    passive = pd.read_parquet(Path("docs/results/wpc_a12/c1_passive_rows.parquet"))
-    passive = passive[(passive["passive_status"] == "computed") & (passive["world"] == "target")
-                      & (passive["sigma_map_m"] == SIGMA)]
-    eps = float(config.get("phase6", "evidence", "epsilon_w"))
-    e_req = (passive.assign(E_req=np.maximum(passive["E_D"] - passive["N_D"], eps) * passive["r_pass"]
-                            + passive["N_pass"]).groupby(["run", "geometry_id"])["E_req"].mean().reset_index())
-    boot = Bootstrap(sorted(pd.read_csv(geometries_path)["geometry_id"]),
-                     int(config.get("phase8", "heldout", "bootstrap_draws")))
+    geom_ids = sorted(pd.read_csv(geometries_path)["geometry_id"]) if geometries_path.exists() else None
 
-    # B2 false rejection on genuine targets
+    # B2 false rejection on genuine targets (revised window). Runs present in cons_dir decide which levels to report.
+    cons_runs = sorted({p.name.rsplit("_", 1)[0] for p in cons_dir.glob("*_*.parquet")} - {"calibration"})
+    order = [r for r in ["heldout", *STANDOFFS] if r in cons_runs] + [r for r in cons_runs
+                                                                      if r not in ["heldout", *STANDOFFS]]
     b2 = []
-    for run in ["heldout", *STANDOFFS]:
+    for run in order:
         d = _load(cons_dir, f"{run}_*.parquet")
         d = d[d["status"] == "computed"].assign(reject=lambda f: f["C"] > c_hi)
+        gids = sorted(d["geometry_id"].unique())
+        boot = Bootstrap(geom_ids if (geom_ids and set(gids) <= set(geom_ids)) else gids,
+                         int(config.get("phase8", "heldout", "bootstrap_draws")))
         point, samples = boot.rate(d, "reject")
         b2.append({"run": run, "false_rejection": point, "ci95_lo": float(np.nanquantile(samples, 0.025)),
                    "ci95_hi": float(np.nanquantile(samples, 0.975)), "n_records": int(len(d)),
                    "n_rejected": int(d["reject"].sum())})
     pd.DataFrame(b2).to_csv(out / "b2_false_rejection.csv", index=False)
 
-    # B1 + B3
+    # Revised certificate (addendum). cp carries kappa_lb, twin_bearing_resid_w, the item-3 ghost flags
+    # (cons_ghost_in_survey_all = all shifted-interval ghosts inside the window; cons_ghost_out_direct_all = all
+    # outside the excluded direct AND reflector regions), and window_lo_ns.
+    eps_c_factor = 10 ** 0.3  # declared measurement/model margin epsilon_C = 3 dB
     cp = _load(couple_dir, "*.parquet")
-    cp = cp.merge(e_req, on=["run", "geometry_id"], how="left")
-    cp["kappa_E_req"] = cp["kappa"] * cp["E_req"]
-    cp["margin3db_factor"] = 10 ** 0.3
-    # Window check (external review): the forced LoS copy must be caught by the consistency statistic,
-    # i.e. its delay sits inside the surveillance window AND outside the direct gate (overlap == False).
-    survey_lo, survey_hi = (float(v) for v in config.get("phase6", "processing", "delay_search_ns"))
-    cp["los_in_survey"] = ((cp["los_copy_at_refl_center_ns"] >= survey_lo)
-                           & (cp["los_copy_at_refl_center_ns"] <= survey_hi))
-    certifiable = (~cp["overlap"]) & cp["los_in_survey"] & cp["kappa"].notna()
-    cp["certified_m0"] = certifiable & (cp["kappa_E_req"] > c_hi)
-    cp["certified_m3db"] = certifiable & (cp["kappa_E_req"] > c_hi * cp["margin3db_factor"])
-    # Conservative certificate (multi-route): every gate route's LoS ghost caught AND kappa_cons * E_req > c_hi.
-    cp["kappa_cons_E_req"] = cp["kappa_cons"] * cp["E_req"]
-    cons_ghosts_ok = cp["cons_ghost_in_survey_all"] & cp["cons_ghost_out_direct_all"]
-    cons_ok = cons_ghosts_ok & cp["kappa_cons"].notna()
-    cp["certified_cons_m0"] = cons_ok & (cp["kappa_cons_E_req"] > c_hi)
-    cp["certified_cons_m3db"] = cons_ok & (cp["kappa_cons_E_req"] > c_hi * cp["margin3db_factor"])
+    cp["kappa_lb_E_min"] = cp["kappa_lb"] * cp["E_min"]
+    cp["forced_minus_subtracted"] = cp["kappa_lb_E_min"] - cp["twin_bearing_resid_w"]
+    cp["c_hi_margin"] = c_hi * eps_c_factor
+    ghosts_ok = cp["cons_ghost_in_survey_all"] & cp["cons_ghost_out_direct_all"]
+    cp["certified_rev"] = ghosts_ok & cp["kappa_lb"].notna() & (cp["forced_minus_subtracted"] > cp["c_hi_margin"])
 
-    def _loss_reason(r) -> str:  # why an old-certified geometry loses the conservative certificate
-        if not r["certified_m0"] or r["certified_cons_m0"]:
+    def _loss_reason(r) -> str:  # why a geometry is NOT certified under the revised certificate
+        if r["certified_rev"]:
             return ""
         if not r["cons_ghost_in_survey_all"]:
             return "ghost_outside_window"
         if not r["cons_ghost_out_direct_all"]:
-            return "ghost_in_direct_gate"
+            return "ghost_in_excluded_gate"
         return "bound_too_weak"
 
     cp["cons_loss_reason"] = cp.apply(_loss_reason, axis=1)
     cp.to_csv(out / "b1_b3_per_geometry.csv", index=False)
     cp[cp["cons_loss_reason"] != ""][["run", "geometry_id", "cons_loss_reason", "n_gate_routes", "kappa_db",
-                                      "kappa_cons_db", "gate_route_ghosts"]].to_csv(
+                                      "kappa_lb_db", "window_lo_ns", "gate_route_ghosts"]].to_csv(
         out / "b3_conservative_losses.csv", index=False)
     cert = []
     for run, part in cp.groupby("run"):
-        n = len(part)
-        cert.append({"run": run, "n_geometries": n, "overlap_fraction": float(part["overlap"].mean()),
-                     "median_G_db": float(part["G_db"].median()), "median_kappa_db": float(part["kappa_db"].median()),
-                     "median_kappa_cons_db": float(part["kappa_cons_db"].median()),
-                     "certified_fraction_m0": float(part["certified_m0"].mean()),
-                     "certified_fraction_m3db": float(part["certified_m3db"].mean()),
-                     "n_certified_m0": int(part["certified_m0"].sum()),
-                     "certified_fraction_cons_m0": float(part["certified_cons_m0"].mean()),
-                     "certified_fraction_cons_m3db": float(part["certified_cons_m3db"].mean()),
-                     "n_certified_cons_m0": int(part["certified_cons_m0"].sum()),
-                     "n_window_failed": int(((~part["overlap"]) & (~part["los_in_survey"])).sum())})
-    cert_df = pd.DataFrame(cert).set_index("run").reindex(["heldout", *STANDOFFS]).reset_index()
+        cert.append({"run": run, "n_geometries": len(part),
+                     "median_kappa_db": float(part["kappa_db"].median()),
+                     "median_kappa_lb_db": float(part["kappa_lb_db"].median()),
+                     "median_window_lo_ns": float(part["window_lo_ns"].median()),
+                     "certified_fraction_rev": float(part["certified_rev"].mean()),
+                     "n_certified_rev": int(part["certified_rev"].sum()),
+                     "n_ghost_outside_window": int((part["cons_loss_reason"] == "ghost_outside_window").sum()),
+                     "n_ghost_in_excluded_gate": int((part["cons_loss_reason"] == "ghost_in_excluded_gate").sum()),
+                     "n_bound_too_weak": int((part["cons_loss_reason"] == "bound_too_weak").sum())})
+    cp_runs = list(cp["run"].unique())
+    cert_order = [r for r in ["heldout", *STANDOFFS] if r in cp_runs] + [r for r in cp_runs
+                                                                         if r not in ["heldout", *STANDOFFS]]
+    cert_df = pd.DataFrame(cert).set_index("run").reindex(cert_order).reset_index()
     cert_df.to_csv(out / "b3_certified_region.csv", index=False)
 
     # Prop. 3 assumption check: non-reciprocal-wall share of reflector-gate energy, median/max per level.
@@ -359,7 +446,7 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
     # the wall path and the others interfere destructively (the coherent total falls below a subset's energy).
     leak = _load(couple_dir.parent / "leak", "*.parquet")
     leak_rows = []
-    if not leak.empty:
+    if not leak.empty and set(leak["run"]) & set(cp_runs):  # skip for the fresh-set report (no matching leak)
         denom = leak["e_gate_wall_only_w"] + leak["e_gate_others_only_w"]
         leak["share_others_incoherent"] = np.where(denom > 0, leak["e_gate_others_only_w"] / denom, np.nan)
         leak.to_csv(out / "prop3_leakage_per_geometry.csv", index=False)
@@ -372,13 +459,18 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
                                   "median_share_coherent": float(sc.median()), "max_share_coherent": float(sc.max())})
         pd.DataFrame(leak_rows).to_csv(out / "prop3_leakage.csv", index=False)
     (out / "README.json").write_text(json.dumps({
-        "label": "Amendment 13 (defensive) pre-registered: B1 coupling, B2 consistency statistic, B3 certified region. No attacker code.",
-        "b1_b3_per_geometry.csv": "per geometry/level: G (dB), kappa (dB), delay offset, overlap, E_req, kappa*E_req, certified flags",
-        "b2_threshold.json": "B2 c_hi (0.99 quantile of C over calibration genuine targets); committed before eval",
-        "b2_false_rejection.csv": "B2 genuine-target false rejection on held-out (sigma 0.5) and each standoff level",
-        "b3_certified_region.csv": "certified fraction per level (margin 0 and 3 dB) vs overlap and median G",
+        "label": "Amendment 13 + revision addendum (defensive). Revised certificate: E_min attacker model, kappa_lb "
+                 "lower bound with bearing leakage, twin-derived whole-gate-span window, c_hi*10^(eps_C/10) margin. "
+                 "SCOPE: 2nd-order routes; ANY signal from the EVALUATED relay position (ray-traced); NOT a "
+                 "verifier-side certificate over unknown relay positions. No attacker code.",
+        "b1_b3_per_geometry.csv": "per geometry/level: kappa, kappa_lb, E_min, forced-minus-subtracted, item-3 ghost "
+                                  "flags, window_lo_ns, certified_rev, loss reason",
+        "b2_threshold.json": "revised c_hi (0.99 quantile of C over calibration genuine targets, revised window); committed before eval",
+        "b2_false_rejection.csv": "genuine-target false rejection, revised window, per level",
+        "b3_certified_region.csv": "revised certified fraction per level + loss-reason counts + median kappa_lb, window_lo",
+        "b3_conservative_losses.csv": "per-geometry loss reason (ghost_outside_window / ghost_in_excluded_gate / bound_too_weak)",
         "prop3_leakage.csv": "Prop.3 check: non-reciprocal-wall share of reflector-gate energy, median/max per level",
-        "c_hi": c_hi, "scripts": ["scripts/wpe_defensive.py"]}, indent=2))
+        "eps_C_db": 3.0, "c_hi": c_hi, "scripts": ["scripts/wpe_defensive.py"]}, indent=2))
     pd.set_option("display.width", 220)
     print(pd.DataFrame(b2).round(4).to_string())
     print(cert_df.round(4).to_string())
