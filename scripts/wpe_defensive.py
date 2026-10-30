@@ -492,6 +492,8 @@ def report(couple_dir: Path, cons_dir: Path, out: Path, geometries_path: Path) -
         "b2_threshold.json": "revised c_hi (0.99 quantile of C over calibration genuine targets, revised window); committed before eval",
         "b2_false_rejection.csv": "genuine-target false rejection, revised window, per level",
         "b3_certified_region.csv": "revised certified fraction per level + loss-reason counts + median kappa_lb, window_lo",
+        "b4_coverage.csv": "Amendment 15 (descriptive): frozen certificate certified fraction + direct-gate overlap "
+                           "margins over the bandwidth x sigma_map grid on held-out geometries (coverage_report mode)",
         "b3_conservative_losses.csv": "per-geometry loss reason (ghost_outside_window / ghost_in_excluded_gate / bound_too_weak)",
         "prop3_leakage.csv": "Prop.3 check: non-reciprocal-wall share of reflector-gate energy, median/max per level",
         "eps_C_db": 3.0, "c_hi": c_hi, "scripts": ["scripts/wpe_defensive.py"]}, indent=2))
