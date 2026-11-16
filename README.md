@@ -42,13 +42,6 @@ scripts/drun.sh python -m isac_verify stress     --config configs/pilot.yaml   #
 scripts/drun.sh python -m isac_verify report                                   # summaries
 ```
 
-Paper figures and tables are regenerated (CPU) from the committed summaries in
-`docs/results/`:
-
-```bash
-scripts/drun.sh python scripts/paper_figures_tables.py
-scripts/drun.sh python scripts/paper_wp_tables.py
-```
 
 ## Layout
 
